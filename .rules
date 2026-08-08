@@ -1,3 +1,18 @@
+# About this repository
+
+This is a **personal fork of Zed** (`zharinov-nikita/zed-experimental`), used to build experimental
+features for the owner's own use. Changes here are not intended for upstream contribution.
+
+- Assume every feature request is fork-local: no upstream issue links, no compatibility promises,
+  no deprecation cycles. Ship the experiment.
+- Keep fork-specific code isolated (new modules/crates, or clearly delimited blocks) so upstream
+  merges stay cheap. Avoid reformatting or refactoring upstream code you aren't changing.
+- When rebasing/merging upstream, prefer upstream's version on conflicts except inside
+  fork-specific code.
+- The Rust and GPUI guidelines below still apply — experimental does not mean sloppy.
+- "Pull request hygiene" and "Rules Hygiene" below describe the upstream Zed process; treat them
+  as optional here unless a change is actually being sent upstream.
+
 # Rust coding guidelines
 
 * Prioritize code correctness and clarity. Speed and efficiency are secondary priorities unless otherwise specified.
