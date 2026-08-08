@@ -9,7 +9,7 @@ description: Build, run, and manage local Zed instances on Windows - release-fas
 
 - **Fast build**: `cargo build --profile release-fast --package zed` → `target\release-fast\zed.exe`. The `release-fast` profile (root `Cargo.toml`) is optimized like release but links fast: `lto = false`, `codegen-units = 16`, `debug = "full"`. This is the sanctioned "doesn't lag, builds quickly" profile; `.zed/tasks.json` has a matching task.
 - **Never set a global `RUSTFLAGS` env var** — it replaces the required flags from `.cargo/config.toml` (`-C target-feature=+crt-static`, `--cfg windows_slim_errors`) and breaks the Windows build.
-- **sccache** is installed (user env: `RUSTC_WRAPPER=sccache`, `SCCACHE_CACHE_SIZE=40G`). It caches release-profile compilation across worktrees; the incremental dev profile bypasses it. In a fresh shell these come from user env; when scripting, set `$env:RUSTC_WRAPPER = 'sccache'` explicitly. `sccache --show-stats` to inspect.
+- **sccache** is installed (user env: `RUSTC_WRAPPER=sccache`, `SCCACHE_CACHE_SIZE=40G`). Measured reality: cross-worktree hit rate is only ~27% — workspace crates hash their absolute path into the compilation identity, so a new worktree's first build still takes ~35-40 min. sccache mainly helps re-builds after `cargo clean` in the same directory and registry deps. The incremental dev profile bypasses it entirely. In a fresh shell the vars come from user env; when scripting, set `$env:RUSTC_WRAPPER = 'sccache'` explicitly. `sccache --show-stats` to inspect.
 - **Release channel** is `dev` (`crates/zed/RELEASE_CHANNEL`). For Dev: auto-update is disabled and the Windows single-instance check is skipped entirely (`crates/zed/src/main.rs` ~line 359) — multiple local instances run concurrently out of the box. Do not change the channel: preview/stable builds re-enable the single-instance mutex (`Zed-Editor-<Channel>-Instance-Mutex`) and auto-update.
 - **Icon embedding**: the exe/taskbar icon is embedded at build time from `crates/zed/resources/windows/app-icon-dev.ico` by `crates/windows_resources/src/windows_resources.rs` (resource ID 1; channel unset → dev arm). The About window uses `include_bytes!` of `crates/zed/resources/app-icon-dev.png` (`crates/zed/src/zed.rs`, `about_window_icon`). No code changes needed to swap icons.
   - **Gotcha**: after replacing icon files, update the mtime of `crates/zed/build.rs` (`(Get-Item crates\zed\build.rs).LastWriteTime = Get-Date`) — its build script only emits `rerun-if-env-changed`, so cargo may not re-embed resources otherwise.
@@ -39,7 +39,7 @@ This creates `..\zed-<name>` plus data dir `%LOCALAPPDATA%\Zed-Local\<name>` wit
 cargo run --profile release-fast -- --user-data-dir "$env:LOCALAPPDATA\Zed-Local\<name>"
 ```
 
-First build of a new worktree is accelerated by sccache. Cleanup: `git worktree remove ..\zed-<name>` and delete the data dir.
+First build of a new worktree is a near-cold ~35-40 min (see sccache note above); afterwards incremental rebuilds in that worktree are fast. Cleanup: `git worktree remove --force ..\zed-<name>` and delete the data dir (`core.longpaths=true` is set in global git config — without it removal fails on the deep `target\` paths).
 
 ### Recolor the icon (e.g. a unique color per worktree)
 
