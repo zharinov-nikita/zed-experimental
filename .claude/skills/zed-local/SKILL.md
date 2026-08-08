@@ -45,10 +45,12 @@ First build of a new worktree is accelerated by sccache. Cleanup: `git worktree 
 
 Use `recolor.py` in this skill directory (needs Pillow, present in system Python). It hue-shifts the saturated blue preview icon; the white Z logo is unaffected. Then verify visually by Reading the output PNG.
 
+**Important**: build the `.ico` from the ORIGINAL Windows preview `.ico` (full-canvas design), NOT from the macOS-style PNGs — those have ~16% transparent margins and render undersized in the taskbar. Get the pristine source with `git show <upstream-commit>:crates/zed/resources/windows/app-icon-preview.ico > $env:TEMP\orig-preview.ico` (any upstream commit, e.g. `origin/main`).
+
 ```powershell
 python .claude/skills/zed-local/recolor.py recolor crates/zed/resources/app-icon-preview.png crates/zed/resources/app-icon-dev.png <shift>
 python .claude/skills/zed-local/recolor.py recolor crates/zed/resources/app-icon-preview@2x.png crates/zed/resources/app-icon-dev@2x.png <shift>
-python .claude/skills/zed-local/recolor.py ico crates/zed/resources/app-icon-dev@2x.png crates/zed/resources/windows/app-icon-dev.ico
+python .claude/skills/zed-local/recolor.py ico $env:TEMP\orig-preview.ico crates/zed/resources/windows/app-icon-dev.ico <shift>
 ```
 
 Shift is in 0–255 hue units. Source blue ≈ 220°; formula: `shift = round(((target_deg - 220) % 360) * 256 / 360)`.

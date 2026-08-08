@@ -2,13 +2,18 @@
 import sys
 from PIL import Image
 
-def recolor(src, dst, shift):
-    img = Image.open(src).convert("RGBA")
+def hue_shift(img, shift):
+    img = img.convert("RGBA")
     alpha = img.getchannel("A")
     h, s, v = img.convert("RGB").convert("HSV").split()
     h = h.point(lambda x: (x + shift) % 256)
     out = Image.merge("HSV", (h, s, v)).convert("RGB")
     out.putalpha(alpha)
+    return out
+
+
+def recolor(src, dst, shift):
+    out = hue_shift(Image.open(src), shift)
     out.save(dst)
     return out
 
@@ -19,9 +24,14 @@ if __name__ == "__main__":
         recolor(src, dst, shift)
         print(f"wrote {dst}")
     elif cmd == "ico":
-        src, dst = sys.argv[2], sys.argv[3]
-        img = Image.open(src).convert("RGBA")
-        img.save(
+        # Recolor the 256px layer of an existing Windows .ico (full-canvas
+        # design, unlike the macOS-style PNGs which have ~16% transparent
+        # margins and render undersized in the taskbar).
+        src, dst, shift = sys.argv[2], sys.argv[3], int(sys.argv[4])
+        img = Image.open(src)
+        img.size = (256, 256)
+        out = hue_shift(img, shift)
+        out.save(
             dst,
             format="ICO",
             bitmap_format="bmp",
