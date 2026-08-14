@@ -1,6 +1,6 @@
 # Локальная разработка Zed на Windows (личная шпаргалка)
 
-> Локальный файл, не для push. Подробности для Claude — в `.claude/skills/zed-local/SKILL.md`.
+> Подробности для Claude — в `.claude/skills/zed-local/SKILL.md`.
 
 ## Быстрая сборка (не лагает)
 
@@ -38,6 +38,6 @@ cargo run --profile release-fast -- --user-data-dir "$env:LOCALAPPDATA\Zed-Local
 
 Установлен, включён через пользовательские env (`RUSTC_WRAPPER=sccache`, `SCCACHE_CACHE_SIZE=40G`). Реально помогает при пересборке после `cargo clean` в той же директории и на зависимостях из registry; между worktree выигрыш скромный (~27%). Статистика: `sccache --show-stats`.
 
-## Локальные коммиты в main
+## Ветки и форк
 
-Иконки, `script/new-worktree.ps1`, skill и этот файл — локальные коммиты, **не пушить**. Для PR ветвиться от `origin/main` или исключать эти коммиты (cherry-pick/rebase).
+Это личный экспериментальный форк `zharinov-nikita/zed-experimental`; PR в оригинальный Zed не планируются. Иконки, `script/new-worktree.ps1`, skill и этот файл коммитятся в ветку `zed-experimental` и пушатся в форк. `main` — чистое зеркало апстрима, свои коммиты туда не добавлять.
