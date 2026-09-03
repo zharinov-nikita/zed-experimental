@@ -60,3 +60,7 @@ crates/docs_preprocessor/actions.json
 .nixos-test-history
 
 .local*
+
+
+# APM dependencies
+apm_modules/
