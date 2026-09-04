@@ -1,4 +1,5 @@
-//! Local: the Dictation Window shown over the agent composer.
+//! Local: the Dictation Window, a section the thread view renders directly
+//! above the agent composer for the duration of a Dictation Session.
 //!
 //! One window drives one Dictation Session: it records, shows the Live
 //! Transcript, runs post-processing, lets the user review the text and then
@@ -17,7 +18,7 @@ use editor::Editor;
 use futures::StreamExt as _;
 use gpui::{
     Animation, AnimationExt as _, App, Context, Entity, EventEmitter, FocusHandle, Focusable,
-    HighlightStyle, ScrollHandle, StyledText, Task, Window, pulsating_between,
+    HighlightStyle, Rems, ScrollHandle, StyledText, Task, Window, pulsating_between,
 };
 use language_model::{
     CompletionIntent, LanguageModel, LanguageModelId, LanguageModelProviderId,
@@ -25,6 +26,7 @@ use language_model::{
 };
 use settings::Settings as _;
 use std::sync::Arc;
+use theme_settings::ThemeSettings;
 use ui::{Callout, Divider, Indicator, KeyBinding, Severity, prelude::*};
 use workspace::Workspace;
 
@@ -667,7 +669,19 @@ impl DictationWindow {
         }
     }
 
-    fn render_body(&self, cx: &mut Context<Self>) -> AnyElement {
+    /// Both the live transcript and the review editor stop growing at this
+    /// many lines and scroll instead, so the height does not jump on stop.
+    const MAX_BODY_LINES: usize = 10;
+
+    /// The text size of an auto-height `Editor`; the live transcript uses
+    /// the same so recording and review share one line height.
+    const BODY_TEXT_SIZE: Rems = rems(0.875);
+
+    fn render_body(&self, window: &Window, cx: &mut Context<Self>) -> AnyElement {
+        let line_height_ratio = ThemeSettings::get_global(cx).buffer_line_height.value();
+        let max_body_height = Self::BODY_TEXT_SIZE.to_pixels(window.rem_size())
+            * line_height_ratio
+            * Self::MAX_BODY_LINES as f32;
         match &self.phase {
             Phase::Starting => div()
                 .px_2()
@@ -711,7 +725,9 @@ impl DictationWindow {
                     .id("dictation-live")
                     .px_2()
                     .py_1()
-                    .max_h(px(220.))
+                    .text_size(Self::BODY_TEXT_SIZE)
+                    .line_height(relative(line_height_ratio))
+                    .max_h(max_body_height)
                     .overflow_y_scroll()
                     .track_scroll(&self.scroll_handle)
                     .child(content)
@@ -748,13 +764,7 @@ impl DictationWindow {
                             .description(error),
                     )
                 })
-                .child(
-                    div()
-                        .px_2()
-                        .py_1()
-                        .max_h(px(240.))
-                        .child(self.review_editor.clone()),
-                )
+                .child(div().px_2().py_1().child(self.review_editor.clone()))
                 .into_any_element(),
             Phase::Failed(error) => Callout::new()
                 .severity(Severity::Error)
@@ -765,7 +775,8 @@ impl DictationWindow {
         }
     }
 
-    /// A footer control: looks like a muted label with its key, but is a real button.
+    /// A footer control: looks like a muted label with its key, but is a real
+    /// button. Keys are drawn smaller than usual so the footer stays one row.
     fn hint(
         label: &'static str,
         action: &dyn gpui::Action,
@@ -776,7 +787,9 @@ impl DictationWindow {
         Button::new(label, label)
             .style(ButtonStyle::Subtle)
             .color(Color::Muted)
-            .key_binding(KeyBinding::for_action_in(action, focus_handle, cx))
+            .key_binding(
+                KeyBinding::for_action_in(action, focus_handle, cx).size(rems_from_px(10.)),
+            )
             .on_click(on_click)
     }
 
@@ -828,31 +841,19 @@ impl DictationWindow {
                 cx.listener(|this, _, window, cx| this.cancel(&CancelDictation, window, cx)),
                 cx,
             )),
-            Phase::Recording { .. } => this
-                .child(Self::hint(
-                    "Accept",
-                    &ToggleDictation,
-                    &composer_focus,
-                    cx.listener(|this, _, window, cx| {
-                        this.toggle_dictation(&ToggleDictation, window, cx)
-                    }),
-                    cx,
-                ))
-                .child(Self::hint(
-                    "Review",
-                    &editor::actions::Cancel,
-                    &composer_focus,
-                    cx.listener(|this, _, window, cx| this.cancel(&CancelDictation, window, cx)),
-                    cx,
-                )),
+            Phase::Recording { .. } => this.child(Self::hint(
+                "Review",
+                &editor::actions::Cancel,
+                &composer_focus,
+                cx.listener(|this, _, window, cx| this.cancel(&CancelDictation, window, cx)),
+                cx,
+            )),
             Phase::Review => this
                 .child(Self::hint(
-                    "Resume",
-                    &ToggleDictation,
+                    "Accept",
+                    &AcceptDictation,
                     &review_focus,
-                    cx.listener(|this, _, window, cx| {
-                        this.toggle_dictation(&ToggleDictation, window, cx)
-                    }),
+                    cx.listener(|this, _, window, cx| this.accept(&AcceptDictation, window, cx)),
                     cx,
                 ))
                 .when(self.processed.is_some(), |this| {
@@ -866,13 +867,6 @@ impl DictationWindow {
                         cx,
                     ))
                 })
-                .child(Self::hint(
-                    "Accept",
-                    &AcceptDictation,
-                    &review_focus,
-                    cx.listener(|this, _, window, cx| this.accept(&AcceptDictation, window, cx)),
-                    cx,
-                ))
                 .child(Self::hint(
                     "Cancel",
                     &CancelDictation,
@@ -901,7 +895,8 @@ impl DictationWindow {
 }
 
 impl Render for DictationWindow {
-    fn render(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+    fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+        let colors = cx.theme().colors();
         v_flex()
             .key_context("DictationWindow")
             .track_focus(&self.focus_handle)
@@ -909,10 +904,13 @@ impl Render for DictationWindow {
             .on_action(cx.listener(Self::cancel))
             .on_action(cx.listener(Self::toggle_raw_text))
             .on_action(cx.listener(Self::toggle_dictation))
-            .w(px(420.))
-            .elevation_2(cx)
+            .w_full()
+            .rounded_sm()
+            .border_1()
+            .border_color(colors.border)
+            .bg(colors.surface_background)
             .py_1()
-            .child(self.render_body(cx))
+            .child(self.render_body(window, cx))
             .child(Divider::horizontal())
             .child(self.render_footer(cx))
     }

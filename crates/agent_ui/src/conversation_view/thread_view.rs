@@ -47,7 +47,7 @@ use ui::{
     SplitButtonStyle, Tab, ToggleState,
 };
 use util::markdown::{source_position_from_fragment, split_local_url_fragment};
-use workspace::{Item as _, OpenOptions, SERIALIZATION_THROTTLE_TIME};
+use workspace::{OpenOptions, SERIALIZATION_THROTTLE_TIME};
 
 use super::elicitation::{
     ElicitationCard, ElicitationCardHandlers, ElicitationFormState, should_render_elicitation,
@@ -4365,25 +4365,12 @@ impl ThreadView {
         let has_messages = self.list_state.item_count() > 0;
         let fills_container = !has_messages || editor_expanded;
 
-        let dictation_overlay = self.dictation_window.clone().map(|dictation_window| {
-            let position = self.dictation_window_position(cx);
-            gpui::deferred(
-                gpui::anchored()
-                    .position(position)
-                    .anchor(gpui::Anchor::BottomLeft)
-                    .snap_to_window_with_margin(px(8.))
-                    .child(dictation_window),
-            )
-            .with_priority(1)
-        });
-
         h_flex()
             .py_2()
             .bg(editor_bg_color)
             .justify_center()
             .on_action(cx.listener(Self::handle_message_editor_move_up))
             .on_action(cx.listener(Self::toggle_dictation))
-            .children(dictation_overlay)
             .map(|this| {
                 if has_messages {
                     this.on_action(cx.listener(Self::expand_message_editor))
@@ -4405,6 +4392,9 @@ impl ThreadView {
                     .flex_grow_0()
                     .justify_between()
                     .gap_2()
+                    // Local: the Dictation Window unfolds as a section above the
+                    // Composer, pushing it down, for the duration of a session.
+                    .children(self.dictation_window.clone())
                     .child(
                         v_flex()
                             .relative()
@@ -4593,18 +4583,6 @@ impl ThreadView {
         cx.notify();
     }
 
-    /// Bottom-left corner for the Dictation Window: just above the composer cursor.
-    fn dictation_window_position(&self, cx: &App) -> gpui::Point<Pixels> {
-        let editor = self.message_editor.read(cx).editor().read(cx);
-        if let Some(cursor) = editor.pixel_position_of_cursor(cx) {
-            return gpui::point(cursor.x - px(12.), cursor.y - px(14.));
-        }
-        editor
-            .last_bounds()
-            .map(|bounds| bounds.origin)
-            .unwrap_or_default()
-    }
-
     fn render_dictation_button(&self, cx: &mut Context<Self>) -> impl IntoElement {
         let recording = self
             .dictation_window
@@ -4621,18 +4599,24 @@ impl ThreadView {
                     this.icon_color(Color::Muted)
                 }
             })
-            .tooltip(move |_window, cx| {
-                Tooltip::for_action_in(
-                    if recording {
-                        "Stop Dictation"
-                    } else {
-                        "Dictate"
-                    },
-                    &crate::ToggleDictation,
-                    &focus_handle,
-                    cx,
-                )
-            })
+            // The footer of the Dictation Window shows only esc/enter/tab
+            // hints, so this tooltip is where the hotkey is documented.
+            .tooltip(Tooltip::element(move |_, cx| {
+                let hotkey =
+                    || KeyBinding::for_action_in(&crate::ToggleDictation, &focus_handle, cx);
+                let row = |label: &'static str, key: KeyBinding| {
+                    h_flex()
+                        .gap_4()
+                        .justify_between()
+                        .child(Label::new(label))
+                        .child(key)
+                };
+                v_flex()
+                    .gap_1()
+                    .child(row("Start / Stop dictation", hotkey()))
+                    .child(row("Resume selected block", hotkey()))
+                    .into_any_element()
+            }))
             .on_click(cx.listener(|this, _, window, cx| {
                 this.toggle_dictation(&crate::ToggleDictation, window, cx);
             }))
