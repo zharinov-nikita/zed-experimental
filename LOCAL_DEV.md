@@ -51,6 +51,10 @@ cargo run --profile release-fast -- --user-data-dir "$env:LOCALAPPDATA\Zed-Local
 - Сборка крейта `dictation` компилирует ggml/transcribe.cpp через cmake (первый раз ~4–7 мин). DLL (`transcribe.dll`,
   `ggml*.dll`) кладутся рядом с `zed.exe` скриптом сборки крейта `transcribe-cpp-sys`.
 - Проверка движка без UI: `cargo run --profile release-fast -p dictation --example transcribe_wav -- <model.bin> <backends_dir> <file.wav>`.
+- Интеграционные тесты цикла распознавания (`crates/dictation/tests/recognition_loop.rs`) гоняют записи Handy и
+  включаются только переменными окружения: `ZED_DICTATION_MODEL=<model.bin>`, `ZED_DICTATION_BACKENDS=<backends_dir>`,
+  `ZED_DICTATION_RECORDINGS=%APPDATA%\com.pais.handy\recordings`; затем `cargo test --profile release-fast -p dictation`.
+  Без переменных тесты выходят сразу.
 
 ## Ветки и форк
 

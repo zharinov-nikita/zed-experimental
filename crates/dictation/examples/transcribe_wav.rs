@@ -51,13 +51,21 @@ fn main() -> anyhow::Result<()> {
         let pcm = load_audio_file(&file)?;
         let audio_seconds = pcm.len() as f32 / dictation::ENGINE_SAMPLE_RATE as f32;
         let started = Instant::now();
-        let text = transcriber.transcribe(&pcm)?;
+        let segments = transcriber.segments(&pcm)?;
         let elapsed = started.elapsed().as_secs_f32();
         println!(
-            "\n== {} ({audio_seconds:.1}s audio, {elapsed:.2}s recognition, RTF {:.2})\n{text}",
+            "\n== {} ({audio_seconds:.1}s audio, {elapsed:.2}s recognition, RTF {:.2})",
             file.display(),
             elapsed / audio_seconds.max(0.01)
         );
+        for segment in segments {
+            println!(
+                "[{:6.2} - {:6.2}] {}",
+                segment.start.as_secs_f32(),
+                segment.end.as_secs_f32(),
+                segment.text
+            );
+        }
     }
     Ok(())
 }

@@ -6,12 +6,13 @@
 //! background task and receives `DictationEvent`s over a channel.
 
 use std::num::NonZero;
+use std::ops::Range;
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::mpsc;
 use std::sync::{Arc, Mutex, OnceLock};
 use std::thread::{self, JoinHandle};
-use std::time::{Duration, Instant};
+use std::time::Duration;
 
 use anyhow::{Context as _, Result, anyhow};
 use audio::RodioExt as _;
@@ -26,18 +27,23 @@ pub use cpal::DeviceId;
 /// Whisper models are trained on 16 kHz mono audio.
 pub const ENGINE_SAMPLE_RATE: u32 = 16_000;
 
-/// How often the live loop looks at new audio.
-const TICK: Duration = Duration::from_millis(400);
-/// A pause at least this long ends the current phrase.
-const SILENCE_TO_COMMIT: Duration = Duration::from_millis(700);
-/// Do not bother recognizing phrases shorter than this; Whisper hallucinates on them.
-const MIN_PHRASE: Duration = Duration::from_millis(900);
-/// New audio required before re-recognizing the pending phrase.
-const MIN_NEW_AUDIO_FOR_PENDING: Duration = Duration::from_millis(600);
-/// Whisper works on 30 s windows; commit long phrases before they hit it.
-const MAX_PHRASE: Duration = Duration::from_secs(24);
-/// RMS below this is treated as silence. Microphone input is normalized to [-1, 1].
-const SILENCE_RMS: f32 = 0.008;
+/// Whisper looks at 30 s of audio at a time; the buffer since the commit point never exceeds it.
+const WINDOW: Duration = Duration::from_secs(30);
+/// New audio required before the buffer is recognized again.
+const STEP: Duration = Duration::from_secs(1);
+/// A segment ending closer than this to the buffer end may still change and stays Pending Text.
+const SETTLE: Duration = Duration::from_secs(1);
+/// Whisper returns nothing for audio shorter than a second; shorter buffers are padded.
+const MIN_AUDIO: Duration = Duration::from_secs(1);
+/// How often the microphone source checks for new audio while waiting.
+const POLL: Duration = Duration::from_millis(50);
+/// Whisper places segment boundaries near pauses, not in them; the commit
+/// point is moved to the quietest spot this far around the boundary.
+const BOUNDARY_SEARCH: Duration = Duration::from_millis(250);
+/// Frame used to compare loudness when looking for the quietest spot.
+const BOUNDARY_FRAME: Duration = Duration::from_millis(20);
+/// How much of the Confirmed Text is handed to Whisper as context for the next buffer.
+const CONTEXT_CHARS: usize = 200;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct EngineConfig {
@@ -53,11 +59,20 @@ pub struct EngineConfig {
     pub threads: usize,
 }
 
+/// One recognized phrase with its position in the audio that was recognized.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Segment {
+    pub start: Duration,
+    pub end: Duration,
+    pub text: String,
+}
+
 /// A loaded model plus a decoding session. One recognizer serves one dictation at a time.
 pub struct Transcriber {
     model: Model,
     session: Session,
     run_options: RunOptions,
+    glossary_prompt: Option<String>,
 }
 
 impl Transcriber {
@@ -83,7 +98,7 @@ impl Transcriber {
             .session_with(&session_options)
             .context("creating recognition session")?;
 
-        let initial_prompt = if config.glossary.is_empty() {
+        let glossary_prompt = if config.glossary.is_empty() {
             None
         } else {
             Some(config.glossary.join(", "))
@@ -93,9 +108,9 @@ impl Transcriber {
         // filler on silence.
         let run_options = RunOptions {
             language: config.language.clone(),
-            timestamps: TimestampKind::None,
+            timestamps: TimestampKind::Segment,
             family: Some(RunExtension::Whisper(WhisperRunOptions {
-                initial_prompt,
+                initial_prompt: glossary_prompt.clone(),
                 condition_on_prev_tokens: Some(false),
                 temperature: Some(0.0),
                 temperature_inc: Some(0.0),
@@ -115,21 +130,67 @@ impl Transcriber {
             model,
             session,
             run_options,
+            glossary_prompt,
         })
     }
 
-    /// Recognizes 16 kHz mono PCM in `[-1, 1]` and returns trimmed text with
-    /// Whisper's well-known silence hallucinations removed.
+    /// Recognizes 16 kHz mono PCM in `[-1, 1]` and returns the text as one string.
     pub fn transcribe(&mut self, pcm: &[f32]) -> Result<String> {
-        let pcm = trim_silence(pcm);
-        if pcm.len() < seconds_to_samples(Duration::from_millis(300)) {
-            return Ok(String::new());
+        let segments = self.segments(pcm)?;
+        Ok(join_text(segments.iter().map(|segment| segment.text.as_str())))
+    }
+
+    /// Recognizes 16 kHz mono PCM in `[-1, 1]` and returns the phrases with
+    /// their timestamps relative to the start of `pcm`.
+    pub fn segments(&mut self, pcm: &[f32]) -> Result<Vec<Segment>> {
+        self.segments_after(pcm, "")
+    }
+
+    /// Like `segments`, with the text spoken right before `pcm` given to the
+    /// model as context, the way whisper.cpp's stream example carries the
+    /// previous iteration's tokens over. Short buffers cut out of a sentence
+    /// are decoded far more consistently with the sentence in front of them.
+    fn segments_after(&mut self, pcm: &[f32], preceding_text: &str) -> Result<Vec<Segment>> {
+        if pcm.is_empty() {
+            return Ok(Vec::new());
         }
+        let padded;
+        let pcm = if pcm.len() < duration_to_samples(MIN_AUDIO) {
+            padded = pad_with_silence(pcm, duration_to_samples(MIN_AUDIO));
+            padded.as_slice()
+        } else {
+            pcm
+        };
+        let context = tail_chars(preceding_text, CONTEXT_CHARS);
+        let with_context;
+        let run_options = if context.is_empty() {
+            &self.run_options
+        } else {
+            let mut options = self.run_options.clone();
+            let prompt = match &self.glossary_prompt {
+                Some(glossary) => format!("{glossary}\n{context}"),
+                None => context.to_string(),
+            };
+            if let Some(RunExtension::Whisper(whisper)) = &mut options.family {
+                whisper.initial_prompt = Some(prompt);
+            }
+            with_context = options;
+            &with_context
+        };
         let transcript = self
             .session
-            .run(pcm, &self.run_options)
+            .run(pcm, run_options)
             .context("recognition failed")?;
-        Ok(remove_hallucinations(&transcript.text))
+        Ok(transcript
+            .segments
+            .iter()
+            .map(|segment| Segment {
+                start: Duration::from_millis(segment.t0_ms.max(0) as u64),
+                end: Duration::from_millis(segment.t1_ms.max(0) as u64),
+                text: segment.text.trim().to_string(),
+            })
+            .filter(|segment| !segment.text.is_empty())
+            .collect())
     }
 
     pub fn backend(&self) -> String {
@@ -153,9 +214,22 @@ fn init_backends(dir: Option<&Path>) -> Result<()> {
         .map_err(|error| anyhow!("initializing speech backends: {error}"))
 }
 
+/// Where the live loop gets its 16 kHz mono samples from: the microphone or a
+/// pre-recorded buffer. Samples are addressed by their position since the
+/// start of the session and never go away while the source lives.
+trait AudioSource: Send {
+    /// Blocks until at least `wanted` samples are available, the source ends
+    /// or `stop` is raised. Returns `None` once no more audio will ever come.
+    fn wait_for(&mut self, wanted: usize, stop: &AtomicBool) -> Option<usize>;
+    /// Samples available so far.
+    fn len(&self) -> usize;
+    fn samples(&self, range: Range<usize>) -> Vec<f32>;
+}
+
 /// Captures the microphone on its own thread into a growing 16 kHz mono buffer.
 pub struct Recorder {
     stop: Arc<AtomicBool>,
+    ended: Arc<AtomicBool>,
     samples: Arc<Mutex<Vec<f32>>>,
     thread: Option<JoinHandle<()>>,
 }
@@ -163,6 +237,7 @@ pub struct Recorder {
 impl Recorder {
     pub fn start(device: Option<DeviceId>) -> Result<Self> {
         let stop = Arc::new(AtomicBool::new(false));
+        let ended = Arc::new(AtomicBool::new(false));
         let samples = Arc::new(Mutex::new(Vec::<f32>::with_capacity(
             ENGINE_SAMPLE_RATE as usize * 60,
         )));
@@ -171,6 +246,7 @@ impl Recorder {
             .name("DictationCapture".into())
             .spawn({
                 let stop = stop.clone();
+                let ended = ended.clone();
                 let samples = samples.clone();
                 move || {
                     // cpal streams must be created and polled on the same thread.
@@ -178,6 +254,7 @@ impl Recorder {
                         Ok(source) => source,
                         Err(error) => {
                             opened_tx.send(Err(error)).ok();
+                            ended.store(true, Ordering::Relaxed);
                             return;
                         }
                     };
@@ -205,6 +282,7 @@ impl Recorder {
                     if let Ok(mut samples) = samples.lock() {
                         samples.extend_from_slice(&chunk);
                     }
+                    ended.store(true, Ordering::Relaxed);
                 }
             })
             .context("spawning capture thread")?;
@@ -216,6 +294,7 @@ impl Recorder {
 
         Ok(Self {
             stop,
+            ended,
             samples,
             thread: Some(thread),
         })
@@ -228,15 +307,12 @@ impl Recorder {
     pub fn is_empty(&self) -> bool {
         self.len() == 0
     }
+}
 
-    pub fn samples_from(&self, start: usize) -> Vec<f32> {
-        self.samples
-            .lock()
-            .map(|samples| samples.get(start..).unwrap_or(&[]).to_vec())
-            .unwrap_or_default()
-    }
-
-    pub fn stop(mut self) {
+/// Releases the microphone before the recorder is gone, so the next session
+/// never finds the device still open.
+impl Drop for Recorder {
+    fn drop(&mut self) {
         self.stop.store(true, Ordering::Relaxed);
         if let Some(thread) = self.thread.take() {
             thread.join().ok();
@@ -244,9 +320,57 @@ impl Recorder {
     }
 }
 
-impl Drop for Recorder {
-    fn drop(&mut self) {
-        self.stop.store(true, Ordering::Relaxed);
+impl AudioSource for Recorder {
+    fn wait_for(&mut self, wanted: usize, stop: &AtomicBool) -> Option<usize> {
+        loop {
+            let available = self.len();
+            if available >= wanted || stop.load(Ordering::Relaxed) {
+                return Some(available);
+            }
+            if self.ended.load(Ordering::Relaxed) {
+                return None;
+            }
+            thread::sleep(POLL);
+        }
+    }
+
+    fn len(&self) -> usize {
+        Recorder::len(self)
+    }
+
+    fn samples(&self, range: Range<usize>) -> Vec<f32> {
+        self.samples
+            .lock()
+            .map(|samples| samples.get(range).unwrap_or(&[]).to_vec())
+            .unwrap_or_default()
+    }
+}
+
+/// A pre-recorded buffer revealed to the loop as fast as it asks for it.
+struct PcmSource {
+    samples: Vec<f32>,
+    revealed: usize,
+}
+
+impl AudioSource for PcmSource {
+    fn wait_for(&mut self, wanted: usize, stop: &AtomicBool) -> Option<usize> {
+        if stop.load(Ordering::Relaxed) {
+            return Some(self.revealed);
+        }
+        if wanted > self.samples.len() && self.revealed == self.samples.len() {
+            return None;
+        }
+        self.revealed = wanted.min(self.samples.len());
+        Some(self.revealed)
+    }
+
+    fn len(&self) -> usize {
+        self.revealed
+    }
+
+    fn samples(&self, range: Range<usize>) -> Vec<f32> {
+        let range = range.start.min(self.revealed)..range.end.min(self.revealed);
+        self.samples.get(range).unwrap_or(&[]).to_vec()
     }
 }
 
@@ -256,6 +380,7 @@ pub struct DictationUpdate {
     pub confirmed: String,
     /// Tail that may still be rewritten as more speech arrives.
     pub pending: String,
+    /// Audio captured so far.
     pub elapsed: Duration,
 }
 
@@ -265,28 +390,52 @@ pub enum DictationEvent {
     Error(String),
 }
 
-/// One dictation session: microphone → phrases → Confirmed/Pending text.
+/// One dictation session: audio source → segments → Confirmed/Pending text.
 pub struct LiveDictation {
     stop: Arc<AtomicBool>,
     worker: Option<JoinHandle<Result<(Transcriber, String)>>>,
 }
 
 impl LiveDictation {
-    /// Starts capturing. `confirmed_prefix` is used when resuming an existing
-    /// Dictation Block: it is kept verbatim and new phrases are appended.
+    /// Starts capturing the microphone. `confirmed_prefix` is used when
+    /// resuming an existing Dictation Block: it is kept verbatim and new
+    /// phrases are appended.
     pub fn start(
         transcriber: Transcriber,
         device: Option<DeviceId>,
         confirmed_prefix: String,
     ) -> Result<(Self, UnboundedReceiver<DictationEvent>)> {
         let recorder = Recorder::start(device)?;
+        Self::start_with_source(transcriber, Box::new(recorder), confirmed_prefix)
+    }
+
+    /// Runs the same loop over pre-recorded 16 kHz mono PCM instead of the
+    /// microphone, as fast as recognition allows. The event stream ends once
+    /// the buffer is exhausted; `finish` then returns the full text.
+    pub fn start_from_pcm(
+        transcriber: Transcriber,
+        pcm: Vec<f32>,
+        confirmed_prefix: String,
+    ) -> Result<(Self, UnboundedReceiver<DictationEvent>)> {
+        let source = PcmSource {
+            samples: pcm,
+            revealed: 0,
+        };
+        Self::start_with_source(transcriber, Box::new(source), confirmed_prefix)
+    }
+
+    fn start_with_source(
+        transcriber: Transcriber,
+        source: Box<dyn AudioSource>,
+        confirmed_prefix: String,
+    ) -> Result<(Self, UnboundedReceiver<DictationEvent>)> {
         let stop = Arc::new(AtomicBool::new(false));
         let (events_tx, events_rx) = unbounded();
         let worker = thread::Builder::new()
             .name("DictationLive".into())
             .spawn({
                 let stop = stop.clone();
-                move || live_loop(transcriber, recorder, confirmed_prefix, stop, events_tx)
+                move || live_loop(transcriber, source, confirmed_prefix, stop, events_tx)
             })
             .context("spawning dictation thread")?;
         Ok((
@@ -318,175 +467,181 @@ impl Drop for LiveDictation {
     }
 }
 
-fn seconds_to_samples(duration: Duration) -> usize {
+fn duration_to_samples(duration: Duration) -> usize {
     (duration.as_secs_f64() * ENGINE_SAMPLE_RATE as f64) as usize
 }
 
-fn rms(samples: &[f32]) -> f32 {
-    if samples.is_empty() {
-        return 0.0;
+fn samples_to_duration(samples: usize) -> Duration {
+    Duration::from_secs_f64(samples as f64 / ENGINE_SAMPLE_RATE as f64)
+}
+
+fn pad_with_silence(pcm: &[f32], length: usize) -> Vec<f32> {
+    let mut padded = pcm.to_vec();
+    padded.resize(length.max(pcm.len()), 0.0);
+    padded
+}
+
+/// The last `count` characters of `text`, starting at a word boundary.
+fn tail_chars(text: &str, count: usize) -> &str {
+    let text = text.trim();
+    let start = text
+        .char_indices()
+        .rev()
+        .nth(count.saturating_sub(1))
+        .map(|(index, _)| index)
+        .unwrap_or(0);
+    let tail = &text[start..];
+    match tail.find(char::is_whitespace) {
+        Some(space) if start > 0 => tail[space..].trim_start(),
+        _ => tail,
     }
-    let energy: f32 = samples.iter().map(|sample| sample * sample).sum();
-    (energy / samples.len() as f32).sqrt()
 }
 
-fn has_speech(samples: &[f32]) -> bool {
-    let window = seconds_to_samples(Duration::from_millis(100)).max(1);
-    samples
-        .chunks(window)
-        .any(|chunk| rms(chunk) > SILENCE_RMS * 2.0)
-}
-
-/// Keeps at most 200 ms of silence on each side of the speech.
-fn trim_silence(pcm: &[f32]) -> &[f32] {
-    let window = seconds_to_samples(Duration::from_millis(50)).max(1);
-    let margin = seconds_to_samples(Duration::from_millis(200));
-    let loud = |chunk: &[f32]| rms(chunk) > SILENCE_RMS;
-    let Some(first) = pcm.chunks(window).position(loud) else {
-        return &[];
-    };
-    let Some(last) = pcm.chunks(window).rposition(loud) else {
-        return &[];
-    };
-    let start = (first * window).saturating_sub(margin);
-    let end = ((last + 1) * window + margin).min(pcm.len());
-    &pcm[start..end]
-}
-
-/// Phrases Whisper produces on silence or noise instead of admitting there is
-/// no speech: subtitle credits, channel sign-offs and similar filler.
-const HALLUCINATIONS: &[&str] = &[
-    "продолжение следует",
-    "субтитр",
-    "реклама",
-    "спасибо за просмотр",
-    "подписывайтесь",
-    "подпишитесь",
-    "ставьте лайк",
-    "до новых встреч",
-    "редактор",
-    "корректор",
-    "thank you for watching",
-    "thanks for watching",
-    "subtitles by",
-    "please subscribe",
-];
-
-fn remove_hallucinations(text: &str) -> String {
-    let mut kept = Vec::new();
-    for sentence in split_sentences(text) {
-        let lowered = sentence.to_lowercase();
-        if HALLUCINATIONS.iter().any(|phrase| lowered.contains(phrase)) {
-            continue;
-        }
-        if !sentence.chars().any(char::is_alphanumeric) {
-            continue;
-        }
-        kept.push(sentence.trim().to_string());
+fn join_text<'a>(parts: impl IntoIterator<Item = &'a str>) -> String {
+    let mut text = String::new();
+    for part in parts {
+        append_text(&mut text, part);
     }
-    kept.join(" ")
+    text
 }
 
-/// Splits on sentence punctuation while keeping the punctuation attached.
-fn split_sentences(text: &str) -> Vec<String> {
-    let mut sentences = Vec::new();
-    let mut current = String::new();
-    for character in text.chars() {
-        current.push(character);
-        if matches!(character, '.' | '!' | '?' | '…') {
-            sentences.push(std::mem::take(&mut current));
-        }
+fn append_segments(text: &mut String, segments: &[Segment]) {
+    for segment in segments {
+        append_text(text, &segment.text);
     }
-    if !current.trim().is_empty() {
-        sentences.push(current);
-    }
-    sentences
 }
 
-fn append_phrase(confirmed: &mut String, phrase: &str) {
-    if phrase.is_empty() {
+fn append_text(text: &mut String, part: &str) {
+    let part = part.trim();
+    if part.is_empty() {
         return;
     }
-    if !confirmed.is_empty() && !confirmed.ends_with(char::is_whitespace) {
-        confirmed.push(' ');
+    if !text.is_empty() && !text.ends_with(char::is_whitespace) {
+        text.push(' ');
     }
-    confirmed.push_str(phrase);
+    text.push_str(part);
+}
+
+/// Picks the cut position for a segment boundary: the start of the quietest
+/// frame within `BOUNDARY_SEARCH` of `boundary`. Segment timestamps are
+/// approximate and often land on the first syllable of the next phrase;
+/// cutting there hands the next window a broken word to recognize.
+fn quietest_point(pcm: &[f32], boundary: usize) -> usize {
+    let radius = duration_to_samples(BOUNDARY_SEARCH);
+    let frame = duration_to_samples(BOUNDARY_FRAME).max(1);
+    let start = boundary.saturating_sub(radius);
+    let end = (boundary + radius).min(pcm.len());
+    if start >= end {
+        return boundary.min(pcm.len());
+    }
+    let energy = |samples: &[f32]| samples.iter().map(|sample| sample * sample).sum::<f32>();
+    pcm[start..end]
+        .chunks(frame)
+        .enumerate()
+        .filter(|(_, chunk)| chunk.len() == frame)
+        .map(|(index, chunk)| (index, energy(chunk)))
+        .min_by(|left, right| left.1.total_cmp(&right.1))
+        .map(|(index, _)| start + index * frame)
+        .unwrap_or(boundary.min(pcm.len()))
+}
+
+/// How many leading segments of a recognized buffer become Confirmed Text.
+///
+/// The last segment always stays pending: its end is where new speech is still
+/// arriving. Earlier segments are confirmed once they end at least `SETTLE`
+/// before the buffer end. When the buffer has reached the Whisper window the
+/// loop cannot wait any longer, so everything but the last segment is
+/// confirmed; a lone segment filling the whole window is confirmed too,
+/// otherwise the commit point could never move again.
+fn segments_to_confirm(segments: &[Segment], buffer: Duration, at_window: bool) -> usize {
+    let Some(candidates) = segments.len().checked_sub(1) else {
+        return 0;
+    };
+    if at_window {
+        return candidates.max(1);
+    }
+    segments[..candidates]
+        .iter()
+        .take_while(|segment| segment.end + SETTLE <= buffer)
+        .count()
 }
 
 fn live_loop(
     mut transcriber: Transcriber,
-    recorder: Recorder,
+    mut source: Box<dyn AudioSource>,
     mut confirmed: String,
     stop: Arc<AtomicBool>,
     events: UnboundedSender<DictationEvent>,
 ) -> Result<(Transcriber, String)> {
-    let started = Instant::now();
-    let mut phrase_start = 0usize;
-    let mut last_pending_len = 0usize;
+    let window = duration_to_samples(WINDOW);
+    let step = duration_to_samples(STEP);
+    let settle = duration_to_samples(SETTLE);
+    let mut commit_point = 0usize;
+    let mut recognized_up_to = 0usize;
     let mut pending = String::new();
-    let silence_samples = seconds_to_samples(SILENCE_TO_COMMIT);
-    let min_phrase = seconds_to_samples(MIN_PHRASE);
-    let min_new_audio = seconds_to_samples(MIN_NEW_AUDIO_FOR_PENDING);
-    let max_phrase = seconds_to_samples(MAX_PHRASE);
 
-    let send = |events: &UnboundedSender<DictationEvent>, confirmed: &str, pending: &str| {
+    let send = |confirmed: &str, pending: &str, captured: usize| {
         events
             .unbounded_send(DictationEvent::Update(DictationUpdate {
                 confirmed: confirmed.to_string(),
                 pending: pending.to_string(),
-                elapsed: started.elapsed(),
+                elapsed: samples_to_duration(captured),
             }))
             .ok();
     };
-    send(&events, &confirmed, &pending);
+    send(&confirmed, &pending, 0);
 
     while !stop.load(Ordering::Relaxed) {
-        thread::sleep(TICK);
-        let phrase = recorder.samples_from(phrase_start);
-        if phrase.len() < min_phrase {
+        let Some(available) = source.wait_for(recognized_up_to + step, &stop) else {
+            break;
+        };
+        if available < recognized_up_to + step {
             continue;
         }
-        let tail_is_silent = phrase.len() >= silence_samples
-            && rms(&phrase[phrase.len() - silence_samples..]) < SILENCE_RMS;
-        if !has_speech(&phrase) {
-            // Skip leading silence so it never counts against the phrase length.
-            if tail_is_silent {
-                phrase_start += phrase.len() - silence_samples;
-                last_pending_len = 0;
+        recognized_up_to = available;
+        let buffer_end = available.min(commit_point + window);
+        let at_window = available - commit_point >= window - settle;
+        let buffer = source.samples(commit_point..buffer_end);
+        let segments = match transcriber.segments_after(&buffer, &confirmed) {
+            Ok(segments) => segments,
+            Err(error) => {
+                events
+                    .unbounded_send(DictationEvent::Error(error.to_string()))
+                    .ok();
+                continue;
             }
-            continue;
+        };
+        let confirm = segments_to_confirm(&segments, samples_to_duration(buffer.len()), at_window);
+        let (confirmed_now, still_pending) = segments.split_at(confirm);
+        if let Some(last) = confirmed_now.last() {
+            append_segments(&mut confirmed, confirmed_now);
+            commit_point += quietest_point(&buffer, duration_to_samples(last.end));
+        } else if at_window && segments.is_empty() {
+            // A full window with nothing in it is silence; drop it so the
+            // loop keeps looking at fresh audio.
+            commit_point = buffer_end - settle;
         }
-
-        if tail_is_silent || phrase.len() >= max_phrase {
-            match transcriber.transcribe(&phrase) {
-                Ok(text) => append_phrase(&mut confirmed, &text),
-                Err(error) => {
-                    events
-                        .unbounded_send(DictationEvent::Error(error.to_string()))
-                        .ok();
-                }
-            }
-            phrase_start += phrase.len();
-            last_pending_len = 0;
-            pending.clear();
-            send(&events, &confirmed, &pending);
-        } else if phrase.len() >= last_pending_len + min_new_audio {
-            last_pending_len = phrase.len();
-            match transcriber.transcribe(&phrase) {
-                Ok(text) => pending = text,
-                Err(error) => log::warn!("dictation: pending recognition failed: {error}"),
-            }
-            send(&events, &confirmed, &pending);
-        }
+        pending = join_text(still_pending.iter().map(|segment| segment.text.as_str()));
+        send(&confirmed, &pending, available);
     }
 
-    let tail = recorder.samples_from(phrase_start);
-    recorder.stop();
-    if has_speech(&tail) && tail.len() >= seconds_to_samples(Duration::from_millis(300)) {
-        let text = transcriber.transcribe(&tail)?;
-        append_phrase(&mut confirmed, &text);
+    let tail = source.samples(commit_point..source.len());
+    let captured = source.len();
+    drop(source);
+    // Recognition may have fallen behind a slow backend, so the tail can be
+    // longer than one Whisper window.
+    for chunk in tail.chunks(window) {
+        match transcriber.segments_after(chunk, &confirmed) {
+            Ok(segments) => append_segments(&mut confirmed, &segments),
+            Err(error) => {
+                log::warn!("dictation: recognizing the tail failed: {error:#}");
+                events
+                    .unbounded_send(DictationEvent::Error(error.to_string()))
+                    .ok();
+            }
+        }
     }
-    send(&events, &confirmed, "");
+    send(&confirmed, "", captured);
     Ok((transcriber, confirmed))
 }
 
