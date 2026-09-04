@@ -55,6 +55,10 @@ cargo run --profile release-fast -- --user-data-dir "$env:LOCALAPPDATA\Zed-Local
   включаются только переменными окружения: `ZED_DICTATION_MODEL=<model.bin>`, `ZED_DICTATION_BACKENDS=<backends_dir>`,
   `ZED_DICTATION_RECORDINGS=%APPDATA%\com.pais.handy\recordings`; затем `cargo test --profile release-fast -p dictation`.
   Без переменных тесты выходят сразу.
+- Микрофон берётся из `audio.experimental.input_audio_device` (страница Audio в Settings); пустое или неизвестное
+  значение даёт устройство по умолчанию с предупреждением в логе.
+- `agent.dictation.save_last_recording: true` пишет WAV последней сессии (16 кГц mono) в `%TEMP%\zed-dictation-last-recording.wav`,
+  путь есть в логе (info). Файл читается примером `transcribe_wav` и годится как запись для интеграционных тестов.
 
 ## Ветки и форк
 

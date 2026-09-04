@@ -27,6 +27,10 @@ pub use cpal::DeviceId;
 /// Whisper models are trained on 16 kHz mono audio.
 pub const ENGINE_SAMPLE_RATE: u32 = 16_000;
 
+fn engine_sample_rate() -> NonZero<u32> {
+    NonZero::new(ENGINE_SAMPLE_RATE).expect("engine sample rate is a non-zero constant")
+}
+
 /// Whisper looks at 30 s of audio at a time; the buffer since the commit point never exceeds it.
 const WINDOW: Duration = Duration::from_secs(30);
 /// New audio required before the buffer is recognized again.
@@ -224,6 +228,9 @@ trait AudioSource: Send {
     /// Samples available so far.
     fn len(&self) -> usize;
     fn samples(&self, range: Range<usize>) -> Vec<f32>;
+    /// Stops capturing; after this `len` and `samples` see everything the
+    /// source ever produced.
+    fn stop(&mut self);
 }
 
 /// Captures the microphone on its own thread into a growing 16 kHz mono buffer.
@@ -258,11 +265,9 @@ impl Recorder {
                             return;
                         }
                     };
-                    let sample_rate = NonZero::new(ENGINE_SAMPLE_RATE)
-                        .expect("engine sample rate is a non-zero constant");
                     let mut source = source
                         .possibly_disconnected_channels_to_mono()
-                        .constant_samplerate(sample_rate);
+                        .constant_samplerate(engine_sample_rate());
                     opened_tx.send(Ok(())).ok();
 
                     let mut chunk = Vec::with_capacity(ENGINE_SAMPLE_RATE as usize / 50);
@@ -309,14 +314,21 @@ impl Recorder {
     }
 }
 
-/// Releases the microphone before the recorder is gone, so the next session
-/// never finds the device still open.
-impl Drop for Recorder {
-    fn drop(&mut self) {
+impl Recorder {
+    /// Stops the capture thread and waits for it to flush its last chunk.
+    fn stop_capture(&mut self) {
         self.stop.store(true, Ordering::Relaxed);
         if let Some(thread) = self.thread.take() {
             thread.join().ok();
         }
+    }
+}
+
+/// Releases the microphone before the recorder is gone, so the next session
+/// never finds the device still open.
+impl Drop for Recorder {
+    fn drop(&mut self) {
+        self.stop_capture();
     }
 }
 
@@ -343,6 +355,10 @@ impl AudioSource for Recorder {
             .lock()
             .map(|samples| samples.get(range).unwrap_or(&[]).to_vec())
             .unwrap_or_default()
+    }
+
+    fn stop(&mut self) {
+        self.stop_capture();
     }
 }
 
@@ -372,6 +388,8 @@ impl AudioSource for PcmSource {
         let range = range.start.min(self.revealed)..range.end.min(self.revealed);
         self.samples.get(range).unwrap_or(&[]).to_vec()
     }
+
+    fn stop(&mut self) {}
 }
 
 #[derive(Clone, Debug, Default, PartialEq)]
@@ -399,14 +417,21 @@ pub struct LiveDictation {
 impl LiveDictation {
     /// Starts capturing the microphone. `confirmed_prefix` is used when
     /// resuming an existing Dictation Block: it is kept verbatim and new
-    /// phrases are appended.
+    /// phrases are appended. With `save_recording_to` set, the whole session
+    /// is written there as a WAV once it ends (see [`last_recording_path`]).
     pub fn start(
         transcriber: Transcriber,
         device: Option<DeviceId>,
         confirmed_prefix: String,
+        save_recording_to: Option<PathBuf>,
     ) -> Result<(Self, UnboundedReceiver<DictationEvent>)> {
         let recorder = Recorder::start(device)?;
-        Self::start_with_source(transcriber, Box::new(recorder), confirmed_prefix)
+        Self::start_with_source(
+            transcriber,
+            Box::new(recorder),
+            confirmed_prefix,
+            save_recording_to,
+        )
     }
 
     /// Runs the same loop over pre-recorded 16 kHz mono PCM instead of the
@@ -421,13 +446,14 @@ impl LiveDictation {
             samples: pcm,
             revealed: 0,
         };
-        Self::start_with_source(transcriber, Box::new(source), confirmed_prefix)
+        Self::start_with_source(transcriber, Box::new(source), confirmed_prefix, None)
     }
 
     fn start_with_source(
         transcriber: Transcriber,
         source: Box<dyn AudioSource>,
         confirmed_prefix: String,
+        save_recording_to: Option<PathBuf>,
     ) -> Result<(Self, UnboundedReceiver<DictationEvent>)> {
         let stop = Arc::new(AtomicBool::new(false));
         let (events_tx, events_rx) = unbounded();
@@ -435,7 +461,16 @@ impl LiveDictation {
             .name("DictationLive".into())
             .spawn({
                 let stop = stop.clone();
-                move || live_loop(transcriber, source, confirmed_prefix, stop, events_tx)
+                move || {
+                    live_loop(
+                        transcriber,
+                        source,
+                        confirmed_prefix,
+                        save_recording_to,
+                        stop,
+                        events_tx,
+                    )
+                }
             })
             .context("spawning dictation thread")?;
         Ok((
@@ -570,6 +605,7 @@ fn live_loop(
     mut transcriber: Transcriber,
     mut source: Box<dyn AudioSource>,
     mut confirmed: String,
+    save_recording_to: Option<PathBuf>,
     stop: Arc<AtomicBool>,
     events: UnboundedSender<DictationEvent>,
 ) -> Result<(Transcriber, String)> {
@@ -625,9 +661,17 @@ fn live_loop(
         send(&confirmed, &pending, available);
     }
 
-    let tail = source.samples(commit_point..source.len());
-    let captured = source.len();
+    source.stop();
+    let session_pcm = source.samples(0..source.len());
+    let captured = session_pcm.len();
     drop(source);
+    if let Some(path) = save_recording_to {
+        match save_recording(&session_pcm, &path) {
+            Ok(()) => log::info!("dictation: saved last recording to {}", path.display()),
+            Err(error) => log::warn!("dictation: saving last recording failed: {error:#}"),
+        }
+    }
+    let tail = session_pcm.get(commit_point..).unwrap_or(&[]);
     // Recognition may have fallen behind a slow backend, so the tail can be
     // longer than one Whisper window.
     for chunk in tail.chunks(window) {
@@ -645,16 +689,64 @@ fn live_loop(
     Ok((transcriber, confirmed))
 }
 
+/// The single WAV the last Dictation Session is written to when
+/// `save_last_recording` is on; every session overwrites it.
+pub fn last_recording_path() -> PathBuf {
+    std::env::temp_dir().join("zed-dictation-last-recording.wav")
+}
+
+/// Writes 16 kHz mono PCM as a WAV that [`load_audio_file`] and the
+/// `transcribe_wav` example read back unchanged.
+pub fn save_recording(pcm: &[f32], path: &Path) -> Result<()> {
+    let source =
+        rodio::buffer::SamplesBuffer::new(rodio::nz!(1), engine_sample_rate(), pcm.to_vec());
+    rodio::wav_to_file(source, path).with_context(|| format!("writing {}", path.display()))
+}
+
 /// Decodes an audio file into 16 kHz mono PCM. Used by tools and tests.
 pub fn load_audio_file(path: &Path) -> Result<Vec<f32>> {
     let file = std::fs::File::open(path).with_context(|| format!("opening {}", path.display()))?;
     let decoder = rodio::Decoder::new(std::io::BufReader::new(file))
         .with_context(|| format!("decoding {}", path.display()))?;
-    let sample_rate =
-        NonZero::new(ENGINE_SAMPLE_RATE).expect("engine sample rate is a non-zero constant");
     let samples: Vec<f32> = decoder
         .possibly_disconnected_channels_to_mono()
-        .constant_samplerate(sample_rate)
+        .constant_samplerate(engine_sample_rate())
         .collect();
     Ok(samples)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn saved_recording_loads_back_as_engine_pcm() {
+        let pcm: Vec<f32> = (0..ENGINE_SAMPLE_RATE * 2)
+            .map(|index| ((index % 100) as f32 / 100.0 - 0.5) * 0.4)
+            .collect();
+        let path = std::env::temp_dir().join(format!(
+            "zed-dictation-test-{}.wav",
+            std::process::id()
+        ));
+
+        save_recording(&pcm, &path).expect("saving");
+        let loaded = load_audio_file(&path).expect("loading");
+        std::fs::remove_file(&path).expect("removing the test file");
+
+        assert_eq!(loaded.len(), pcm.len());
+        let max_error = loaded
+            .iter()
+            .zip(&pcm)
+            .map(|(left, right)| (left - right).abs())
+            .fold(0.0f32, f32::max);
+        assert!(max_error < 1e-6, "samples changed by up to {max_error}");
+    }
+
+    #[test]
+    fn last_recording_path_is_fixed_and_in_temp_dir() {
+        let path = last_recording_path();
+        assert_eq!(path, last_recording_path());
+        assert!(path.starts_with(std::env::temp_dir()));
+        assert_eq!(path.extension().and_then(|ext| ext.to_str()), Some("wav"));
+    }
 }

@@ -67,6 +67,21 @@ fn engine_config(settings: &DictationSettings) -> Result<EngineConfig> {
     })
 }
 
+/// The microphone from `audio.experimental.input_audio_device`, read at every
+/// session start so a change on the Audio page applies without a restart.
+/// `None` is the system default.
+#[cfg(feature = "audio")]
+fn input_audio_device(cx: &App) -> Option<dictation::DeviceId> {
+    audio::AudioSettings::get_global(cx)
+        .input_audio_device
+        .clone()
+}
+
+#[cfg(not(feature = "audio"))]
+fn input_audio_device(_cx: &App) -> Option<dictation::DeviceId> {
+    None
+}
+
 fn select_post_processing_model(
     settings: &DictationSettings,
     cx: &mut App,
@@ -303,11 +318,15 @@ impl DictationWindow {
         cx.emit(DictationWindowEvent::RecordingStarted);
 
         let prefix = self.prefix.clone();
+        let device = input_audio_device(cx);
+        let save_recording_to = settings
+            .save_last_recording
+            .then(dictation::last_recording_path);
         self._engine_task = Some(cx.spawn(async move |this, cx| {
             let started = cx
                 .background_spawn(async move {
                     let transcriber = acquire_engine(&config)?;
-                    LiveDictation::start(transcriber, None, prefix)
+                    LiveDictation::start(transcriber, device, prefix, save_recording_to)
                 })
                 .await;
             this.update(cx, |this, cx| match started {

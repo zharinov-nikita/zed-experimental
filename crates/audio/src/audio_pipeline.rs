@@ -123,14 +123,15 @@ pub fn open_input_stream(
         // if let Some(input_device) = default_host().device_by_id(id) {
         //     builder.device(input_device);
         // }
-        let mut found = None;
-        for input in rodio::microphone::available_inputs()? {
-            if input.clone().into_inner().id()? == id {
-                found = Some(builder.device(input));
-                break;
+        match find_input_device(&id) {
+            Some(input) => builder.device(input)?,
+            None => {
+                log::warn!(
+                    "Selected audio input device {id} not found, falling back to the default input"
+                );
+                builder.default_device()?
             }
         }
-        found.unwrap_or_else(|| builder.default_device())?
     } else {
         builder.default_device()?
     };
@@ -147,6 +148,29 @@ pub fn open_input_stream(
         .open_stream()?;
     log::info!("Opened microphone: {:?}", stream.config());
     Ok(stream)
+}
+
+/// Local: rodio's microphone builder only accepts devices from its own input
+/// list, so the configured id is matched against that list rather than
+/// resolved through `device_by_id`. Devices that fail to report an id are
+/// skipped and a listing failure counts as "not found" so the caller can fall
+/// back to the default input.
+fn find_input_device(id: &DeviceId) -> Option<rodio::microphone::Input> {
+    let inputs = match rodio::microphone::available_inputs() {
+        Ok(inputs) => inputs,
+        Err(error) => {
+            log::warn!("Could not list audio input devices: {error}");
+            return None;
+        }
+    };
+    inputs.into_iter().find(|input| {
+        input
+            .clone()
+            .into_inner()
+            .id()
+            .map(|input_id| &input_id == id)
+            .unwrap_or(false)
+    })
 }
 
 pub fn resolve_device(device_id: Option<&DeviceId>, input: bool) -> anyhow::Result<cpal::Device> {
