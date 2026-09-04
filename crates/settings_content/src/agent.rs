@@ -191,6 +191,161 @@ pub struct AutoCompactSettingsContent {
     pub threshold: Option<AutoCompactThreshold>,
 }
 
+/// Local: builds the dictation language enum so the code Whisper expects
+/// is written once, next to the English name shown in the settings UI.
+macro_rules! dictation_languages {
+    ($($(#[$attr:meta])* $variant:ident => $code:literal),* $(,)?) => {
+        /// Spoken language for voice dictation. Serialized as the code
+        /// Whisper expects; `auto` lets the model detect the language.
+        #[derive(
+            Clone,
+            Copy,
+            Debug,
+            Default,
+            PartialEq,
+            Eq,
+            Serialize,
+            Deserialize,
+            JsonSchema,
+            MergeFrom,
+            strum::VariantArray,
+            strum::VariantNames,
+        )]
+        pub enum DictationLanguage {
+            $(
+                $(#[$attr])*
+                #[serde(rename = $code)]
+                $variant,
+            )*
+        }
+
+        impl DictationLanguage {
+            /// The value as written in settings (`auto`, `en`, `ru`, ...).
+            pub fn code(self) -> &'static str {
+                match self {
+                    $(Self::$variant => $code,)*
+                }
+            }
+        }
+    };
+}
+
+dictation_languages! {
+    Auto => "auto",
+    Afrikaans => "af",
+    Albanian => "sq",
+    Amharic => "am",
+    Arabic => "ar",
+    Armenian => "hy",
+    Assamese => "as",
+    Azerbaijani => "az",
+    Bashkir => "ba",
+    Basque => "eu",
+    Belarusian => "be",
+    Bengali => "bn",
+    Bosnian => "bs",
+    Breton => "br",
+    Bulgarian => "bg",
+    Cantonese => "yue",
+    Catalan => "ca",
+    Chinese => "zh",
+    Croatian => "hr",
+    Czech => "cs",
+    Danish => "da",
+    Dutch => "nl",
+    #[default]
+    English => "en",
+    Estonian => "et",
+    Faroese => "fo",
+    Finnish => "fi",
+    French => "fr",
+    Galician => "gl",
+    Georgian => "ka",
+    German => "de",
+    Greek => "el",
+    Gujarati => "gu",
+    HaitianCreole => "ht",
+    Hausa => "ha",
+    Hawaiian => "haw",
+    Hebrew => "he",
+    Hindi => "hi",
+    Hungarian => "hu",
+    Icelandic => "is",
+    Indonesian => "id",
+    Italian => "it",
+    Japanese => "ja",
+    Javanese => "jw",
+    Kannada => "kn",
+    Kazakh => "kk",
+    Khmer => "km",
+    Korean => "ko",
+    Lao => "lo",
+    Latin => "la",
+    Latvian => "lv",
+    Lingala => "ln",
+    Lithuanian => "lt",
+    Luxembourgish => "lb",
+    Macedonian => "mk",
+    Malagasy => "mg",
+    Malay => "ms",
+    Malayalam => "ml",
+    Maltese => "mt",
+    Maori => "mi",
+    Marathi => "mr",
+    Mongolian => "mn",
+    Myanmar => "my",
+    Nepali => "ne",
+    Norwegian => "no",
+    Nynorsk => "nn",
+    Occitan => "oc",
+    Pashto => "ps",
+    Persian => "fa",
+    Polish => "pl",
+    Portuguese => "pt",
+    Punjabi => "pa",
+    Romanian => "ro",
+    Russian => "ru",
+    Sanskrit => "sa",
+    Serbian => "sr",
+    Shona => "sn",
+    Sindhi => "sd",
+    Sinhala => "si",
+    Slovak => "sk",
+    Slovenian => "sl",
+    Somali => "so",
+    Spanish => "es",
+    Sundanese => "su",
+    Swahili => "sw",
+    Swedish => "sv",
+    Tagalog => "tl",
+    Tajik => "tg",
+    Tamil => "ta",
+    Tatar => "tt",
+    Telugu => "te",
+    Thai => "th",
+    Tibetan => "bo",
+    Turkish => "tr",
+    Turkmen => "tk",
+    Ukrainian => "uk",
+    Urdu => "ur",
+    Uzbek => "uz",
+    Vietnamese => "vi",
+    Welsh => "cy",
+    Yiddish => "yi",
+    Yoruba => "yo",
+}
+
+impl DictationLanguage {
+    /// Language hint for the recognizer; `None` for `auto` so the model
+    /// detects the language itself.
+    pub fn whisper_code(self) -> Option<&'static str> {
+        match self {
+            Self::Auto => None,
+            other => Some(other.code()),
+        }
+    }
+}
+
 /// Local: voice dictation in the agent panel composer.
 #[with_fallible_options]
 #[derive(Clone, PartialEq, Serialize, Deserialize, JsonSchema, MergeFrom, Debug, Default)]
@@ -205,20 +360,30 @@ pub struct DictationSettingsContent {
     ///
     /// Default: null
     pub backends_dir: Option<String>,
-    /// ISO 639-1 code of the spoken language, e.g. `ru`. Null lets the
-    /// model detect the language.
+    /// Spoken language as the code Whisper expects (`en`, `ru`, ...), or
+    /// `auto` to let the model detect it.
     ///
-    /// Default: "ru"
-    pub language: Option<String>,
+    /// Default: "en"
+    pub language: Option<DictationLanguage>,
     /// Terms the recognizer should spell correctly (product names,
     /// commands, identifiers). Also given to post-processing.
     #[serde(default)]
     pub glossary: Vec<String>,
-    /// Keyboard shortcut hint is shown in the composer when there is no
-    /// microphone button. Purely cosmetic.
+    /// Play a sound when dictation starts and stops.
     ///
     /// Default: false
     pub sounds: Option<bool>,
+    /// Keep the Whisper model in memory after a dictation session ends, so
+    /// the next session starts instantly. Turn off to free VRAM after each
+    /// session.
+    ///
+    /// Default: true
+    pub keep_model_loaded: Option<bool>,
+    /// Save the audio of the last dictation session as a WAV file in the
+    /// temporary directory for diagnosing recognition problems.
+    ///
+    /// Default: false
+    pub save_last_recording: Option<bool>,
     pub post_processing: Option<DictationPostProcessingSettingsContent>,
 }
 

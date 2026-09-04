@@ -61,7 +61,7 @@ fn engine_config(settings: &DictationSettings) -> Result<EngineConfig> {
     Ok(EngineConfig {
         model_path,
         backends_dir: settings.backends_dir.clone(),
-        language: settings.language.clone(),
+        language: settings.language.whisper_code().map(str::to_owned),
         glossary: settings.glossary.clone(),
         threads: 0,
     })

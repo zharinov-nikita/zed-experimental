@@ -16,7 +16,7 @@ use project::DisableAiSettings;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use settings::{
-    DockPosition, DockSide, LanguageModelParameters, LanguageModelSelection,
+    DictationLanguage, DockPosition, DockSide, LanguageModelParameters, LanguageModelSelection,
     NotifyWhenAgentWaiting, PlaySoundWhenAgentDone, RegisterSetting, Settings, SettingsContent,
     SettingsStore, SidebarDockPosition, SidebarSide, ThinkingBlockDisplay, ToolPermissionMode,
     update_settings_file, update_settings_file_with_completion,
@@ -206,9 +206,11 @@ fn parse_auto_compact_threshold(raw: &str) -> anyhow::Result<AutoCompactThreshol
 pub struct DictationSettings {
     pub model_path: Option<std::path::PathBuf>,
     pub backends_dir: Option<std::path::PathBuf>,
-    pub language: Option<String>,
+    pub language: DictationLanguage,
     pub glossary: Vec<String>,
     pub sounds: bool,
+    pub keep_model_loaded: bool,
+    pub save_last_recording: bool,
     pub post_processing_enabled: bool,
     pub post_processing_model: Option<LanguageModelSelection>,
     pub post_processing_prompt: String,
@@ -781,11 +783,11 @@ impl Settings for AgentSettings {
                     .backends_dir
                     .filter(|path| !path.trim().is_empty())
                     .map(std::path::PathBuf::from),
-                language: dictation
-                    .language
-                    .filter(|language| !language.trim().is_empty()),
+                language: dictation.language.unwrap_or_default(),
                 glossary: dictation.glossary,
                 sounds: dictation.sounds.unwrap_or(false),
+                keep_model_loaded: dictation.keep_model_loaded.unwrap_or(true),
+                save_last_recording: dictation.save_last_recording.unwrap_or(false),
                 post_processing_enabled: post_processing.enabled.unwrap_or(true),
                 post_processing_model: post_processing.model,
                 post_processing_prompt: post_processing.prompt.unwrap_or_default(),
@@ -1144,6 +1146,108 @@ mod tests {
                 .terminal_init_command
                 .is_none()
         );
+    }
+
+    #[gpui::test]
+    fn test_dictation_settings_defaults_and_overrides(cx: &mut gpui::App) {
+        let store = SettingsStore::test(cx);
+        cx.set_global(store);
+        project::DisableAiSettings::register(cx);
+        AgentSettings::register(cx);
+
+        let dictation = AgentSettings::get_global(cx).dictation.clone();
+        assert_eq!(dictation.language, DictationLanguage::English);
+        assert!(dictation.keep_model_loaded);
+        assert!(!dictation.save_last_recording);
+        assert!(
+            dictation.post_processing_prompt.contains("${glossary}"),
+            "default prompt should mention the glossary placeholder"
+        );
+        assert!(
+            dictation.post_processing_prompt.contains("${output}"),
+            "default prompt should mention the output placeholder"
+        );
+
+        SettingsStore::update_global(cx, |store, cx| {
+            store
+                .set_user_settings(
+                    r#"{
+                        "agent": {
+                            "dictation": {
+                                "language": "ru",
+                                "keep_model_loaded": false,
+                                "save_last_recording": true
+                            }
+                        }
+                    }"#,
+                    cx,
+                )
+                .unwrap();
+        });
+        let dictation = AgentSettings::get_global(cx).dictation.clone();
+        assert_eq!(dictation.language, DictationLanguage::Russian);
+        assert_eq!(dictation.language.whisper_code(), Some("ru"));
+        assert!(!dictation.keep_model_loaded);
+        assert!(dictation.save_last_recording);
+
+        // An unknown language code is reported as a parse error, and the
+        // rest of the document still applies with the default language.
+        SettingsStore::update_global(cx, |store, cx| {
+            let result = store
+                .set_user_settings(
+                    r#"{ "agent": { "dictation": { "language": "klingon", "save_last_recording": true } } }"#,
+                    cx,
+                )
+                .result();
+            assert!(result.is_err(), "unknown language should be rejected");
+        });
+        let dictation = AgentSettings::get_global(cx).dictation.clone();
+        assert_eq!(dictation.language, DictationLanguage::English);
+        assert!(dictation.save_last_recording);
+    }
+
+    #[test]
+    fn test_dictation_language_round_trip() {
+        use strum::VariantArray as _;
+
+        for (language, code) in [
+            (DictationLanguage::Auto, "auto"),
+            (DictationLanguage::English, "en"),
+            (DictationLanguage::Russian, "ru"),
+            (DictationLanguage::Cantonese, "yue"),
+        ] {
+            let json = serde_json::to_string(&language).unwrap();
+            assert_eq!(json, format!("\"{code}\""));
+            assert_eq!(
+                serde_json::from_str::<DictationLanguage>(&json).unwrap(),
+                language
+            );
+        }
+        assert!(serde_json::from_str::<DictationLanguage>("\"klingon\"").is_err());
+
+        assert_eq!(DictationLanguage::Auto.whisper_code(), None);
+        assert_eq!(DictationLanguage::default(), DictationLanguage::English);
+
+        let codes: HashSet<&str> = DictationLanguage::VARIANTS
+            .iter()
+            .map(|language| language.code())
+            .collect();
+        assert_eq!(codes.len(), DictationLanguage::VARIANTS.len());
+        // whisper.cpp knows 99 languages plus Cantonese; `auto` is ours.
+        assert_eq!(DictationLanguage::VARIANTS.len(), 101);
+    }
+
+    #[test]
+    fn test_default_json_dictation_language_is_english() {
+        let default_json = include_str!("../../../assets/settings/default.json");
+        let value: serde_json_lenient::Value = serde_json_lenient::from_str(default_json).unwrap();
+        let dictation = value
+            .get("agent")
+            .and_then(|agent| agent.get("dictation"))
+            .expect("default.json should have 'agent.dictation'");
+        let language: DictationLanguage =
+            serde_json_lenient::from_value(dictation.get("language").unwrap().clone()).unwrap();
+        assert_eq!(language, DictationLanguage::English);
     }
 
     #[test]
