@@ -41,10 +41,17 @@ cargo run --profile release-fast -- --user-data-dir "$env:LOCALAPPDATA\Zed-Local
 ## Голосовая диктовка (фича форка)
 
 Код: крейт `crates/dictation` (движок transcribe.cpp + захват микрофона), `crates/agent_ui/src/dictation_window.rs`
-(окно над композером), Dictation Block = crease с `MentionUri::Dictation`. Решения и словарь: `prototypes/voice-dictation/DECISION.md`, `CONTEXT.md`.
+(секция над композером), Dictation Block = crease с `MentionUri::Dictation`. Решения и словарь: `prototypes/voice-dictation/DECISION.md`, `CONTEXT.md`.
 
 - Хоткей `ctrl-alt-space` в композере панели агента: старт, повторно — принять. `esc` во время записи — просмотр.
   В просмотре: `enter` принять, `esc` отменить, `tab` сырой/обработанный текст, `ctrl-alt-space` продолжить.
+  Dictation Window разворачивается секцией над композером на всю его ширину (тело до 10 строк, дальше прокрутка);
+  в подвале только короткие подсказки `esc`/`enter`/`tab`, хоткей старта, остановки и Resume показывает тултип
+  кнопки микрофона.
+- Настройки в окне Settings: AI → General → Dictation (поиск по «whisper», «microphone»). Подстраница правит
+  `agent.dictation` и `audio.experimental.input_audio_device` в `settings.json`; провайдер и модель Post-processing
+  пишутся парой в `agent.dictation.post_processing.model` (как `agent.default_model`), «Agent default model» удаляет
+  ключ; «Reset to default» у промпта удаляет `prompt`, и действует умолчание из `assets/settings/default.json`.
 - Нужны настройки `agent.dictation.model_path` и `backends_dir` (см. `prototypes/voice-dictation/PLAN.md`,
   там же готовый фрагмент для этой машины). Vulkan-бэкенд не собирается из исходников: `ggml-vulkan.dll`
   берётся из официального артефакта transcribe.cpp в `%LOCALAPPDATA%\zed-dictation\transcribe-native`.

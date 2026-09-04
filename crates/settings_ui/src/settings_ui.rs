@@ -590,6 +590,8 @@ fn init_renderers(cx: &mut App) {
         .add_basic_renderer::<settings::CursorShapeContent>(render_dropdown)
         .add_basic_renderer::<settings::EditPredictionPromptFormatContent>(render_dropdown)
         .add_basic_renderer::<settings::EditPredictionDataCollectionChoice>(render_dropdown)
+        // Local: voice dictation language.
+        .add_basic_renderer::<settings::DictationLanguage>(render_dropdown)
         .add_basic_renderer::<f32>(render_editable_number_field)
         .add_basic_renderer::<settings::AutoCompactThreshold>(render_text_field)
         .add_basic_renderer::<u32>(render_editable_number_field)

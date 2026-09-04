@@ -784,7 +784,7 @@ impl Settings for AgentSettings {
                     .filter(|path| !path.trim().is_empty())
                     .map(std::path::PathBuf::from),
                 language: dictation.language.unwrap_or_default(),
-                glossary: dictation.glossary,
+                glossary: dictation.glossary.unwrap_or_default(),
                 sounds: dictation.sounds.unwrap_or(false),
                 keep_model_loaded: dictation.keep_model_loaded.unwrap_or(true),
                 save_last_recording: dictation.save_last_recording.unwrap_or(false),
@@ -1204,6 +1204,45 @@ mod tests {
         let dictation = AgentSettings::get_global(cx).dictation.clone();
         assert_eq!(dictation.language, DictationLanguage::English);
         assert!(dictation.save_last_recording);
+    }
+
+    #[gpui::test]
+    fn test_dictation_glossary_defaults_survive_a_user_dictation_block(cx: &mut gpui::App) {
+        let store = SettingsStore::test(cx);
+        cx.set_global(store);
+        AgentSettings::register(cx);
+        let default_glossary = AgentSettings::get_global(cx).dictation.glossary.clone();
+        assert!(
+            default_glossary.contains(&"Rust".to_string()),
+            "default.json should ship a glossary"
+        );
+
+        SettingsStore::update_global(cx, |store, cx| {
+            store
+                .set_user_settings(
+                    r#"{ "agent": { "dictation": { "model_path": "model.bin" } } }"#,
+                    cx,
+                )
+                .unwrap();
+        });
+        assert_eq!(
+            AgentSettings::get_global(cx).dictation.glossary,
+            default_glossary,
+            "a user dictation block without `glossary` must keep the default terms"
+        );
+
+        SettingsStore::update_global(cx, |store, cx| {
+            store
+                .set_user_settings(
+                    r#"{ "agent": { "dictation": { "glossary": ["Zed"] } } }"#,
+                    cx,
+                )
+                .unwrap();
+        });
+        assert_eq!(
+            AgentSettings::get_global(cx).dictation.glossary,
+            vec!["Zed".to_string()]
+        );
     }
 
     #[test]

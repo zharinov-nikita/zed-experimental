@@ -367,8 +367,10 @@ pub struct DictationSettingsContent {
     pub language: Option<DictationLanguage>,
     /// Terms the recognizer should spell correctly (product names,
     /// commands, identifiers). Also given to post-processing.
-    #[serde(default)]
-    pub glossary: Vec<String>,
+    ///
+    /// Optional so that a user `dictation` block without this key keeps the
+    /// default list instead of replacing it with an empty one.
+    pub glossary: Option<Vec<String>>,
     /// Play a sound when dictation starts and stops.
     ///
     /// Default: false
