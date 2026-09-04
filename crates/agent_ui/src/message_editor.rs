@@ -207,8 +207,17 @@ pub struct MessageEditor {
     local_commands: SharedLocalCommands,
     agent_id: AgentId,
     thread_store: Option<Entity<ThreadStore>>,
+    /// Local: Dictation Blocks living in this composer, by block id.
+    dictation_blocks: std::collections::HashMap<String, DictationBlock>,
     _subscriptions: Vec<Subscription>,
     _parse_slash_command_task: Task<()>,
+}
+
+/// Local: one Dictation Block as stored behind its chip in the composer.
+struct DictationBlock {
+    text: String,
+    duration: std::time::Duration,
+    crease_id: CreaseId,
 }
 
 #[derive(Clone, Debug)]
@@ -609,6 +618,7 @@ impl MessageEditor {
             local_commands,
             agent_id,
             thread_store,
+            dictation_blocks: Default::default(),
             _subscriptions: subscriptions,
             _parse_slash_command_task: Task::ready(()),
         }
@@ -728,6 +738,137 @@ impl MessageEditor {
 
     pub(crate) fn editor(&self) -> &Entity<Editor> {
         &self.editor
+    }
+
+    /// Local: inserts a Dictation Block at the cursor and returns its id.
+    pub fn insert_dictation_block(
+        &mut self,
+        text: String,
+        duration: std::time::Duration,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) -> Option<String> {
+        let id = uuid::Uuid::new_v4().to_string();
+        self.insert_dictation_block_with_id(id.clone(), text, duration, window, cx)
+            .then_some(id)
+    }
+
+    fn insert_dictation_block_with_id(
+        &mut self,
+        id: String,
+        text: String,
+        duration: std::time::Duration,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) -> bool {
+        let word_count = text.split_whitespace().count() as u32;
+        let mention_uri = MentionUri::Dictation {
+            id: id.clone(),
+            duration_secs: duration.as_secs() as u32,
+            word_count,
+        };
+        let link_text = mention_uri.as_link().to_string();
+        let label: SharedString = mention_uri.name().into();
+        let icon_path = mention_uri.icon_path(cx);
+        let tooltip: SharedString = crate::dictation_window::block_tooltip(&text).into();
+        let workspace = self.workspace.clone();
+
+        let crease_id = self.editor.update(cx, |editor, cx| {
+            editor.insert(&format!("{link_text} "), window, cx);
+            let snapshot = editor.buffer().read(cx).snapshot(cx);
+            let cursor = editor
+                .selections
+                .newest_anchor()
+                .head()
+                .to_offset(&snapshot)
+                .0;
+            let end = cursor.checked_sub(1)?;
+            let start = end.checked_sub(link_text.len())?;
+            let range = snapshot.anchor_after(MultiBufferOffset(start))
+                ..snapshot.anchor_after(MultiBufferOffset(end));
+            let crease = crate::mention_set::crease_for_mention(
+                label,
+                icon_path,
+                Some(tooltip),
+                Some(mention_uri.clone()),
+                Some(workspace),
+                range,
+                cx.weak_entity(),
+            );
+            let ids = editor.insert_creases(vec![crease.clone()], cx);
+            editor.fold_creases(vec![crease], false, window, cx);
+            ids.first().copied()
+        });
+        let Some(crease_id) = crease_id else {
+            return false;
+        };
+
+        self.mention_set.update(cx, |mention_set, cx| {
+            mention_set.insert_mention(
+                crease_id,
+                mention_uri,
+                Task::ready(Ok(Mention::Text {
+                    content: text.clone(),
+                    tracked_buffers: Vec::new(),
+                }))
+                .shared(),
+                None,
+                cx,
+            );
+        });
+        self.dictation_blocks.insert(
+            id,
+            DictationBlock {
+                text,
+                duration,
+                crease_id,
+            },
+        );
+        cx.notify();
+        true
+    }
+
+    /// Local: text and duration of a Dictation Block in this composer.
+    pub fn dictation_block(&self, id: &str) -> Option<(String, std::time::Duration)> {
+        self.dictation_blocks
+            .get(id)
+            .map(|block| (block.text.clone(), block.duration))
+    }
+
+    /// Local: replaces a Dictation Block in place. If its chip was deleted
+    /// meanwhile, the new block goes to the cursor instead.
+    pub fn replace_dictation_block(
+        &mut self,
+        id: &str,
+        text: String,
+        duration: std::time::Duration,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        let Some(block) = self.dictation_blocks.remove(id) else {
+            self.insert_dictation_block(text, duration, window, cx);
+            return;
+        };
+        self.editor.update(cx, |editor, cx| {
+            let crease_snapshot = editor.display_map.read(cx).crease_snapshot();
+            let buffer_snapshot = editor.buffer().read(cx).snapshot(cx);
+            let range = crease_snapshot
+                .creases()
+                .find(|(crease_id, _)| *crease_id == block.crease_id)
+                .map(|(_, crease)| crease.range().to_offset(&buffer_snapshot));
+            let Some(range) = range else {
+                return;
+            };
+            editor.remove_creases([block.crease_id], cx);
+            editor.edit([(range.clone(), "")], cx);
+            editor.change_selections(Default::default(), window, cx, |selections| {
+                selections.select_ranges([range.start..range.start]);
+            });
+        });
+        self.mention_set.update(cx, |mention_set, cx| {
+            mention_set.remove_mention(&block.crease_id, cx);
+        });
+        self.insert_dictation_block_with_id(id.to_string(), text, duration, window, cx);
     }
 
     pub fn is_empty(&self, cx: &App) -> bool {

@@ -167,6 +167,7 @@ impl MentionSet {
             MentionUri::PastedImage { .. }
             | MentionUri::TerminalSelection { .. }
             | MentionUri::MergeConflict { .. }
+            | MentionUri::Dictation { .. }
             | MentionUri::Rule { .. } => {
                 Task::ready(Err(anyhow!("Unsupported mention URI type for paste")))
             }
@@ -351,6 +352,12 @@ impl MentionSet {
             MentionUri::Rule { .. } => {
                 debug_panic!("unexpected rule URI");
                 Task::ready(Err(anyhow!("unexpected rule URI")))
+            }
+            MentionUri::Dictation { .. } => {
+                debug_panic!(
+                    "dictation blocks are inserted by the dictation window, not completions"
+                );
+                Task::ready(Err(anyhow!("unexpected dictation URI")))
             }
         };
         let task = cx

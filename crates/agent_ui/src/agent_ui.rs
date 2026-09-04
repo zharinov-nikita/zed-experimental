@@ -11,6 +11,7 @@ mod context;
 mod context_server_configuration;
 pub(crate) mod conversation_view;
 mod diagnostics;
+mod dictation_window;
 pub mod draft_prompt_store;
 mod entry_view_state;
 mod external_source_prompt;
@@ -326,6 +327,14 @@ actions!(
         ImportThreadsFromOtherChannels,
         /// Starts a new terminal thread.
         NewTerminalThread,
+        /// Local: starts voice dictation, or accepts the current dictation into the composer.
+        ToggleDictation,
+        /// Local: accepts the reviewed dictation into the composer.
+        AcceptDictation,
+        /// Local: discards the current dictation.
+        CancelDictation,
+        /// Local: switches the dictation review between raw and post-processed text.
+        ToggleDictationRawText,
     ]
 );
 
@@ -972,8 +981,10 @@ mod tests {
             AllLanguageSettings::register(cx);
         });
 
+        let dictation = cx.update(|cx| AgentSettings::get_global(cx).dictation.clone());
         let agent_settings = AgentSettings {
             enabled: true,
+            dictation,
             button: true,
             dock: DockPosition::Right,
             flexible: true,

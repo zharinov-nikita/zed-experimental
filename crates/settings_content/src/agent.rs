@@ -191,6 +191,54 @@ pub struct AutoCompactSettingsContent {
     pub threshold: Option<AutoCompactThreshold>,
 }
 
+/// Local: voice dictation in the agent panel composer.
+#[with_fallible_options]
+#[derive(Clone, PartialEq, Serialize, Deserialize, JsonSchema, MergeFrom, Debug, Default)]
+pub struct DictationSettingsContent {
+    /// Path to the Whisper model file (ggml `.bin` or `.gguf`) used for
+    /// speech recognition. Dictation is unavailable until this is set.
+    ///
+    /// Default: null
+    pub model_path: Option<String>,
+    /// Directory with the ggml backend modules (`ggml-vulkan.dll` etc.).
+    /// When null, backends are looked up next to the speech library.
+    ///
+    /// Default: null
+    pub backends_dir: Option<String>,
+    /// ISO 639-1 code of the spoken language, e.g. `ru`. Null lets the
+    /// model detect the language.
+    ///
+    /// Default: "ru"
+    pub language: Option<String>,
+    /// Terms the recognizer should spell correctly (product names,
+    /// commands, identifiers). Also given to post-processing.
+    #[serde(default)]
+    pub glossary: Vec<String>,
+    /// Keyboard shortcut hint is shown in the composer when there is no
+    /// microphone button. Purely cosmetic.
+    ///
+    /// Default: false
+    pub sounds: Option<bool>,
+    pub post_processing: Option<DictationPostProcessingSettingsContent>,
+}
+
+/// Local: rewriting of the raw transcript by a language model.
+#[with_fallible_options]
+#[derive(Clone, PartialEq, Serialize, Deserialize, JsonSchema, MergeFrom, Debug, Default)]
+pub struct DictationPostProcessingSettingsContent {
+    /// Whether to run the transcript through a language model before it is
+    /// accepted into the composer.
+    ///
+    /// Default: true
+    pub enabled: Option<bool>,
+    /// Model used for post-processing. Falls back to the agent's default
+    /// model when not set.
+    pub model: Option<LanguageModelSelection>,
+    /// Prompt for post-processing. `${output}` is replaced with the raw
+    /// transcript and `${glossary}` with the comma-separated glossary.
+    pub prompt: Option<String>,
+}
+
 #[with_fallible_options]
 #[derive(Clone, PartialEq, Serialize, Deserialize, JsonSchema, MergeFrom, Debug, Default)]
 pub struct AgentSettingsContent {
@@ -198,6 +246,8 @@ pub struct AgentSettingsContent {
     ///
     /// Default: true
     pub enabled: Option<bool>,
+    /// Local: voice dictation in the composer.
+    pub dictation: Option<DictationSettingsContent>,
     /// Whether to show the agent panel button in the status bar.
     ///
     /// Default: true

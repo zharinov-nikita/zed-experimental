@@ -1,0 +1,573 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<title>PROTOTYPE — Голосовая диктовка в панели агента Zed</title>
+<!--
+  PROTOTYPE (throwaway). Четыре варианта РАСПОЛОЖЕНИЯ окна диктовки поверх макета панели агента Zed,
+  переключаются через ?variant=A|B|C|D. Состояния окна ?state=idle|recording|review|error имеют
+  один и тот же каркас во всех вариантах: текст сверху, одна строка снизу (таймер слева, подсказки
+  клавиш справа). ?mic=left|right|none — позиция кнопки-микрофона в тулбаре композера.
+
+  Ограничение: только нативные элементы Zed. Каждый CSS-класс ниже воспроизводит компонент крейта `ui`
+  (ButtonLike/IconButton, Label, KeyBinding, Indicator, Callout, Popover/elevation_2, Modal/elevation_3,
+  Section, Divider) с его размерами и цветами темы Ayu Dark. Иконки из assets/icons. Своих элементов нет.
+  Открывать двойным кликом. Шрифты берутся из ../../assets/fonts.
+-->
+<style>
+  @font-face { font-family: "IBM Plex Sans"; src: url("../../assets/fonts/ibm-plex-sans/IBMPlexSans-Regular.ttf"); font-weight: 400; }
+  @font-face { font-family: "IBM Plex Sans"; src: url("../../assets/fonts/ibm-plex-sans/IBMPlexSans-SemiBold.ttf"); font-weight: 600; }
+  @font-face { font-family: "Lilex"; src: url("../../assets/fonts/lilex/Lilex-Regular.ttf"); font-weight: 400; }
+
+  /* ===== Токены темы Ayu Dark (assets/themes/ayu/ayu.json) ===== */
+  :root {
+    --background: #313337; --surface: #1f2127; --elevated: #1f2127; --panel: #1f2127;
+    --editor-bg: #0d1016; --editor-fg: #bfbdb6;
+    --border: #3f4043; --border-variant: #2d2f34; --border-focused: #1b4a6e;
+    --text: #bfbdb6; --text-muted: #8a8986; --text-placeholder: #696a6a; --text-accent: #5ac1fe; --text-disabled: #696a6a;
+    --element-bg: #1f2127; --element-hover: #2d2f34; --element-active: #3e4043;
+    --ghost-hover: #2d2f34; --ghost-active: #3e4043;
+    --error: #ef7177; --error-bg: #48161b; --error-border: #66272d;
+    --warning: #feb454; --warning-bg: #572815; --warning-border: #754221;
+    --info: #5ac1fe; --info-bg: #0d2f4e; --info-border: #1b4a6e;
+    --predictive: #5a728b;
+    --kw: #ff8f3f; --fn: #ffb353; --cmt: #5c6773;
+    --selection: #5ac1fe3d;
+    --ui: "IBM Plex Sans", "Segoe UI", sans-serif;
+    --mono: "Lilex", "Cascadia Mono", monospace;
+  }
+  * { box-sizing: border-box; }
+  /* ui_font_size = 16 → 1rem = 16px; agent_ui_font_size = 16 */
+  html, body { margin: 0; height: 100%; background: #000; color: var(--text); font: 16px/1.5 var(--ui); overflow: hidden; }
+  button { font: inherit; color: inherit; background: none; border: 0; padding: 0; cursor: pointer; }
+  svg { display: block; flex: none; }
+  svg path { stroke: currentColor; }
+  svg path[fill] { fill: currentColor; }
+
+  /* ===== ui::Icon — IconSize: XSmall 12, Small 14 ===== */
+  .ic-xs svg { width: 12px; height: 12px; }
+  .ic-sm svg { width: 14px; height: 14px; }
+  .c-muted { color: var(--text-muted); } .c-accent { color: var(--text-accent); } .c-error { color: var(--error); }
+  .c-warning { color: var(--warning); } .c-placeholder { color: var(--text-placeholder); }
+
+  /* ===== ui::Label — Default 14, Small 12; line-height 1 ===== */
+  .lbl { font-size: 14px; line-height: 1; white-space: nowrap; }
+  .lbl-sm { font-size: 12px; line-height: 1; white-space: nowrap; }
+  .headline-sm { font-size: 16px; line-height: 1.6; }
+
+  /* ===== ui::ButtonLike — Default 22px, rounded_sm 2px, px 4, gap 4 ===== */
+  .btn { display: inline-flex; align-items: center; flex: none; height: 22px; padding: 0 4px; gap: 4px; border-radius: 2px; color: var(--text); font-size: 14px; line-height: 1; white-space: nowrap; }
+  .btn .inner { display: inline-flex; align-items: center; gap: 6px; }
+  .btn.subtle:hover { background: var(--ghost-hover); }
+  .btn.filled { background: var(--element-bg); }
+  .btn.filled:hover { background: rgba(31,33,39,.5); }
+  /* IconButton wide: высота 22, иконка Small 14 */
+  .ib { display: inline-flex; align-items: center; justify-content: center; flex: none; height: 22px; padding: 0 4px; border-radius: 2px; color: var(--text-muted); }
+  .ib.subtle:hover { background: var(--ghost-hover); }
+  .ib.filled { background: var(--element-bg); }
+  .ib.filled:hover { background: rgba(31,33,39,.5); }
+  .ib.tinted-error { background: var(--error-bg); border: 1px solid var(--error-border); color: var(--error); }
+
+  /* ===== ui::KeyBinding — без рамок, text_muted, 14px, Windows: одна строка "Ctrl-Shift-Space" ===== */
+  .kb { display: inline-flex; align-items: center; gap: 4px; padding: 2px 0; color: var(--text-muted); font-size: 14px; line-height: 1; white-space: nowrap; }
+  .kb-hint { display: inline-flex; align-items: center; gap: 4px; cursor: pointer; }
+  .kb-hint:hover .lbl { color: var(--text); }
+
+  /* ===== ui::Indicator::dot — 6px ===== */
+  .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--error); flex: none; }
+  .pulse { animation: pulsate 2s ease-in-out infinite; }
+  @keyframes pulsate { 0%,100% { opacity: .4; } 50% { opacity: .8; } }
+
+  /* ===== ui::Callout (Severity::Warning) ===== */
+  .callout { display: flex; align-items: flex-start; width: 100%; padding: 8px; gap: 8px; border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); background: rgba(87,40,21,.2); }
+  .callout .icon { height: 20px; display: flex; align-items: center; }
+  .callout .body { flex: 1; display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+  .callout .title-row { display: flex; align-items: center; justify-content: space-between; gap: 4px; flex-wrap: wrap; }
+  .callout .desc { font-size: 12px; color: var(--text-muted); line-height: 1.4; }
+
+  /* ===== ui::Popover / elevation_2 ===== */
+  .popover { background: var(--elevated); border: 1px solid var(--border-variant); border-radius: 8px; box-shadow: 0 2px 3px rgba(0,0,0,.12), 0 1px 0 rgba(0,0,0,.06); padding: 4px 0; }
+  /* ===== ui::Modal / elevation_3 ===== */
+  .modal { background: var(--elevated); border: 1px solid var(--border-variant); border-radius: 8px; box-shadow: 0 2px 3px rgba(0,0,0,.12), 0 3px 6px rgba(0,0,0,.08), 0 6px 12px rgba(0,0,0,.04), 0 1px 0 rgba(0,0,0,.12); display: flex; flex-direction: column; overflow: hidden; }
+  .modal-header { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 8px 12px 4px; }
+  .modal-footer { display: flex; align-items: center; justify-content: space-between; gap: 4px; padding: 8px; border-top: 1px solid var(--border-variant); }
+  /* ===== ui::Section ===== */
+  .section { border-radius: 2px; border: 1px solid var(--border); background: var(--surface); }
+  /* ===== ui::Divider ===== */
+  .divider { height: 1px; background: var(--border-variant); }
+  .h { display: flex; align-items: center; } .g2 { gap: 2px; } .g4 { gap: 4px; } .g8 { gap: 8px; } .g16 { gap: 16px; }
+  .grow { flex: 1; min-width: 0; }
+
+  /* ===== Макет окна Zed ===== */
+  .zed { position: absolute; inset: 0; display: grid; grid-template-rows: 34px 1fr 26px; background: var(--background); }
+  .titlebar { display: flex; align-items: center; gap: 12px; padding: 0 12px; font-size: 14px; color: var(--text-muted); border-bottom: 1px solid var(--border); }
+  .titlebar .proj { color: var(--text); }
+  .body-grid { display: grid; grid-template-columns: 200px 1fr 520px; min-height: 0; }
+  .project-panel { background: var(--panel); border-right: 1px solid var(--border); padding: 8px 0; font-size: 14px; }
+  .project-panel div { padding: 3px 14px; color: var(--text-muted); white-space: nowrap; }
+  .project-panel .open { color: var(--text); background: var(--element-active); }
+  .editor { display: grid; grid-template-rows: 32px 1fr; min-width: 0; }
+  .tabs { display: flex; background: var(--surface); border-bottom: 1px solid var(--border); font-size: 14px; }
+  .tab { padding: 0 14px; display: flex; align-items: center; border-right: 1px solid var(--border); color: var(--text-muted); }
+  .tab.active { background: var(--editor-bg); color: var(--text); }
+  pre.code { margin: 0; padding: 10px 0; background: var(--editor-bg); font: 15px/1.5 var(--mono); color: var(--editor-fg); overflow: hidden; }
+  pre.code .ln { display: inline-block; width: 52px; text-align: right; padding-right: 16px; color: #3f4043; user-select: none; }
+  .kw { color: var(--kw); } .fn { color: var(--fn); } .cmt { color: var(--cmt); }
+  .statusbar { display: flex; align-items: center; gap: 16px; padding: 0 12px; font-size: 13px; color: var(--text-muted); border-top: 1px solid var(--border); }
+
+  /* ===== Панель агента ===== */
+  .agent { position: relative; display: grid; grid-template-rows: 36px 1fr auto; background: var(--panel); border-left: 1px solid var(--border); min-height: 0; min-width: 0; overflow: hidden; }
+  .composer-wrap, .composer, .composer > .inner { min-width: 0; }
+  .agent-header { display: flex; align-items: center; gap: 8px; padding: 0 8px; border-bottom: 1px solid var(--border); font-size: 14px; }
+  .agent-header .title { flex: 1; color: var(--text); }
+  .thread { position: relative; overflow: hidden; padding: 12px 12px 8px; display: flex; flex-direction: column; gap: 14px; justify-content: flex-end; }
+  .msg-user { border: 1px solid var(--border); background: var(--editor-bg); border-radius: 6px; padding: 8px 10px; }
+  /* Правка отправленного сообщения (thread_view.rs render user message): рамка border_focused,
+     тулбар сверху справа: IconButton Close (error) + IconButton Return (muted), XSmall */
+  .msg-user.editing { position: relative; border-color: var(--border-focused); }
+  .msg-toolbar { position: absolute; top: -14px; right: 12px; display: flex; gap: 4px; border: 1px solid var(--border); background: var(--editor-bg); border-radius: 2px; overflow: hidden; }
+  .msg-toolbar .ib svg { width: 12px; height: 12px; }
+  .composer-text.empty > *:not(.expand) { display: none; }
+  .composer-text.empty::before { content: "Message the agent — @ to include context"; color: var(--text-placeholder); }
+  .msg-agent { padding: 0 4px; }
+  .msg-agent p { margin: 0 0 8px; }
+  code { font: 14px var(--mono); background: var(--element-hover); padding: 1px 4px; border-radius: 3px; }
+  .msg-agent ul { margin: 0 0 8px; padding-left: 20px; }
+  .msg-agent li { margin-bottom: 2px; }
+
+  /* композер: h_flex py-2 bg editor_background border-t; внутри v_flex px-2 gap-2 */
+  .composer-wrap { position: relative; }
+  .composer { position: relative; padding: 8px 0; background: var(--editor-bg); border-top: 1px solid var(--border); }
+  .composer > .inner { display: flex; flex-direction: column; gap: 8px; padding: 0 8px; }
+  /* AutoHeight: min 4 строки (message_editor_min_lines), max = min × 2 = 8 строк, дальше скролл */
+  .composer-text { position: relative; min-height: calc(4 * 1.5em + 4px); max-height: calc(8 * 1.5em + 4px); overflow-y: auto; overflow-x: hidden; padding: 4px 10px 0 2px; font: 16px/1.5 var(--ui); white-space: pre-wrap; word-break: break-word; }
+  .composer .expand { position: absolute; top: 0; right: 0; opacity: .5; }
+  .caret { display: inline-block; width: 2px; height: 1.2em; background: var(--text-accent); vertical-align: text-bottom; margin-left: 1px; animation: blink 1s steps(2) infinite; }
+  @keyframes blink { 50% { opacity: 0; } }
+  .crease { display: inline-flex; align-items: center; gap: 4px; height: 22px; padding: 0 4px; border: 1px solid var(--border-variant); border-radius: 2px; background: var(--element-bg); font: 14px var(--mono); vertical-align: middle; }
+  .footer { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; width: 100%; }
+  /* Dictation Block, вариант «чип»: тот же MentionCrease (ButtonLike outlined + icon + label), при наведении Tooltip с текстом */
+  .crease.dict { cursor: pointer; position: relative; }
+  .crease.dict:hover { border-color: var(--border); }
+  .tooltip { position: fixed; z-index: 60; width: 360px; padding: 4px 8px; background: var(--elevated); border: 1px solid var(--border-variant); border-radius: 8px; box-shadow: 0 2px 3px rgba(0,0,0,.12), 0 1px 0 rgba(0,0,0,.06); font: 14px/1.4 var(--ui); white-space: normal; color: var(--text); }
+  .tooltip .meta { font-size: 12px; color: var(--text-muted); margin-top: 4px; }
+  /* Dictation Block, вариант «блок»: Section + Disclosure */
+  .dblock { display: block; width: 100%; max-width: 100%; margin: 4px 0; border: 1px solid var(--border); border-radius: 2px; background: var(--surface); white-space: normal; }
+  .dblock .preview { display: block; max-width: 100%; }
+  .dblock .head { display: flex; align-items: center; gap: 4px; height: 26px; padding: 0 4px 0 8px; }
+  .dblock .head .lbl-sm { flex: 1; }
+  .dblock .text { padding: 0 8px 6px; }
+  .dblock.folded .text { display: none; }
+  .dblock .preview { padding: 0 8px 6px; color: var(--text-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .dblock:not(.folded) .preview { display: none; }
+  .ring { width: 16px; height: 16px; border-radius: 50%; border: 2px solid var(--text-muted); border-right-color: transparent; border-bottom-color: transparent; transform: rotate(-45deg); flex: none; }
+
+  /* ===== Окно диктовки: единый каркас для всех состояний ===== */
+  .dw { color: var(--text); font: 16px/1.5 var(--ui); }
+  .dw-body { padding: 4px 8px; overflow: auto; }
+  .dw-foot { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-height: 26px; padding: 0 8px; }
+  .dw-foot .g16 { flex-wrap: wrap; justify-content: flex-end; row-gap: 0; }
+  .live, .edit { white-space: pre-wrap; word-break: break-word; }
+  .pending { color: var(--predictive); }
+  .edit { outline: none; caret-color: var(--text-accent); }
+  .edit::selection { background: var(--selection); }
+
+  /* --- A: Popover у курсора --- */
+  .dwA { position: absolute; z-index: 5; width: 420px; }
+  .dwA.wide { width: 500px; }
+  .dwA .dw-body { max-height: 220px; }
+  .dwA .dw-body.rec { display: flex; flex-direction: column; justify-content: flex-end; overflow: hidden; }
+  /* --- B: на месте композера, стили самого композера --- */
+  .dwB { position: absolute; left: 0; right: 0; bottom: 0; z-index: 5; background: var(--editor-bg); border-top: 1px solid var(--border); padding: 8px 0; }
+  .dwB .dw-body { min-height: 96px; max-height: 240px; }
+  /* --- C: Section над композером --- */
+  .dwC { margin: 0 8px 8px; }
+  .dwC .dw-body { max-height: 160px; }
+  .dwC .dw-body.rec { max-height: 76px; display: flex; flex-direction: column; justify-content: flex-end; overflow: hidden; }
+  /* --- D: Modal по центру панели --- */
+  .backdrop { position: absolute; inset: 0; z-index: 4; background: rgba(13,16,22,.6); }
+  .dwD { position: absolute; z-index: 5; left: 50%; top: 50%; transform: translate(-50%,-50%); width: 480px; }
+  .dwD .dw-body { min-height: 96px; max-height: 240px; padding: 4px 12px 8px; }
+  .dwD .dw-foot { width: 100%; padding: 0 12px; }
+
+  /* ===== Плавающая панель прототипа (не часть дизайна) ===== */
+  .proto { position: fixed; left: 220px; top: 44px; z-index: 50; display: flex; flex-wrap: wrap; align-items: center; gap: 8px 10px; padding: 8px 12px; max-width: 820px; border-radius: 12px; background: #f4f4f4; color: #111; font: 13px var(--ui); box-shadow: 0 6px 24px rgba(0,0,0,.6); white-space: nowrap; }
+  .proto b { font-weight: 600; min-width: 220px; text-align: center; }
+  .proto button { padding: 3px 8px; border-radius: 6px; background: #e2e2e2; color: #111; font-size: 13px; }
+  .proto button:hover { background: #d0d0d0; }
+  .proto button.on { background: #111; color: #fff; }
+  .proto .group { display: flex; gap: 3px; align-items: center; }
+  .proto .group small { color: #666; margin-right: 2px; }
+  .proto .sep { width: 1px; height: 18px; background: #ccc; }
+</style>
+</head>
+<body>
+
+<div class="zed">
+  <div class="titlebar">
+    <span class="proj">zed-experimental</span><span>·</span><span>zed-experimental</span>
+    <span style="flex:1"></span><span>Zed Experimental</span>
+  </div>
+  <div class="body-grid">
+    <div class="project-panel">
+      <div>▾ crates</div><div>&nbsp;&nbsp;▸ acp_thread</div><div>&nbsp;&nbsp;▾ agent_ui</div><div>&nbsp;&nbsp;&nbsp;&nbsp;▾ src</div>
+      <div class="open">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;message_editor.rs</div><div>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;mention_set.rs</div><div>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;thread_view.rs</div>
+      <div>&nbsp;&nbsp;▸ audio</div><div>&nbsp;&nbsp;▸ editor</div><div>&nbsp;&nbsp;▸ gpui</div><div>▸ prototypes</div><div>&nbsp;&nbsp;CONTEXT.md</div>
+    </div>
+    <div class="editor">
+      <div class="tabs"><div class="tab active">message_editor.rs</div><div class="tab">mention_set.rs</div><div class="tab">CONTEXT.md</div></div>
+<pre class="code"><span class="ln">1880</span>
+<span class="ln">1881</span>    <span class="cmt">/// Inserts text at the cursor position in the message editor.</span>
+<span class="ln">1882</span>    <span class="kw">pub fn</span> <span class="fn">insert_text</span>(&amp;<span class="kw">mut self</span>, text: &amp;<span class="kw">str</span>, window: &amp;<span class="kw">mut</span> Window, cx: &amp;<span class="kw">mut</span> Context&lt;<span class="kw">Self</span>&gt;) {
+<span class="ln">1883</span>        <span class="kw">self</span>.editor.update(cx, |editor, cx| {
+<span class="ln">1884</span>            editor.insert(text, window, cx);
+<span class="ln">1885</span>        });
+<span class="ln">1886</span>    }
+<span class="ln">1887</span>
+<span class="ln">1888</span>    <span class="kw">pub fn</span> <span class="fn">set_cursor_offset</span>(&amp;<span class="kw">mut self</span>, offset: <span class="kw">usize</span>, window: &amp;<span class="kw">mut</span> Window, cx: &amp;<span class="kw">mut</span> Context&lt;<span class="kw">Self</span>&gt;) {
+<span class="ln">1889</span>        <span class="kw">self</span>.editor.update(cx, |editor, cx| {
+<span class="ln">1890</span>            editor.change_selections(<span class="kw">Default</span>::default(), window, cx, |selections| {
+<span class="ln">1891</span>                selections.select_ranges([offset..offset]);
+<span class="ln">1892</span>            });
+<span class="ln">1893</span>        });
+<span class="ln">1894</span>    }
+<span class="ln">1895</span>
+<span class="ln">1896</span>    <span class="kw">pub fn</span> <span class="fn">text</span>(&amp;<span class="kw">self</span>, cx: &amp;App) -&gt; String {
+<span class="ln">1897</span>        <span class="kw">self</span>.editor.read(cx).text(cx)
+<span class="ln">1898</span>    }
+<span class="ln">1899</span>
+<span class="ln">1900</span>    <span class="kw">pub fn</span> <span class="fn">send</span>(&amp;<span class="kw">mut self</span>, cx: &amp;<span class="kw">mut</span> Context&lt;<span class="kw">Self</span>&gt;) {
+<span class="ln">1901</span>        cx.emit(MessageEditorEvent::Send);
+<span class="ln">1902</span>    }
+<span class="ln">1903</span>
+<span class="ln">1904</span>    <span class="kw">pub fn</span> <span class="fn">clear</span>(&amp;<span class="kw">mut self</span>, window: &amp;<span class="kw">mut</span> Window, cx: &amp;<span class="kw">mut</span> Context&lt;<span class="kw">Self</span>&gt;) {
+<span class="ln">1905</span>        <span class="kw">self</span>.editor.update(cx, |editor, cx| editor.clear(window, cx));
+<span class="ln">1906</span>        <span class="kw">self</span>.mention_set.update(cx, |set, cx| set.clear(cx));
+<span class="ln">1907</span>    }
+</pre>
+    </div>
+
+    <!-- ===== Панель агента ===== -->
+    <div class="agent" id="agent">
+      <div class="agent-header" id="agentHeader"></div>
+      <div class="thread" id="thread">
+        <div class="msg-user">Посмотри, как <code>insert_text</code> в <code>MessageEditor</code> работает с undo. Если вставлять по слову, каждый вызов будет отдельной транзакцией?</div>
+        <div class="msg-agent">
+          <p>Да. <code>insert_text</code> вызывает <code>Editor::insert</code>, а тот открывает и закрывает транзакцию на каждый вызов. Если стримить транскрипт по слову, отмена будет откатывать по одному слову.</p>
+          <p>Есть два способа сделать один undo-шаг:</p>
+          <ul>
+            <li>Обернуть серию вставок в <code>editor.transact(window, cx, |editor, window, cx| { ... })</code>.</li>
+            <li>Не писать в композер во время записи вообще, а вставить весь текст одним вызовом при Commit.</li>
+          </ul>
+          <p>Второй вариант проще и совпадает с тем, что окно диктовки не трогает композер до Commit.</p>
+        </div>
+      </div>
+
+      <div class="composer-wrap" id="composerWrap">
+        <div class="composer">
+          <div class="inner">
+            <div class="composer-text" id="composerText"><span class="crease" id="creaseIcon"></span><span id="typed"> Тогда второй вариант. </span><span id="commitSlot"></span><span class="caret" id="caret"></span><span class="expand ib ic-sm" id="expandBtn"></span></div>
+            <div class="footer" id="footer"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="statusbar"><span>⎇ zed-experimental</span><span>0 ⚠ 0 ✕</span><span style="flex:1"></span><span>Rust</span><span>1884:32</span><span id="statusDict"></span></div>
+</div>
+
+<div class="proto" id="proto"></div>
+
+<script>
+// ----- Иконки Zed (assets/icons/*.svg, IconName) -----
+const I = {
+  mic: '<svg viewBox="0 0 16 16"><path d="M8 12.2028V14.3042" stroke-width="1.2" stroke-linecap="round"/><path d="M12.2027 6.94928V8.11672C12.2027 9.20041 11.7599 10.2397 10.9717 11.006C10.1836 11.7723 9.11457 12.2028 7.99992 12.2028C6.88527 12.2028 5.81627 11.7723 5.02809 11.006C4.23991 10.2397 3.79712 9.20041 3.79712 8.11672V6.94928" stroke-width="1.2" stroke-linecap="round"/><path d="M10.1015 3.63555C10.1015 2.56426 9.16065 1.6958 8.00008 1.6958C6.83951 1.6958 5.89868 2.56426 5.89868 3.63555V8.16165C5.89868 9.23294 6.83951 10.1014 8.00008 10.1014C9.16065 10.1014 10.1015 9.23294 10.1015 8.16165V3.63555Z" stroke-width="1.2"/></svg>',
+  send: '<svg viewBox="0 0 16 16"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.2" d="M3.377 3.028a.25.25 0 0 0-.292.045.291.291 0 0 0-.067.303l1.496 4.236c.088.25.088.526 0 .776l-1.496 4.236a.291.291 0 0 0 .067.303.25.25 0 0 0 .292.045l9.472-4.72a.267.267 0 0 0 .11-.103.288.288 0 0 0-.11-.4L3.377 3.028ZM5 8h8"/></svg>',
+  plus: '<svg viewBox="0 0 16 16"><path d="M3.33325 8H12.6666" stroke-width="1.2" stroke-linecap="round"/><path d="M8 3.33333V12.6667" stroke-width="1.2" stroke-linecap="round"/></svg>',
+  crosshair: '<svg viewBox="0 0 16 16"><path d="M8 14C11.3137 14 14 11.3137 14 8C14 4.6863 11.3137 2 8 2C4.6863 2 2 4.6863 2 8C2 11.3137 4.6863 14 8 14Z" stroke-width="1.2"/><path d="M14 8L11 8" stroke-width="1.2" stroke-linecap="round"/><path d="M5 8H2" stroke-width="1.2" stroke-linecap="round"/><path d="M8 5V2" stroke-width="1.2" stroke-linecap="round"/><path d="M8 14V11" stroke-width="1.2" stroke-linecap="round"/></svg>',
+  maximize: '<svg viewBox="0 0 16 16"><path d="M10 3H13V6" stroke-width="1.2" stroke-linecap="round"/><path d="M6 13H3V10" stroke-width="1.2" stroke-linecap="round"/><path d="M13 3L9.5 6.5" stroke-width="1.2" stroke-linecap="round"/><path d="M3 13L6.5 9.5" stroke-width="1.2" stroke-linecap="round"/></svg>',
+  warn: '<svg viewBox="0 0 16 16"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.2" d="M13.84 11.6 9.037 3.199a1.2 1.2 0 0 0-2.089 0l-4.802 8.403a1.2 1.2 0 0 0 1.05 1.8h9.604a1.201 1.201 0 0 0 1.038-1.8ZM8 6v2.667M8 11.333h.007"/></svg>',
+  rotate: '<svg viewBox="0 0 16 16"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.2" d="m13 5.778-1.256-1.256A5.416 5.416 0 0 0 8 3a5 5 0 1 0 4.583 7"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.2" d="M13 3v3h-3"/></svg>',
+  chev: '<svg viewBox="0 0 16 16"><path d="M4.15186 6.47321L7.99258 10.1696L11.8483 6.47321" stroke-width="1.2" stroke-linecap="round"/></svg>',
+  chevUp: '<svg viewBox="0 0 16 16"><path d="M4.15186 9.52679L7.99258 5.8304L11.8483 9.52679" stroke-width="1.2" stroke-linecap="round"/></svg>',
+  ret: '<svg viewBox="0 0 16 16"><path d="M6.00008 6.66669L2.66675 10L6.00008 13.3334" stroke-width="1.2" stroke-linecap="round"/><path d="M13.3334 2.66669V7.33335C13.3334 8.0406 13.0525 8.71888 12.5524 9.21897C12.0523 9.71907 11.374 10 10.6667 10H2.66675" stroke-width="1.2" stroke-linecap="round"/></svg>',
+  close: '<svg viewBox="0 0 16 16"><path d="M4.70581 4.5L11.294 11.5M11.294 4.5L4.70581 11.5" stroke-width="1.2" stroke-linecap="round"/></svg>',
+  pencil: '<svg viewBox="0 0 16 16"><path d="M12.5871 5.40582C12.8514 5.14152 13 4.78304 13 4.40922C13 4.03541 12.8516 3.67688 12.5873 3.41252C12.323 3.14816 11.9645 2.99962 11.5907 2.99957C11.2169 2.99953 10.8584 3.14798 10.594 3.41227L3.92098 10.0869C3.80488 10.2027 3.71903 10.3452 3.67097 10.5019L3.01047 12.678C2.99754 12.7212 2.99657 12.7672 3.00764 12.8109C3.01872 12.8547 3.04143 12.8946 3.07337 12.9265C3.1053 12.9584 3.14528 12.981 3.18905 12.992C3.23282 13.003 3.27875 13.002 3.32197 12.989L5.49849 12.329C5.65508 12.2813 5.79758 12.196 5.91349 12.0805L12.5871 5.40582Z" stroke-width="1.2"/><path d="M9 5L11 7" stroke-width="1.2" stroke-linecap="round"/></svg>',
+  sparkle: '<svg viewBox="0 0 16 16"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.2" d="M6.762 10.1a1.2 1.2 0 0 0-.862-.862l-3.68-.95a.3.3 0 0 1 0-.577l3.68-.95a1.2 1.2 0 0 0 .862-.86l.95-3.682a.3.3 0 0 1 .577 0L9.238 5.9a1.2 1.2 0 0 0 .862.862l3.68.949a.3.3 0 0 1 0 .578l-3.68.949a1.2 1.2 0 0 0-.862.862l-.95 3.68a.3.3 0 0 1-.577 0l-.949-3.68Z"/></svg>',
+  zed: '<svg viewBox="0 0 16 16"><path d="M8 2.93652L6.9243 6.20697C6.86924 6.37435 6.77565 6.52646 6.65105 6.65105C6.52646 6.77565 6.37435 6.86924 6.20697 6.9243L2.93652 8L6.20697 9.0757C6.37435 9.13076 6.52646 9.22435 6.65105 9.34895C6.77565 9.47354 6.86924 9.62565 6.9243 9.79306L8 13.0635L9.0757 9.79306C9.13076 9.62565 9.22435 9.47354 9.34895 9.34895C9.47354 9.22435 9.62565 9.13076 9.79306 9.0757L13.0635 8L9.79306 6.9243C9.62565 6.86924 9.47354 6.77565 9.34895 6.65105C9.22435 6.52646 9.13076 6.37435 9.0757 6.20697L8 2.93652Z" stroke-width="1.2"/></svg>',
+};
+const icon = (name, size, color) => `<span class="${size} ${color || ''}">${I[name]}</span>`;
+
+// ----- Данные диктовки -----
+// Пары [черновик, окончательный вариант]: словарь-подсказка исправляет термин при подтверждении.
+const WORDS = [
+  ['посмотри'],['на'],['мессадж','MessageEditor'],['эдитор',''],['в'],['крейте'],['эйджент','agent_ui'],['юай',''],
+  ['мне'],['нужно'],['чтобы'],['при'],['вставке'],['текста'],['через'],['инсерт','insert_text'],['текст',''],
+  ['не'],['создавалась'],['э'],['отдельная'],['транзакция'],['на'],['каждое'],['слово'],
+  ['сделай'],['так'],['чтобы'],['весь'],['коммит','Commit'],['из'],['окна'],['диктовки'],['был'],['ну'],['одним'],['андо','undo'],['шагом'],
+  ['и'],['добавь'],['тест'],['в'],['мессадж','message_editor.rs'],['эдитор',''],['рс',''],
+  ['и'],['ещё'],['проверь'],['что'],['гит','git push'],['пуш',''],['не'],['ломает'],['си','CI'],['ай',''],
+];
+const RAW = 'посмотри на MessageEditor в крейте agent_ui мне нужно чтобы при вставке текста через insert_text не создавалась э отдельная транзакция на каждое слово сделай так чтобы весь Commit из окна диктовки был ну одним undo шагом и добавь тест в message_editor.rs и ещё проверь что git push не ломает CI';
+const PROCESSED = 'Посмотри на `MessageEditor` в крейте `agent_ui`. Мне нужно, чтобы при вставке текста через `insert_text` не создавалась отдельная транзакция на каждое слово. Сделай так, чтобы весь Commit из окна диктовки был одним undo-шагом, и добавь тест в `message_editor.rs`. И ещё проверь, что `git push` не ломает CI.';
+
+// Длинная диктовка: та же фраза ×4 (~220 слов), для просмотра абзацы через пустую строку
+const WORDS_LONG = [].concat(WORDS, WORDS, WORDS, WORDS);
+const RAW_LONG = [RAW, RAW, RAW, RAW].join(' ');
+const PROCESSED_LONG = [PROCESSED, PROCESSED, PROCESSED, PROCESSED].join('\n\n');
+const LENGTHS = { short: 'короткий', long: 'длинный' };
+// Как Dictation Block выглядит в композере и в истории: свободный текст, чип-crease, блок-Section
+const ENTITIES = { text: 'текст', chip: 'чип', block: 'блок' };
+const OPENS = { no: 'свёрнут', yes: 'раскрыт' };
+
+const VARIANTS = { A: 'Popover у курсора', B: 'На месте композера', C: 'Section над композером', D: 'Modal по центру панели' };
+const STATES = { idle: 'Покой', recording: 'Запись', review: 'Просмотр', resumed: 'Продолжение блока', error: 'Ошибка постобработки', committed: 'После Enter', sent: 'В чате, правка' };
+const WINDOW_STATES = ['recording', 'review', 'error'];
+const MICS = { left: 'слева, у «+»', right: 'справа, у Send', none: 'нет, только хоткей' };
+
+const params = new URLSearchParams(location.search);
+const S = {
+  variant: VARIANTS[params.get('variant')] ? params.get('variant') : 'A',
+  state: (STATES[params.get('state')] && params.get('state') !== 'resumed') ? params.get('state') : (params.get('state') === 'resumed' ? 'recording' : 'recording'),
+  resumed: params.get('state') === 'resumed',
+  mic: MICS[params.get('mic')] ? params.get('mic') : 'left',
+  length: LENGTHS[params.get('length')] ? params.get('length') : 'short',
+  entity: ENTITIES[params.get('entity')] ? params.get('entity') : 'text',
+  open: OPENS[params.get('open')] ? params.get('open') : 'no',
+  showRaw: false,
+  wordCount: params.get('state') === 'resumed' ? WORDS.length + 6 : ((params.get('length') === 'long' && params.get('state') === 'recording') ? WORDS_LONG.length - 30 : 0),
+  seconds: (params.get('state') === 'review' || params.get('state') === 'error' || params.get('state') === 'resumed') ? 63 : (params.get('length') === 'long' ? 71 : 0),
+  committed: '',
+};
+function setParams() { history.replaceState(null, '', '?' + new URLSearchParams({ variant: S.variant, state: S.resumed && S.state === 'recording' ? 'resumed' : S.state, mic: S.mic, length: S.length, entity: S.entity, open: S.open })); }
+const words = () => (S.length === 'long' || S.resumed) ? WORDS_LONG : WORDS;
+const raw = () => S.length === 'long' ? RAW_LONG : RAW;
+const processed = () => S.length === 'long' ? PROCESSED_LONG : PROCESSED;
+
+// ----- Живой транскрипт: Confirmed Text обычным цветом, Pending Text цветом predictive (ghost text edit predictions) -----
+function liveHtml() {
+  const n = S.wordCount, confirmedEnd = Math.max(0, n - 4), parts = [], W = words();
+  // Продолжение блока: ранее принятый текст уже прошёл постобработку и остаётся как есть
+  if (S.resumed) parts.push(PROCESSED.replace(/`([^`]+)`/g, '<code>$1</code>'));
+  for (let i = S.resumed ? WORDS.length : 0; i < n; i++) {
+    const [draft, fin] = W[i], isPending = i >= confirmedEnd;
+    const text = isPending ? draft : (fin === undefined ? draft : fin);
+    if (text === '') continue;
+    parts.push(isPending ? `<span class="pending">${text}</span>` : text);
+  }
+  return parts.join(' ') + '<span class="caret"></span>';
+}
+function processedHtml() { return processed().replace(/`([^`]+)`/g, '<code>$1</code>'); }
+function fmt(sec) { return `${Math.floor(sec/60)}:${String(sec%60).padStart(2,'0')}`; }
+
+let tick = null;
+function startTicks() {
+  stopTicks();
+  tick = setInterval(() => {
+    if (S.state !== 'recording') return;
+    S.wordCount = Math.min(words().length, S.wordCount + 1);
+    if (S.wordCount === words().length) { S.wordCount = 0; S.seconds = 0; }
+    if (S.wordCount % 3 === 0) S.seconds++;
+    document.querySelectorAll('.live').forEach(el => { el.innerHTML = liveHtml(); el.parentElement.scrollTop = 1e6; });
+    document.querySelectorAll('.timer').forEach(el => el.textContent = fmt(S.seconds));
+    positionA();
+  }, 380);
+}
+function stopTicks() { if (tick) clearInterval(tick); tick = null; }
+
+// ----- Действия -----
+function act(name) {
+  if (name === 'stop') { S.state = 'review'; S.showRaw = false; }
+  if (name === 'commit') {
+    S.committed = (S.state === 'error' || S.showRaw) ? raw() : processed();
+    if (S.resumed) S.committed = PROCESSED + ' ' + PROCESSED;
+    S.state = 'committed';
+  }
+  if (name === 'resume') { S.state = 'recording'; S.resumed = true; S.wordCount = WORDS.length; S.seconds = 63; }
+  if (name === 'send') { S.state = 'sent'; }
+  if (name === 'toggleOpen') { S.open = S.open === 'yes' ? 'no' : 'yes'; }
+  if (name === 'reopen') { S.state = 'review'; S.showRaw = false; S.seconds = 63; }
+  if (name === 'discard') { S.state = 'idle'; }
+  if (name === 'retry') { S.state = 'review'; }
+  if (name === 'toggleRaw') { S.showRaw = !S.showRaw; }
+  if (name === 'start') { S.state = 'recording'; S.wordCount = 0; S.seconds = 0; S.committed = ''; S.resumed = false; }
+  if (name === 'discard') { S.resumed = false; }
+  setParams(); render();
+}
+window.act = act;
+
+// ----- Нативные кусочки -----
+const kb = (keys) => `<span class="kb">${keys}</span>`;
+const hint = (keys, text, onclick) => `<span class="kb-hint" onclick="${onclick || ''}"><span class="lbl c-muted">${text}</span>${kb(keys)}</span>`;
+const button = (label, style, onclick, opts = {}) =>
+  `<button class="btn ${style}" onclick="${onclick}">${opts.icon ? icon(opts.icon, 'ic-sm', 'c-muted') : ''}<span class="inner"><span>${label}</span></span></button>`;
+const iconButton = (name, style, onclick, color, title) =>
+  `<button class="ib ${style} ic-sm ${color || ''}" title="${title || ''}" onclick="${onclick}">${I[name]}</button>`;
+const callout = () => `<div class="callout">
+  <div class="icon ic-sm c-warning">${I.warn}</div>
+  <div class="body">
+    <div class="title-row"><span class="lbl-sm">Post-processing Unavailable</span>${button('Retry', 'subtle', "act('retry')", { icon: 'rotate' })}</div>
+    <div class="desc">Ollama is not responding on localhost:11434. Enter accepts the raw transcript.</div>
+  </div></div>`;
+
+// ----- Dictation Block в композере и в истории -----
+function entityHtml(text) {
+  const html = text.replace(/`([^`]+)`/g, '<code>$1</code>').replace(/\n\n/g, '<br><br>');
+  const wordsCount = text.split(/\s+/).length;
+  const label = `Dictation · ${fmt(S.seconds || 63)} · ${wordsCount} words`;
+  if (S.entity === 'text') return html;
+  if (S.entity === 'chip') {
+    const tip = S.open === 'yes'
+      ? `<div class="tooltip">${html}<div class="meta">Click to open in the dictation window · Backspace deletes the block</div></div>` : '';
+    return `<span class="crease dict" onclick="event.stopPropagation(); act('toggleOpen')">${icon('mic', 'ic-sm', 'c-muted')}${label}${tip}</span>`;
+  }
+  return `<span class="dblock ${S.open === 'yes' ? '' : 'folded'}"><span class="head">${icon('mic', 'ic-sm', 'c-muted')}<span class="lbl-sm c-muted">${label}</span>${iconButton('pencil', 'subtle', "act('reopen')", 'c-muted', 'Open in Dictation Window')}${iconButton(S.open === 'yes' ? 'chevUp' : 'chev', 'subtle', "act('toggleOpen')", 'c-muted', S.open === 'yes' ? 'Collapse' : 'Expand')}</span><span class="preview">${text.replace(/`/g, '')}</span><span class="text">${html}</span></span>`;
+}
+
+// ----- Единый каркас состояний: тело + одна строка снизу -----
+function stateBody() {
+  const rec = S.state === 'recording', err = S.state === 'error';
+  if (rec) return `<div class="dw-body rec"><div class="live">${liveHtml()}</div></div>`;
+  const text = err ? raw() : (S.showRaw ? raw() : processedHtml());
+  return `${err ? callout() : ''}<div class="dw-body"><div class="edit" contenteditable="true" spellcheck="false">${text}</div></div>`;
+}
+function stateFooter() {
+  const rec = S.state === 'recording', err = S.state === 'error';
+  const left = `<div class="h g8">${rec ? '<span class="dot pulse"></span>' : ''}<span class="lbl-sm c-muted timer">${fmt(S.seconds)}</span></div>`;
+  let hints;
+  if (rec) hints = hint('Ctrl-Shift-Space', 'Accept', "act('commit')") + hint('Esc', 'Review', "act('stop')");
+  else if (err) hints = hint('Enter', 'Accept Raw', "act('commit')") + hint('Esc', 'Cancel', "act('discard')");
+  else hints = hint('Ctrl-Shift-Space', 'Resume', "act('resume')") + hint('Tab', S.showRaw ? 'Processed' : 'Raw', "act('toggleRaw')") + hint('Enter', 'Accept', "act('commit')") + hint('Esc', 'Cancel', "act('discard')");
+  return `<div class="dw-foot">${left}<div class="h g16">${hints}</div></div>`;
+}
+
+// ----- Тулбар композера (thread_view.rs render_message_editor) -----
+function micButton() {
+  const rec = WINDOW_STATES.includes(S.state);
+  return `<button class="ib ic-sm ${rec ? 'tinted-error c-error pulse' : 'subtle c-muted'}" title="${rec ? 'Stop Dictation' : 'Dictate'}  Ctrl-Shift-Space" onclick="act('${rec ? 'stop' : 'start'}')">${I.mic}</button>`;
+}
+function renderFooter() {
+  const left = [iconButton('plus', 'subtle', '', 'c-muted', 'Add Context')];
+  if (S.mic === 'left') left.push(micButton());
+  left.push(iconButton('crosshair', 'subtle', '', 'c-muted', 'Follow Agent'));
+  const right = [
+    `<span class="ring" title="3.1k / 128k"></span>`,
+    `<button class="btn subtle"><span class="inner"><span class="lbl-sm c-muted">Write</span></span>${icon('chev', 'ic-xs', 'c-muted')}</button>`,
+    `<button class="btn subtle">${icon('zed', 'ic-xs', 'c-muted')}<span class="inner"><span class="lbl-sm c-muted">qwen3:14b</span></span>${icon('chev', 'ic-xs', 'c-muted')}</button>`,
+  ];
+  if (S.mic === 'right') right.push(micButton());
+  right.push(iconButton('send', 'filled', '', 'c-accent', 'Send  Enter'));
+  const hintNone = S.mic === 'none' ? `<span class="kb-hint" style="margin-left:6px">${icon('mic', 'ic-xs', 'c-placeholder')}${kb('Ctrl-Shift-Space')}</span>` : '';
+  document.getElementById('footer').innerHTML = `<div class="h g2">${left.join('')}${hintNone}</div><div class="h g4">${right.join('')}</div>`;
+}
+
+// ----- Варианты: отличаются только контейнером и расположением -----
+function renderA() { return `<div class="dw dwA popover ${S.state === 'review' ? 'wide' : ''}">${stateBody()}<div class="divider"></div>${stateFooter()}</div>`; }
+function positionA() {
+  const win = document.querySelector('.dwA'); if (!win) return;
+  const caret = document.getElementById('caret').getBoundingClientRect();
+  const agent = document.getElementById('agent').getBoundingClientRect();
+  const w = win.offsetWidth, h = win.offsetHeight;
+  let left = caret.left - agent.left - 12;
+  left = Math.max(8, Math.min(left, agent.width - w - 8));
+  win.style.left = left + 'px';
+  win.style.top = (caret.top - agent.top - h - 6) + 'px';
+}
+function renderB() { return `<div class="dw dwB">${stateBody()}${stateFooter()}</div>`; }
+function renderC() { return `<div class="dw dwC section">${stateBody()}${stateFooter()}</div>`; }
+function renderD() {
+  return `<div class="backdrop" onclick="act('discard')"></div><div class="dw dwD modal">
+    <div class="modal-header"><span class="headline-sm c-muted">Dictation</span></div>
+    ${stateBody()}<div class="modal-footer" style="padding:0">${stateFooter()}</div></div>`;
+}
+
+function render() {
+  document.querySelectorAll('.dwA,.dwB,.dwC,.dwD,.backdrop').forEach(e => e.remove());
+  renderFooter();
+  document.getElementById('agentHeader').innerHTML = `${iconButton('sparkle', 'subtle', '', 'c-muted')}<span class="title lbl">Undo для вставки из диктовки</span>${iconButton('plus', 'subtle', '', 'c-muted')}${iconButton('maximize', 'subtle', '', 'c-muted')}`;
+  document.getElementById('creaseIcon').innerHTML = icon('pencil', 'ic-sm', 'c-muted') + 'message_editor.rs';
+  document.getElementById('expandBtn').innerHTML = I.maximize;
+  // После Enter: текст лежит в композере как обычный текст у курсора
+  if (S.state === 'committed' && !S.committed) S.committed = processed();
+  if (S.state === 'sent' && !S.committed) S.committed = processed();
+  const committedHtml = S.committed ? entityHtml(S.committed) : '';
+  document.getElementById('commitSlot').innerHTML = S.state === 'sent' ? '' : committedHtml;
+  if (S.state === 'committed' && S.entity === 'text') requestAnimationFrame(() => { const t = document.getElementById('composerText'); t.scrollTop = t.scrollHeight; });
+  // Tooltip у чипа — оверлей поверх всего, как ui::Tooltip, а не элемент внутри прокручиваемого композера
+  requestAnimationFrame(() => {
+    const tip = document.querySelector('.crease.dict .tooltip'); if (!tip) return;
+    const r = tip.parentElement.getBoundingClientRect();
+    tip.style.left = Math.min(r.left, window.innerWidth - 372) + 'px';
+    tip.style.top = (r.bottom + 4) + 'px';
+    if (r.bottom + 4 + tip.offsetHeight > window.innerHeight) tip.style.top = (r.top - tip.offsetHeight - 4) + 'px';
+  });
+  // После Send: сообщение в истории, правка как у любого сообщения пользователя в Zed
+  document.querySelectorAll('.msg-sent').forEach(e => e.remove());
+  const composerText = document.getElementById('composerText');
+  composerText.classList.toggle('empty', S.state === 'sent');
+  if (S.state === 'sent') {
+    document.getElementById('thread').insertAdjacentHTML('beforeend', `
+      <div class="msg-sent"><div class="msg-user editing">
+        <div class="msg-toolbar">${iconButton('close', 'subtle', "act('discard')", 'c-error', 'Cancel')}${iconButton('ret', 'subtle', '', 'c-muted', 'Editing will restart the thread from this point.')}</div>
+        <span class="crease">${icon('pencil', 'ic-sm', 'c-muted')}message_editor.rs</span> Тогда второй вариант. ${committedHtml}<span class="caret"></span>
+      </div></div>
+      <div class="msg-sent msg-agent"><p>Понял. Оборачиваю Commit в <code>editor.transact</code> и добавляю тест…</p></div>`);
+  }
+
+  const agent = document.getElementById('agent'), wrap = document.getElementById('composerWrap');
+  if (WINDOW_STATES.includes(S.state)) {
+    if (S.variant === 'A') { agent.insertAdjacentHTML('beforeend', renderA()); positionA(); }
+    if (S.variant === 'B') { agent.insertAdjacentHTML('beforeend', renderB()); }
+    if (S.variant === 'C') { wrap.insertAdjacentHTML('beforebegin', renderC()); }
+    if (S.variant === 'D') { agent.insertAdjacentHTML('beforeend', renderD()); }
+    const edit = document.querySelector('.edit'); if (edit) edit.focus();
+  }
+  document.getElementById('statusDict').textContent = S.state === 'recording' ? '● Dictation ' + fmt(S.seconds) : '';
+  renderProto();
+  if (S.state === 'recording') startTicks(); else stopTicks();
+}
+
+// ----- Плавающая панель прототипа -----
+function renderProto() {
+  const grp = (obj, key, label) => `<div class="group"><small>${label}</small>${Object.entries(obj).map(([k, v]) =>
+    `<button class="${(key === 'state' ? ((S.resumed && S.state === 'recording') ? 'resumed' : S.state) : S[key]) === k ? 'on' : ''}" onclick="setS('${key}','${k}')" title="${v}">${(key === 'variant' || key === 'mic') ? k : v}</button>`).join('')}</div>`;
+  document.getElementById('proto').innerHTML = `
+    <button onclick="cycle(-1)">◀</button><b>${S.variant} — ${VARIANTS[S.variant]}</b><button onclick="cycle(1)">▶</button>
+    <span class="sep"></span>${grp(STATES, 'state', 'состояние')}<span class="sep"></span>${grp(MICS, 'mic', 'микрофон')}<span class="sep"></span>${grp(LENGTHS, 'length', 'текст')}<span class="sep"></span>${grp(ENTITIES, 'entity', 'вставка')}<span class="sep"></span>${grp(OPENS, 'open', 'вставка')}`;
+}
+function setS(key, val) {
+  if (key === 'state' && val === 'resumed') { act('resume'); return; }
+  if (key === 'state') S.resumed = false;
+  S[key] = val;
+  if ((key === 'state' && val === 'recording') || key === 'length') { S.wordCount = 0; S.seconds = 0; }
+  if (key === 'length' && val === 'long' && S.state === 'recording') { S.wordCount = WORDS_LONG.length - 30; S.seconds = 71; }
+  if (key === 'state' && (val === 'review' || val === 'error') && S.seconds === 0) S.seconds = 63;
+  setParams(); render();
+}
+function cycle(d) { const keys = Object.keys(VARIANTS); S.variant = keys[(keys.indexOf(S.variant) + d + keys.length) % keys.length]; setParams(); render(); }
+window.setS = setS; window.cycle = cycle;
+
+document.addEventListener('keydown', e => {
+  const inEdit = e.target.matches('[contenteditable]');
+  if (e.key === 'Escape') { if (S.state === 'recording') act('stop'); else if (WINDOW_STATES.includes(S.state)) act('discard'); return; }
+  if (e.key === 'Enter' && !e.shiftKey && (S.state === 'review' || S.state === 'error')) { e.preventDefault(); act('commit'); return; }
+  if (e.key === 'Enter' && !e.shiftKey && S.state === 'committed') { e.preventDefault(); act('send'); return; }
+  if (e.key === 'Tab' && S.state === 'review') { e.preventDefault(); act('toggleRaw'); return; }
+  if (e.key === ' ' && e.ctrlKey && e.shiftKey) {
+    e.preventDefault();
+    if (S.state === 'recording') act('commit');
+    else if (S.state === 'review') act('resume');
+    else if (!WINDOW_STATES.includes(S.state)) act('start');
+    return;
+  }
+  if (inEdit) return;
+  if (e.key === 'ArrowLeft') cycle(-1);
+  if (e.key === 'ArrowRight') cycle(1);
+});
+window.addEventListener('resize', positionA);
+
+setParams();
+render();
+</script>
+</body>
+</html>

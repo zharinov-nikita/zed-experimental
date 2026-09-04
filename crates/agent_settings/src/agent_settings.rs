@@ -201,9 +201,23 @@ fn parse_auto_compact_threshold(raw: &str) -> anyhow::Result<AutoCompactThreshol
     }
 }
 
+/// Local: resolved voice dictation settings.
+#[derive(Clone, Debug, PartialEq)]
+pub struct DictationSettings {
+    pub model_path: Option<std::path::PathBuf>,
+    pub backends_dir: Option<std::path::PathBuf>,
+    pub language: Option<String>,
+    pub glossary: Vec<String>,
+    pub sounds: bool,
+    pub post_processing_enabled: bool,
+    pub post_processing_model: Option<LanguageModelSelection>,
+    pub post_processing_prompt: String,
+}
+
 #[derive(Clone, Debug, RegisterSetting)]
 pub struct AgentSettings {
     pub enabled: bool,
+    pub dictation: DictationSettings,
     pub button: bool,
     pub dock: DockPosition,
     pub flexible: bool,
@@ -754,8 +768,28 @@ pub fn normalize_path(raw: &str) -> String {
 impl Settings for AgentSettings {
     fn from_settings(content: &settings::SettingsContent) -> Self {
         let agent = content.agent.clone().unwrap();
+        let dictation = agent.dictation.clone().unwrap_or_default();
+        let post_processing = dictation.post_processing.clone().unwrap_or_default();
         Self {
             enabled: agent.enabled.unwrap(),
+            dictation: DictationSettings {
+                model_path: dictation
+                    .model_path
+                    .filter(|path| !path.trim().is_empty())
+                    .map(std::path::PathBuf::from),
+                backends_dir: dictation
+                    .backends_dir
+                    .filter(|path| !path.trim().is_empty())
+                    .map(std::path::PathBuf::from),
+                language: dictation
+                    .language
+                    .filter(|language| !language.trim().is_empty()),
+                glossary: dictation.glossary,
+                sounds: dictation.sounds.unwrap_or(false),
+                post_processing_enabled: post_processing.enabled.unwrap_or(true),
+                post_processing_model: post_processing.model,
+                post_processing_prompt: post_processing.prompt.unwrap_or_default(),
+            },
             button: agent.button.unwrap(),
             dock: agent.dock.unwrap(),
             sidebar_side: agent.sidebar_side.unwrap(),

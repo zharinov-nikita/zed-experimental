@@ -1,0 +1,22 @@
+[package]
+name = "dictation"
+version = "0.1.0"
+edition.workspace = true
+publish.workspace = true
+license = "GPL-3.0-or-later"
+
+[lints]
+workspace = true
+
+[lib]
+path = "src/dictation.rs"
+doctest = false
+
+[dependencies]
+anyhow.workspace = true
+audio.workspace = true
+cpal.workspace = true
+futures.workspace = true
+log.workspace = true
+rodio.workspace = true
+transcribe-cpp.workspace = true

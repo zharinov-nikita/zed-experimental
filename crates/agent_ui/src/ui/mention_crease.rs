@@ -205,6 +205,9 @@ fn open_mention_uri(
         MentionUri::Fetch { url } => {
             cx.open_url(url.as_str());
         }
+        MentionUri::Dictation { id, .. } => {
+            crate::dictation_window::open_dictation_block(workspace, id, window, cx);
+        }
         MentionUri::PastedImage { .. }
         | MentionUri::Selection { abs_path: None, .. }
         | MentionUri::Diagnostics { .. }

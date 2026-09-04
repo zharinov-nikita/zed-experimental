@@ -23,6 +23,7 @@ use editor::actions::OpenExcerpts;
 use sandbox::{SandboxFsPolicy, SandboxNetPolicy, SandboxPolicy};
 
 use crate::completion_provider::{AvailableSkill, PromptLocalCommand, pluralize};
+use crate::dictation_window::{DictationWindow, DictationWindowEvent};
 use crate::message_editor::SharedSessionCapabilities;
 use crate::ui::{
     SandboxGroup, SandboxRow, SandboxSection, SandboxStatusTooltip, TerminalSandboxWarning,
@@ -46,7 +47,7 @@ use ui::{
     SplitButtonStyle, Tab, ToggleState,
 };
 use util::markdown::{source_position_from_fragment, split_local_url_fragment};
-use workspace::{OpenOptions, SERIALIZATION_THROTTLE_TIME};
+use workspace::{Item as _, OpenOptions, SERIALIZATION_THROTTLE_TIME};
 
 use super::elicitation::{
     ElicitationCard, ElicitationCardHandlers, ElicitationFormState, should_render_elicitation,
@@ -624,6 +625,9 @@ pub struct ThreadView {
     pub add_context_menu_handle: PopoverMenuHandle<ContextMenu>,
     pub thinking_effort_menu_handle: PopoverMenuHandle<ContextMenu>,
     pub fast_mode_menu_handle: PopoverMenuHandle<ContextMenu>,
+    /// Local: the Dictation Window, present only during a Dictation Session.
+    dictation_window: Option<Entity<DictationWindow>>,
+    _dictation_subscription: Option<Subscription>,
     pub project: WeakEntity<Project>,
     /// Cache + worktree snapshot for resolving paths in markdown code spans.
     /// Cloned from the parent `ConversationView` so the cache is shared and the
@@ -1037,6 +1041,8 @@ impl ThreadView {
             add_context_menu_handle: PopoverMenuHandle::default(),
             thinking_effort_menu_handle: PopoverMenuHandle::default(),
             fast_mode_menu_handle: PopoverMenuHandle::default(),
+            dictation_window: None,
+            _dictation_subscription: None,
             project,
             code_span_resolver,
             show_external_source_prompt_warning,
@@ -1132,7 +1138,13 @@ impl ThreadView {
             MessageEditorEvent::Send => self.send(window, cx),
             MessageEditorEvent::SendImmediately => self.interrupt_and_send(window, cx),
             MessageEditorEvent::Cancel => {
-                if !self.close_thread_search(window, cx) {
+                if let Some(dictation_window) = self.dictation_window.clone()
+                    && dictation_window.read(cx).is_recording()
+                {
+                    dictation_window.update(cx, |dictation_window, cx| {
+                        dictation_window.cancel(&crate::CancelDictation, window, cx);
+                    });
+                } else if !self.close_thread_search(window, cx) {
                     self.cancel_generation(cx);
                 }
             }
@@ -4353,11 +4365,25 @@ impl ThreadView {
         let has_messages = self.list_state.item_count() > 0;
         let fills_container = !has_messages || editor_expanded;
 
+        let dictation_overlay = self.dictation_window.clone().map(|dictation_window| {
+            let position = self.dictation_window_position(cx);
+            gpui::deferred(
+                gpui::anchored()
+                    .position(position)
+                    .anchor(gpui::Anchor::BottomLeft)
+                    .snap_to_window_with_margin(px(8.))
+                    .child(dictation_window),
+            )
+            .with_priority(1)
+        });
+
         h_flex()
             .py_2()
             .bg(editor_bg_color)
             .justify_center()
             .on_action(cx.listener(Self::handle_message_editor_move_up))
+            .on_action(cx.listener(Self::toggle_dictation))
+            .children(dictation_overlay)
             .map(|this| {
                 if has_messages {
                     this.on_action(cx.listener(Self::expand_message_editor))
@@ -4451,11 +4477,165 @@ impl ThreadView {
                                             .children(self.mode_selector.clone())
                                             .children(self.model_selector.clone()),
                                     })
+                                    .child(self.render_dictation_button(cx))
                                     .child(self.render_send_button(cx)),
                             ),
                     ),
             )
             .into_any()
+    }
+
+    // ----- Local: voice dictation -----
+
+    pub(crate) fn toggle_dictation(
+        &mut self,
+        _: &crate::ToggleDictation,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        if let Some(dictation_window) = self.dictation_window.clone() {
+            dictation_window.update(cx, |dictation_window, cx| {
+                dictation_window.toggle_dictation(&crate::ToggleDictation, window, cx);
+            });
+            return;
+        }
+        self.open_dictation_window(
+            |composer_focus, window, cx| DictationWindow::start(composer_focus, window, cx),
+            window,
+            cx,
+        );
+    }
+
+    /// Opens an existing Dictation Block for review. One session at a time:
+    /// while a window is open, clicks on other chips are ignored.
+    pub(crate) fn edit_dictation_block(
+        &mut self,
+        id: String,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        if self.dictation_window.is_some() {
+            return;
+        }
+        let Some((text, duration)) = self.message_editor.read(cx).dictation_block(&id) else {
+            return;
+        };
+        self.open_dictation_window(
+            move |composer_focus, window, cx| {
+                DictationWindow::review(composer_focus, id, text, duration, window, cx)
+            },
+            window,
+            cx,
+        );
+    }
+
+    fn open_dictation_window(
+        &mut self,
+        build: impl FnOnce(FocusHandle, &mut Window, &mut Context<DictationWindow>) -> DictationWindow,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        let composer_focus = self.message_editor.focus_handle(cx);
+        let dictation_window = cx.new(|cx| build(composer_focus, window, cx));
+        self._dictation_subscription = Some(cx.subscribe_in(
+            &dictation_window,
+            window,
+            Self::handle_dictation_window_event,
+        ));
+        self.dictation_window = Some(dictation_window);
+        cx.notify();
+    }
+
+    fn handle_dictation_window_event(
+        &mut self,
+        _: &Entity<DictationWindow>,
+        event: &DictationWindowEvent,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        match event {
+            DictationWindowEvent::Accept {
+                text,
+                duration,
+                block_id,
+            } => {
+                self.message_editor
+                    .update(cx, |message_editor, cx| match block_id {
+                        Some(id) => message_editor.replace_dictation_block(
+                            id,
+                            text.clone(),
+                            *duration,
+                            window,
+                            cx,
+                        ),
+                        None => {
+                            message_editor.insert_dictation_block(
+                                text.clone(),
+                                *duration,
+                                window,
+                                cx,
+                            );
+                        }
+                    });
+                self.close_dictation_window(window, cx);
+            }
+            DictationWindowEvent::RecordingStarted => {
+                window.focus(&self.message_editor.focus_handle(cx), cx);
+            }
+            DictationWindowEvent::Dismiss => self.close_dictation_window(window, cx),
+        }
+    }
+
+    fn close_dictation_window(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        self.dictation_window = None;
+        self._dictation_subscription = None;
+        window.focus(&self.message_editor.focus_handle(cx), cx);
+        cx.notify();
+    }
+
+    /// Bottom-left corner for the Dictation Window: just above the composer cursor.
+    fn dictation_window_position(&self, cx: &App) -> gpui::Point<Pixels> {
+        let editor = self.message_editor.read(cx).editor().read(cx);
+        if let Some(cursor) = editor.pixel_position_of_cursor(cx) {
+            return gpui::point(cursor.x - px(12.), cursor.y - px(14.));
+        }
+        editor
+            .last_bounds()
+            .map(|bounds| bounds.origin)
+            .unwrap_or_default()
+    }
+
+    fn render_dictation_button(&self, cx: &mut Context<Self>) -> impl IntoElement {
+        let recording = self
+            .dictation_window
+            .as_ref()
+            .is_some_and(|dictation_window| dictation_window.read(cx).is_recording());
+        let focus_handle = self.message_editor.focus_handle(cx);
+        IconButton::new("dictation", IconName::Mic)
+            .icon_size(IconSize::Small)
+            .map(|this| {
+                if recording {
+                    this.style(ButtonStyle::Tinted(TintColor::Error))
+                        .icon_color(Color::Error)
+                } else {
+                    this.icon_color(Color::Muted)
+                }
+            })
+            .tooltip(move |_window, cx| {
+                Tooltip::for_action_in(
+                    if recording {
+                        "Stop Dictation"
+                    } else {
+                        "Dictate"
+                    },
+                    &crate::ToggleDictation,
+                    &focus_handle,
+                    cx,
+                )
+            })
+            .on_click(cx.listener(|this, _, window, cx| {
+                this.toggle_dictation(&crate::ToggleDictation, window, cx);
+            }))
     }
 
     fn render_queue_steer_button(
@@ -12609,6 +12789,7 @@ pub(crate) fn open_link(
             MentionUri::TerminalSelection { .. } => {}
             MentionUri::GitDiff { .. } => {}
             MentionUri::MergeConflict { .. } => {}
+            MentionUri::Dictation { .. } => {}
             MentionUri::Rule { name, .. } => {
                 crate::ui::open_migrated_rule(workspace, &name, window, cx);
             }

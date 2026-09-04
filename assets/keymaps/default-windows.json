@@ -348,6 +348,7 @@
       "ctrl-alt-'": "agent::ToggleThinkingEffortMenu",
       "ctrl-'": "agent::CycleThinkingEffort",
       "ctrl-alt-.": "agent::ToggleFastMode",
+      "ctrl-alt-space": "agent::ToggleDictation",
     },
   },
   {
@@ -388,6 +389,18 @@
     "bindings": {
       "ctrl-enter": "agent::Chat",
       "enter": "editor::Newline",
+    },
+  },
+  // Local: must come after the AcpThread composer bindings, later bindings win at equal depth.
+  {
+    "context": "DictationWindow || DictationWindow > Editor",
+    "use_key_equivalents": true,
+    "bindings": {
+      "enter": "agent::AcceptDictation",
+      "shift-enter": "editor::Newline",
+      "escape": "agent::CancelDictation",
+      "tab": "agent::ToggleDictationRawText",
+      "ctrl-alt-space": "agent::ToggleDictation",
     },
   },
   {

@@ -74,6 +74,13 @@ pub enum MentionUri {
         source: String,
         skill_file_path: PathBuf,
     },
+    /// Local: a Dictation Block produced by voice dictation in the agent panel.
+    /// The dictated text itself lives in the mention content, not in the URI.
+    Dictation {
+        id: String,
+        duration_secs: u32,
+        word_count: u32,
+    },
 }
 
 impl MentionUri {
@@ -273,6 +280,20 @@ impl MentionUri {
                         source: source.context("missing skill source")?,
                         skill_file_path: skill_file_path.context("missing skill file path")?,
                     })
+                } else if path.starts_with("/agent/dictation") {
+                    validate_query_params(&url, &["id", "seconds", "words"])?;
+                    let id = query_param(&url, "id").context("missing dictation id")?;
+                    let duration_secs = query_param(&url, "seconds")
+                        .and_then(|value| value.parse::<u32>().ok())
+                        .unwrap_or(0);
+                    let word_count = query_param(&url, "words")
+                        .and_then(|value| value.parse::<u32>().ok())
+                        .unwrap_or(0);
+                    Ok(Self::Dictation {
+                        id,
+                        duration_secs,
+                        word_count,
+                    })
                 } else {
                     bail!("invalid zed url: {:?}", input);
                 }
@@ -328,7 +349,8 @@ impl MentionUri {
             | MentionUri::Fetch { .. }
             | MentionUri::TerminalSelection { .. }
             | MentionUri::GitDiff { .. }
-            | MentionUri::MergeConflict { .. } => None,
+            | MentionUri::MergeConflict { .. }
+            | MentionUri::Dictation { .. } => None,
         }
     }
 
@@ -366,6 +388,16 @@ impl MentionUri {
             } => selection_name(path.as_deref(), line_range),
             MentionUri::Fetch { url } => url.to_string(),
             MentionUri::Skill { name, .. } => name.clone(),
+            MentionUri::Dictation {
+                duration_secs,
+                word_count,
+                ..
+            } => format!(
+                "Dictation · {}:{:02} · {} words",
+                duration_secs / 60,
+                duration_secs % 60,
+                word_count
+            ),
         }
     }
 
@@ -451,6 +483,7 @@ impl MentionUri {
             MentionUri::GitDiff { .. } => IconName::GitBranch.path().into(),
             MentionUri::MergeConflict { .. } => IconName::GitMergeConflict.path().into(),
             MentionUri::Skill { .. } => IconName::Sparkle.path().into(),
+            MentionUri::Dictation { .. } => IconName::Mic.path().into(),
         }
     }
 
@@ -580,6 +613,18 @@ impl MentionUri {
                     .append_pair("name", name)
                     .append_pair("source", source)
                     .append_pair("path", &skill_file_path.to_string_lossy());
+                url
+            }
+            MentionUri::Dictation {
+                id,
+                duration_secs,
+                word_count,
+            } => {
+                let mut url = Url::parse("zed:///agent/dictation").unwrap();
+                url.query_pairs_mut()
+                    .append_pair("id", id)
+                    .append_pair("seconds", &duration_secs.to_string())
+                    .append_pair("words", &word_count.to_string());
                 url
             }
         }
@@ -1384,6 +1429,21 @@ mod tests {
         let parsed = MentionUri::parse(&serialized, PathStyle::local()).unwrap();
 
         assert_eq!(parsed, skill_uri);
+    }
+
+    #[test]
+    fn test_parse_dictation_uri_round_trip() {
+        let dictation_uri = MentionUri::Dictation {
+            id: "b3f1c2d4".to_string(),
+            duration_secs: 63,
+            word_count: 46,
+        };
+
+        let serialized = dictation_uri.to_uri().to_string();
+        let parsed = MentionUri::parse(&serialized, PathStyle::local()).unwrap();
+
+        assert_eq!(parsed, dictation_uri);
+        assert_eq!(dictation_uri.name(), "Dictation · 1:03 · 46 words");
     }
 
     #[test]
