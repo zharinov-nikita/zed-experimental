@@ -57,6 +57,9 @@ cargo run --profile release-fast -- --user-data-dir "$env:LOCALAPPDATA\Zed-Local
   Без переменных тесты выходят сразу.
 - Микрофон берётся из `audio.experimental.input_audio_device` (страница Audio в Settings); пустое или неизвестное
   значение даёт устройство по умолчанию с предупреждением в логе.
+- Модель грузится при первом старте (секция показывает «Loading Whisper model…», микрофон открывается после загрузки)
+  и остаётся в памяти до закрытия Zed; `agent.dictation.keep_model_loaded: false` выгружает её после каждой сессии.
+  На процесс одна сессия: старт во втором окне даёт Callout «Dictation is already running in another window».
 - `agent.dictation.save_last_recording: true` пишет WAV последней сессии (16 кГц mono) в `%TEMP%\zed-dictation-last-recording.wav`,
   путь есть в логе (info). Файл читается примером `transcribe_wav` и годится как запись для интеграционных тестов.
 

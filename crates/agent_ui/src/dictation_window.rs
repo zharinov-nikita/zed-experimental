@@ -5,12 +5,14 @@
 //! emits [`DictationWindowEvent::Accept`] so the thread view can place a
 //! Dictation Block into the composer. See `CONTEXT.md` for the vocabulary.
 
-use std::sync::{Mutex, OnceLock};
+use std::sync::Mutex;
 use std::time::Duration;
 
 use agent_settings::{AgentSettings, DictationSettings};
 use anyhow::{Result, anyhow};
-use dictation::{DictationEvent, DictationUpdate, EngineConfig, LiveDictation, Transcriber};
+use dictation::{
+    DictationEvent, DictationUpdate, EngineConfig, LiveDictation, Recorder, Transcriber,
+};
 use editor::Editor;
 use futures::StreamExt as _;
 use gpui::{
@@ -26,33 +28,13 @@ use std::sync::Arc;
 use ui::{Callout, Divider, Indicator, KeyBinding, Severity, prelude::*};
 use workspace::Workspace;
 
+use crate::dictation_engine::{EngineCache, EngineLease};
 use crate::{
     AcceptDictation, AgentPanel, CancelDictation, ToggleDictation, ToggleDictationRawText,
 };
 
 /// The loaded Whisper model is kept between sessions: loading it takes seconds.
-static ENGINE: OnceLock<Mutex<Option<(EngineConfig, Transcriber)>>> = OnceLock::new();
-
-fn engine_slot() -> &'static Mutex<Option<(EngineConfig, Transcriber)>> {
-    ENGINE.get_or_init(|| Mutex::new(None))
-}
-
-fn acquire_engine(config: &EngineConfig) -> Result<Transcriber> {
-    let cached = engine_slot()
-        .lock()
-        .map_err(|_| anyhow!("dictation engine cache is poisoned"))?
-        .take();
-    match cached {
-        Some((cached_config, transcriber)) if cached_config == *config => Ok(transcriber),
-        _ => Transcriber::load(config),
-    }
-}
-
-fn release_engine(config: EngineConfig, transcriber: Transcriber) {
-    if let Ok(mut slot) = engine_slot().lock() {
-        *slot = Some((config, transcriber));
-    }
-}
+static ENGINE: Mutex<EngineCache<Transcriber>> = Mutex::new(EngineCache::new());
 
 fn engine_config(settings: &DictationSettings) -> Result<EngineConfig> {
     let model_path = settings.model_path.clone().ok_or_else(|| {
@@ -209,10 +191,15 @@ pub struct DictationWindow {
     raw: String,
     processed: Option<String>,
     post_processing_error: Option<SharedString>,
+    /// Why the last Resume could not start; shown in review so the text is kept.
+    resume_error: Option<SharedString>,
+    /// Set while a Resume is starting so a failure returns to review.
+    resuming: bool,
     show_raw: bool,
     duration: Duration,
     accept_when_done: bool,
-    engine_config: Option<EngineConfig>,
+    /// Held while recording; dropping the window frees the session slot.
+    engine_lease: Option<EngineLease<Transcriber>>,
     review_editor: Entity<Editor>,
     scroll_handle: ScrollHandle,
     _events_task: Option<Task<()>>,
@@ -251,10 +238,12 @@ impl DictationWindow {
             raw: String::new(),
             processed: None,
             post_processing_error: None,
+            resume_error: None,
+            resuming: false,
             show_raw: false,
             duration: Duration::ZERO,
             accept_when_done: false,
-            engine_config: None,
+            engine_lease: None,
             review_editor,
             scroll_handle: ScrollHandle::new(),
             _events_task: None,
@@ -270,7 +259,7 @@ impl DictationWindow {
         cx: &mut Context<Self>,
     ) -> Self {
         let mut this = Self::build(composer_focus_handle, None, window, cx);
-        this.start_recording(cx);
+        this.start_recording(window, cx);
         this
     }
 
@@ -300,51 +289,79 @@ impl DictationWindow {
         matches!(self.phase, Phase::Recording { .. } | Phase::Starting)
     }
 
-    fn start_recording(&mut self, cx: &mut Context<Self>) {
+    fn start_recording(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         let settings = AgentSettings::get_global(cx).dictation.clone();
         let config = match engine_config(&settings) {
             Ok(config) => config,
             Err(error) => {
-                self.phase = Phase::Failed(error.to_string().into());
-                cx.notify();
+                self.start_failed(error.to_string().into(), window, cx);
                 return;
             }
         };
-        self.engine_config = Some(config.clone());
         self.phase = Phase::Starting;
         self.processed = None;
         self.post_processing_error = None;
+        self.resume_error = None;
         cx.notify();
         cx.emit(DictationWindowEvent::RecordingStarted);
 
         let prefix = self.prefix.clone();
         let device = input_audio_device(cx);
+        let keep_model_loaded = settings.keep_model_loaded;
         let save_recording_to = settings
             .save_last_recording
             .then(dictation::last_recording_path);
-        self._engine_task = Some(cx.spawn(async move |this, cx| {
-            let started = cx
+        self._engine_task = Some(cx.spawn_in(window, async move |this, cx| {
+            // Only the slow, cancellable part runs in the background: if the
+            // window goes away meanwhile, dropping the lease still returns the
+            // model to the cache and dropping the recorder closes the microphone.
+            let prepared = cx
                 .background_spawn(async move {
-                    let transcriber = acquire_engine(&config)?;
-                    LiveDictation::start(transcriber, device, prefix, save_recording_to)
+                    let lease =
+                        EngineLease::begin(&ENGINE, config, keep_model_loaded, Transcriber::load)?;
+                    let recorder = Recorder::start(device)?;
+                    anyhow::Ok((lease, recorder))
                 })
                 .await;
-            this.update(cx, |this, cx| match started {
-                Ok((live, events)) => {
-                    this.phase = Phase::Recording {
-                        update: DictationUpdate::default(),
-                        live: Some(live),
-                    };
-                    this.listen(events, cx);
-                    cx.notify();
-                }
-                Err(error) => {
-                    this.phase = Phase::Failed(format!("{error:#}").into());
-                    cx.notify();
+            this.update_in(cx, |this, window, cx| {
+                let started = prepared.and_then(|(mut lease, recorder)| {
+                    let transcriber = lease
+                        .take_engine()
+                        .ok_or_else(|| anyhow!("dictation engine lease is empty"))?;
+                    let (live, events) =
+                        LiveDictation::start(transcriber, recorder, prefix, save_recording_to)?;
+                    Ok((lease, live, events))
+                });
+                match started {
+                    Ok((lease, live, events)) => {
+                        this.engine_lease = Some(lease);
+                        this.resuming = false;
+                        this.phase = Phase::Recording {
+                            update: DictationUpdate::default(),
+                            live: Some(live),
+                        };
+                        this.listen(events, cx);
+                        cx.notify();
+                    }
+                    Err(error) => this.start_failed(format!("{error:#}").into(), window, cx),
                 }
             })
             .ok();
         }));
+    }
+
+    /// A failed start of a fresh session closes with a Callout; a failed
+    /// Resume returns to review so the text already there is not lost.
+    fn start_failed(&mut self, error: SharedString, window: &mut Window, cx: &mut Context<Self>) {
+        if self.resuming {
+            self.resuming = false;
+            self.resume_error = Some(error);
+            self.phase = Phase::Review;
+            self.focus_review_editor(window, cx);
+        } else {
+            self.phase = Phase::Failed(error);
+        }
+        cx.notify();
     }
 
     fn listen(
@@ -397,13 +414,13 @@ impl DictationWindow {
         self.phase = Phase::Finishing;
         cx.notify();
 
-        let config = self.engine_config.clone();
+        let lease = self.engine_lease.take();
         self._engine_task = Some(cx.spawn_in(window, async move |this, cx| {
             let result = cx
                 .background_spawn(async move {
                     let (transcriber, text) = live.finish()?;
-                    if let Some(config) = config {
-                        release_engine(config, transcriber);
+                    if let Some(mut lease) = lease {
+                        lease.return_engine(transcriber);
                     }
                     anyhow::Ok(text)
                 })
@@ -567,10 +584,11 @@ impl DictationWindow {
         });
     }
 
-    fn resume(&mut self, cx: &mut Context<Self>) {
+    fn resume(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         self.prefix = self.review_editor.read(cx).text(cx).trim_end().to_string();
         self.base_duration = self.duration;
-        self.start_recording(cx);
+        self.resuming = true;
+        self.start_recording(window, cx);
     }
 
     pub fn accept(&mut self, _: &AcceptDictation, window: &mut Window, cx: &mut Context<Self>) {
@@ -591,6 +609,13 @@ impl DictationWindow {
     pub fn cancel(&mut self, _: &CancelDictation, window: &mut Window, cx: &mut Context<Self>) {
         match self.phase {
             Phase::Recording { .. } => self.stop_recording(false, window, cx),
+            Phase::Starting if self.resuming => {
+                self._engine_task = None;
+                self.resuming = false;
+                self.phase = Phase::Review;
+                self.focus_review_editor(window, cx);
+                cx.notify();
+            }
             Phase::Starting | Phase::Finishing => {
                 self.accept_when_done = false;
                 self._engine_task = None;
@@ -634,7 +659,7 @@ impl DictationWindow {
             Phase::Recording { .. } => self.stop_recording(true, window, cx),
             Phase::Review => {
                 if self._post_processing_task.is_none() {
-                    self.resume(cx);
+                    self.resume(window, cx);
                 }
             }
             Phase::Starting | Phase::Finishing => {}
@@ -647,7 +672,7 @@ impl DictationWindow {
             Phase::Starting => div()
                 .px_2()
                 .py_1()
-                .child(Label::new("Loading speech model…").color(Color::Muted))
+                .child(Label::new("Loading Whisper model…").color(Color::Muted))
                 .into_any_element(),
             Phase::Recording { update, .. } => {
                 let mut text = self.prefix.clone();
@@ -705,6 +730,15 @@ impl DictationWindow {
                 )
                 .into_any_element(),
             Phase::Review => v_flex()
+                .when_some(self.resume_error.clone(), |this, error| {
+                    this.child(
+                        Callout::new()
+                            .severity(Severity::Error)
+                            .icon(IconName::XCircle)
+                            .title("Dictation Unavailable")
+                            .description(error),
+                    )
+                })
                 .when_some(self.post_processing_error.clone(), |this, error| {
                     this.child(
                         Callout::new()
@@ -750,8 +784,9 @@ impl DictationWindow {
         let composer_focus = self.composer_focus_handle.clone();
         let review_focus = self.review_editor.focus_handle(cx);
         let (timer, recording) = match &self.phase {
-            Phase::Recording { update, .. } => (self.base_duration + update.elapsed, true),
-            _ => (self.duration, false),
+            Phase::Starting => (None, false),
+            Phase::Recording { update, .. } => (Some(self.base_duration + update.elapsed), true),
+            _ => (Some(self.duration), false),
         };
         let processing = self._post_processing_task.is_some();
 
@@ -770,11 +805,13 @@ impl DictationWindow {
                         ),
                 )
             })
-            .child(
-                Label::new(format_duration(timer))
-                    .size(LabelSize::Small)
-                    .color(Color::Muted),
-            )
+            .when_some(timer, |this, timer| {
+                this.child(
+                    Label::new(format_duration(timer))
+                        .size(LabelSize::Small)
+                        .color(Color::Muted),
+                )
+            })
             .when(processing, |this| {
                 this.child(
                     Label::new("Post-processing…")
@@ -784,7 +821,14 @@ impl DictationWindow {
             });
 
         let right = h_flex().gap_2().map(|this| match &self.phase {
-            Phase::Recording { .. } | Phase::Starting => this
+            Phase::Starting => this.child(Self::hint(
+                "Cancel",
+                &editor::actions::Cancel,
+                &composer_focus,
+                cx.listener(|this, _, window, cx| this.cancel(&CancelDictation, window, cx)),
+                cx,
+            )),
+            Phase::Recording { .. } => this
                 .child(Self::hint(
                     "Accept",
                     &ToggleDictation,
@@ -874,6 +918,29 @@ impl Render for DictationWindow {
     }
 }
 
+impl Drop for DictationWindow {
+    fn drop(&mut self) {
+        // A window closed mid-recording still owns the model inside the
+        // recognition thread. Finishing it on a helper thread keeps the UI
+        // responsive and returns the model to the cache instead of losing it.
+        let Phase::Recording { live, .. } = &mut self.phase else {
+            return;
+        };
+        let (Some(live), Some(mut lease)) = (live.take(), self.engine_lease.take()) else {
+            return;
+        };
+        let spawned = std::thread::Builder::new()
+            .name("DictationDiscard".into())
+            .spawn(move || match live.finish() {
+                Ok((transcriber, _)) => lease.return_engine(transcriber),
+                Err(error) => log::warn!("dictation: discarding session failed: {error:#}"),
+            });
+        if let Err(error) = spawned {
+            log::warn!("dictation: could not finish the discarded session: {error}");
+        }
+    }
+}
+
 /// Opens the Dictation Block with the given id in the active thread's composer.
 pub(crate) fn open_dictation_block(
     workspace: &mut Workspace,
@@ -900,12 +967,5 @@ pub(crate) fn block_tooltip(text: &str) -> String {
     } else {
         let short: String = text.chars().take(LIMIT).collect();
         format!("{short}…")
-    }
-}
-
-impl Drop for DictationWindow {
-    fn drop(&mut self) {
-        // A window closed mid-recording drops the live session; its thread
-        // stops on the shared flag and the model is simply reloaded next time.
     }
 }

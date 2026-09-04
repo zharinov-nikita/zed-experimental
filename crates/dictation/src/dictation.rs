@@ -141,7 +141,9 @@ impl Transcriber {
     /// Recognizes 16 kHz mono PCM in `[-1, 1]` and returns the text as one string.
     pub fn transcribe(&mut self, pcm: &[f32]) -> Result<String> {
         let segments = self.segments(pcm)?;
-        Ok(join_text(segments.iter().map(|segment| segment.text.as_str())))
+        Ok(join_text(
+            segments.iter().map(|segment| segment.text.as_str()),
+        ))
     }
 
     /// Recognizes 16 kHz mono PCM in `[-1, 1]` and returns the phrases with
@@ -306,7 +308,10 @@ impl Recorder {
     }
 
     pub fn len(&self) -> usize {
-        self.samples.lock().map(|samples| samples.len()).unwrap_or(0)
+        self.samples
+            .lock()
+            .map(|samples| samples.len())
+            .unwrap_or(0)
     }
 
     pub fn is_empty(&self) -> bool {
@@ -415,17 +420,18 @@ pub struct LiveDictation {
 }
 
 impl LiveDictation {
-    /// Starts capturing the microphone. `confirmed_prefix` is used when
-    /// resuming an existing Dictation Block: it is kept verbatim and new
-    /// phrases are appended. With `save_recording_to` set, the whole session
-    /// is written there as a WAV once it ends (see [`last_recording_path`]).
+    /// Recognizes an already opened microphone. The caller opens the
+    /// [`Recorder`] only once the model is loaded so that nothing is captured
+    /// during Model Loading. `confirmed_prefix` is used when resuming an
+    /// existing Dictation Block: it is kept verbatim and new phrases are
+    /// appended. With `save_recording_to` set, the whole session is written
+    /// there as a WAV once it ends (see [`last_recording_path`]).
     pub fn start(
         transcriber: Transcriber,
-        device: Option<DeviceId>,
+        recorder: Recorder,
         confirmed_prefix: String,
         save_recording_to: Option<PathBuf>,
     ) -> Result<(Self, UnboundedReceiver<DictationEvent>)> {
-        let recorder = Recorder::start(device)?;
         Self::start_with_source(
             transcriber,
             Box::new(recorder),
@@ -724,10 +730,8 @@ mod tests {
         let pcm: Vec<f32> = (0..ENGINE_SAMPLE_RATE * 2)
             .map(|index| ((index % 100) as f32 / 100.0 - 0.5) * 0.4)
             .collect();
-        let path = std::env::temp_dir().join(format!(
-            "zed-dictation-test-{}.wav",
-            std::process::id()
-        ));
+        let path =
+            std::env::temp_dir().join(format!("zed-dictation-test-{}.wav", std::process::id()));
 
         save_recording(&pcm, &path).expect("saving");
         let loaded = load_audio_file(&path).expect("loading");
