@@ -38,6 +38,10 @@ _Avoid_: Cancel, abort
 Appending new speech to an existing Dictation Block from inside the Dictation Window. Already accepted text stays as it is; only the new part goes through Post-processing.
 _Avoid_: Continue, append, re-record
 
+**Session Audio**:
+The sound of one Dictation Session as the user spoke it, kept locally so it can be played back or used to reproduce a recognition problem. Belongs to the Dictation Block the session produced; a Resume adds its sound to the same block.
+_Avoid_: Recording, WAV, last recording, audio file
+
 ### Transcript
 
 **Live Transcript**:
@@ -73,6 +77,18 @@ _Avoid_: Cleanup, polishing, correction
 **Recognizer Artifact**:
 A phrase the Transcription Engine invents on silence or noise ("Продолжение следует", "Subtitles by"). Not filtered by the engine; left to Post-processing.
 _Avoid_: Hallucination, garbage, noise text
+
+**Decoder Loop**:
+The Transcription Engine repeating one short phrase over and over on a near-empty buffer. A decoding failure, not speech and not a Recognizer Artifact: the engine drops it by its shape, without looking at the words.
+_Avoid_: Hallucination loop, stutter, repetition bug
+
+**Engine Assets**:
+The files the Transcription Engine cannot start without: the model file and the folder with the backend modules. Their locations are settings; the files themselves come from Engine Download or from anywhere the user put them.
+_Avoid_: Weights, binaries, dependencies
+
+**Engine Download**:
+Fetching Engine Assets from the Settings window and pointing the settings at them. Chooses from a fixed list; never runs on its own.
+_Avoid_: Auto-download, model manager, installer
 
 **Glossary**:
 A user-maintained list of terms (mostly English technical words) that guides both the Transcription Engine and Post-processing.
