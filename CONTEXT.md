@@ -75,8 +75,12 @@ Optional rewrite of a transcript by a local language model driven by a user-edit
 _Avoid_: Cleanup, polishing, correction
 
 **Recognizer Artifact**:
-A phrase the Transcription Engine invents on silence or noise ("Продолжение следует", "Subtitles by"). Not filtered by the engine; left to Post-processing.
+A phrase the Transcription Engine invents on silence or noise ("Продолжение следует", "Subtitles by"). The engine never judges it by its words: the Speech Gate keeps silence from being decoded at all, and whatever still slips through is left to Post-processing.
 _Avoid_: Hallucination, garbage, noise text
+
+**Speech Gate**:
+The Transcription Engine's decision whether the audio it has not yet decoded contains speech at all, made by comparing it with the noise of the same session. While the gate is closed nothing is decoded and the Pending Text stays empty; when it opens, decoding starts from the beginning of the speech, without the silence before it. It opens easily and closes only after clear silence, because a lost word costs more than a stray artifact.
+_Avoid_: VAD, energy threshold, silence trimming, volume gate
 
 **Decoder Loop**:
 The Transcription Engine repeating one short phrase over and over on a near-empty buffer. A decoding failure, not speech and not a Recognizer Artifact: the engine drops it by its shape, without looking at the words.
