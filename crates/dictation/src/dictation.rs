@@ -22,7 +22,49 @@ use transcribe_cpp::{
     WhisperRunOptions,
 };
 
+pub use audio::OpenedInputDevice;
 pub use cpal::DeviceId;
+
+pub mod engine_download;
+pub mod playback;
+pub mod session_audio;
+
+pub use session_audio::{SessionAudioSink, SessionAudioStore};
+
+/// Where everything the dictation feature stores lives: `dictation` in the
+/// Zed data directory. Engine Assets go into its `models` and `backends`
+/// subfolders, Session Audio into `audio`.
+pub fn data_dir() -> PathBuf {
+    paths::data_dir().join("dictation")
+}
+
+pub fn session_audio_dir() -> PathBuf {
+    data_dir().join("audio")
+}
+
+/// Puts `from` in place of `to`, keeping the old `to` until the new one is
+/// in place: Windows refuses to rename over an existing file, and deleting
+/// first would lose both copies when the rename then fails.
+pub(crate) fn replace_file(from: &Path, to: &Path) -> Result<()> {
+    let previous = to.with_extension("old");
+    if to.exists() {
+        std::fs::rename(to, &previous)
+            .with_context(|| format!("setting aside {}", to.display()))?;
+    }
+    if let Err(error) = std::fs::rename(from, to) {
+        if previous.exists() {
+            std::fs::rename(&previous, to)
+                .with_context(|| format!("restoring {}", to.display()))?;
+        }
+        return Err(error)
+            .with_context(|| format!("moving {} to {}", from.display(), to.display()));
+    }
+    if previous.exists() {
+        std::fs::remove_file(&previous)
+            .with_context(|| format!("removing {}", previous.display()))?;
+    }
+    Ok(())
+}
 
 /// Whisper models are trained on 16 kHz mono audio.
 pub const ENGINE_SAMPLE_RATE: u32 = 16_000;
@@ -149,14 +191,27 @@ impl Transcriber {
     /// Recognizes 16 kHz mono PCM in `[-1, 1]` and returns the phrases with
     /// their timestamps relative to the start of `pcm`.
     pub fn segments(&mut self, pcm: &[f32]) -> Result<Vec<Segment>> {
-        self.segments_after(pcm, "")
+        Ok(drop_decoder_loops(self.segments_after(pcm, "", false)?))
     }
 
     /// Like `segments`, with the text spoken right before `pcm` given to the
     /// model as context, the way whisper.cpp's stream example carries the
     /// previous iteration's tokens over. Short buffers cut out of a sentence
     /// are decoded far more consistently with the sentence in front of them.
-    fn segments_after(&mut self, pcm: &[f32], preceding_text: &str) -> Result<Vec<Segment>> {
+    ///
+    /// With `gate_no_speech` the decoder's own no-speech verdict is trusted
+    /// outright: whisper.cpp drops a window only when its no-speech
+    /// probability is above the threshold *and* the average log-probability
+    /// is below `logprob_thold`, so raising that bound to zero (log
+    /// probabilities never exceed it) leaves the probability alone in charge.
+    /// Used for the tail on stop, where a silent window otherwise turns into
+    /// a Recognizer Artifact (ADR 0001).
+    fn segments_after(
+        &mut self,
+        pcm: &[f32],
+        preceding_text: &str,
+        gate_no_speech: bool,
+    ) -> Result<Vec<Segment>> {
         if pcm.is_empty() {
             return Ok(Vec::new());
         }
@@ -168,20 +223,24 @@ impl Transcriber {
             pcm
         };
         let context = tail_chars(preceding_text, CONTEXT_CHARS);
-        let with_context;
-        let run_options = if context.is_empty() {
+        let adjusted;
+        let run_options = if context.is_empty() && !gate_no_speech {
             &self.run_options
         } else {
             let mut options = self.run_options.clone();
-            let prompt = match &self.glossary_prompt {
-                Some(glossary) => format!("{glossary}\n{context}"),
-                None => context.to_string(),
-            };
             if let Some(RunExtension::Whisper(whisper)) = &mut options.family {
-                whisper.initial_prompt = Some(prompt);
+                if !context.is_empty() {
+                    whisper.initial_prompt = Some(match &self.glossary_prompt {
+                        Some(glossary) => format!("{glossary}\n{context}"),
+                        None => context.to_string(),
+                    });
+                }
+                if gate_no_speech {
+                    whisper.logprob_thold = Some(0.0);
+                }
             }
-            with_context = options;
-            &with_context
+            adjusted = options;
+            &adjusted
         };
         let transcript = self
             .session
@@ -197,6 +256,49 @@ impl Transcriber {
             })
             .filter(|segment| !segment.text.is_empty())
             .collect())
+    }
+
+    /// Recognizes the audio left over when the user stops. Whisper scores
+    /// no-speech per window, and a window that mixes the last words with the
+    /// silence after them scores as speech, so each trailing segment is
+    /// decoded again on its own span with the no-speech gate armed: a
+    /// segment the decoder itself calls silence when it stands alone is a
+    /// decoder failure on the silent tail ("Thank you.") and is dropped.
+    /// Real last words survive the check and end the search.
+    ///
+    /// Segments that already stood in the Live Transcript (`pending_text`,
+    /// the Pending Text at the moment of the stop) were produced while audio
+    /// was still arriving and are never questioned: the gate only judges
+    /// what appeared at the stop itself.
+    pub fn tail_segments(
+        &mut self,
+        pcm: &[f32],
+        preceding_text: &str,
+        pending_text: &str,
+    ) -> Result<Vec<Segment>> {
+        let mut segments = drop_decoder_loops(self.segments_after(pcm, preceding_text, false)?);
+        let pending_words = loop_words(pending_text);
+        while let Some(last) = segments.last() {
+            let last_words = loop_words(&last.text);
+            if !last_words.is_empty() && contains_run(&pending_words, &last_words) {
+                break;
+            }
+            let start = duration_to_samples(last.start).min(pcm.len());
+            let end = duration_to_samples(last.end + SETTLE).clamp(start, pcm.len());
+            if end - start < duration_to_samples(BOUNDARY_FRAME) {
+                // Timestamps outside the audio give the decoder nothing to
+                // judge; without a verdict the words stay.
+                break;
+            }
+            let alone = self.segments_after(&pcm[start..end], preceding_text, true)?;
+            if alone.iter().all(|segment| segment.text.is_empty()) {
+                log::info!("dictation: dropped no-speech tail segment {:?}", last.text);
+                segments.pop();
+            } else {
+                break;
+            }
+        }
+        Ok(segments)
     }
 
     pub fn backend(&self) -> String {
@@ -241,6 +343,7 @@ pub struct Recorder {
     ended: Arc<AtomicBool>,
     samples: Arc<Mutex<Vec<f32>>>,
     thread: Option<JoinHandle<()>>,
+    device: OpenedInputDevice,
 }
 
 impl Recorder {
@@ -250,7 +353,7 @@ impl Recorder {
         let samples = Arc::new(Mutex::new(Vec::<f32>::with_capacity(
             ENGINE_SAMPLE_RATE as usize * 60,
         )));
-        let (opened_tx, opened_rx) = mpsc::channel::<Result<()>>();
+        let (opened_tx, opened_rx) = mpsc::channel::<Result<OpenedInputDevice>>();
         let thread = thread::Builder::new()
             .name("DictationCapture".into())
             .spawn({
@@ -259,8 +362,8 @@ impl Recorder {
                 let samples = samples.clone();
                 move || {
                     // cpal streams must be created and polled on the same thread.
-                    let source = match audio::open_input_stream(device) {
-                        Ok(source) => source,
+                    let (source, opened) = match audio::open_input_stream_reporting(device) {
+                        Ok(opened) => opened,
                         Err(error) => {
                             opened_tx.send(Err(error)).ok();
                             ended.store(true, Ordering::Relaxed);
@@ -270,7 +373,7 @@ impl Recorder {
                     let mut source = source
                         .possibly_disconnected_channels_to_mono()
                         .constant_samplerate(engine_sample_rate());
-                    opened_tx.send(Ok(())).ok();
+                    opened_tx.send(Ok(opened)).ok();
 
                     let mut chunk = Vec::with_capacity(ENGINE_SAMPLE_RATE as usize / 50);
                     while !stop.load(Ordering::Relaxed) {
@@ -294,7 +397,7 @@ impl Recorder {
             })
             .context("spawning capture thread")?;
 
-        opened_rx
+        let device = opened_rx
             .recv()
             .context("capture thread exited before opening the microphone")?
             .context("opening microphone")?;
@@ -304,7 +407,14 @@ impl Recorder {
             ended,
             samples,
             thread: Some(thread),
+            device,
         })
+    }
+
+    /// The input the session is actually captured from, and whether the
+    /// configured device was missing so the default was opened instead.
+    pub fn device(&self) -> &OpenedInputDevice {
+        &self.device
     }
 
     pub fn len(&self) -> usize {
@@ -424,19 +534,19 @@ impl LiveDictation {
     /// [`Recorder`] only once the model is loaded so that nothing is captured
     /// during Model Loading. `confirmed_prefix` is used when resuming an
     /// existing Dictation Block: it is kept verbatim and new phrases are
-    /// appended. With `save_recording_to` set, the whole session is written
-    /// there as a WAV once it ends (see [`last_recording_path`]).
+    /// appended. With `session_audio` set, everything captured is appended
+    /// to the block's Session Audio once the session ends.
     pub fn start(
         transcriber: Transcriber,
         recorder: Recorder,
         confirmed_prefix: String,
-        save_recording_to: Option<PathBuf>,
+        session_audio: Option<SessionAudioSink>,
     ) -> Result<(Self, UnboundedReceiver<DictationEvent>)> {
         Self::start_with_source(
             transcriber,
             Box::new(recorder),
             confirmed_prefix,
-            save_recording_to,
+            session_audio,
         )
     }
 
@@ -459,7 +569,7 @@ impl LiveDictation {
         transcriber: Transcriber,
         source: Box<dyn AudioSource>,
         confirmed_prefix: String,
-        save_recording_to: Option<PathBuf>,
+        session_audio: Option<SessionAudioSink>,
     ) -> Result<(Self, UnboundedReceiver<DictationEvent>)> {
         let stop = Arc::new(AtomicBool::new(false));
         let (events_tx, events_rx) = unbounded();
@@ -472,7 +582,7 @@ impl LiveDictation {
                         transcriber,
                         source,
                         confirmed_prefix,
-                        save_recording_to,
+                        session_audio,
                         stop,
                         events_tx,
                     )
@@ -563,6 +673,89 @@ fn append_text(text: &mut String, part: &str) {
     text.push_str(part);
 }
 
+/// The words of a segment as the Decoder Loop guard sees them: case and
+/// punctuation do not make "Git work tree." differ from "git work tree".
+fn loop_words(text: &str) -> Vec<String> {
+    text.split(|character: char| !character.is_alphanumeric())
+        .filter(|word| !word.is_empty())
+        .map(str::to_lowercase)
+        .collect()
+}
+
+/// Whether `needle` occurs in `haystack` as a contiguous run of words.
+fn contains_run(haystack: &[String], needle: &[String]) -> bool {
+    !needle.is_empty()
+        && haystack
+            .windows(needle.len())
+            .any(|window| window == needle)
+}
+
+/// Minimum repetitions of one n-gram that make a segment a Decoder Loop.
+const LOOP_REPEATS: usize = 3;
+
+/// Whether `words` contain a run of one n-gram of at least `min_n` words
+/// repeated `LOOP_REPEATS` or more times in a row.
+fn has_repeated_run(words: &[String], min_n: usize) -> bool {
+    (min_n..=words.len() / LOOP_REPEATS).any(|n| {
+        (0..=words.len() - LOOP_REPEATS * n).any(|start| {
+            let unit = &words[start..start + n];
+            (1..LOOP_REPEATS).all(|repeat| {
+                let from = start + repeat * n;
+                words.get(from..from + n) == Some(unit)
+            })
+        })
+    })
+}
+
+/// Whether `text` has the shape of a Decoder Loop: the whole text is one
+/// n-gram repeated `LOOP_REPEATS` or more times in a row (an incomplete last
+/// repetition allowed), or a phrase of two or more words is repeated that
+/// often anywhere inside it. The words themselves are never consulted
+/// (ADR 0001): "да да да" and "раз, git work tree, git work tree, git work
+/// tree" are dropped, while "нет, нет, нет, я имею в виду другое" stays,
+/// because people do repeat a single word.
+pub fn is_decoder_loop(text: &str) -> bool {
+    let words = loop_words(text);
+    let whole = (1..=words.len() / LOOP_REPEATS).any(|n| {
+        let unit = &words[..n];
+        words.chunks(n).all(|chunk| unit.starts_with(chunk))
+    });
+    whole || has_repeated_run(&words, 2)
+}
+
+/// Removes Decoder Loops from a recognized buffer: segments that loop inside
+/// themselves, and runs of `LOOP_REPEATS` or more consecutive segments that
+/// repeat the same phrase of two or more words, which is how the same loop
+/// looks when Whisper splits it at timestamps. Single-word segments are
+/// left alone for the same reason a single repeated word is.
+fn drop_decoder_loops(segments: Vec<Segment>) -> Vec<Segment> {
+    let segments: Vec<Segment> = segments
+        .into_iter()
+        .filter(|segment| !is_decoder_loop(&segment.text))
+        .collect();
+    let words: Vec<Vec<String>> = segments
+        .iter()
+        .map(|segment| loop_words(&segment.text))
+        .collect();
+    let mut keep = vec![true; segments.len()];
+    let mut start = 0;
+    while start < segments.len() {
+        let mut end = start + 1;
+        while end < segments.len() && words[end] == words[start] {
+            end += 1;
+        }
+        if end - start >= LOOP_REPEATS && words[start].len() >= 2 {
+            keep[start..end].fill(false);
+        }
+        start = end;
+    }
+    segments
+        .into_iter()
+        .zip(keep)
+        .filter_map(|(segment, keep)| keep.then_some(segment))
+        .collect()
+}
+
 /// Picks the cut position for a segment boundary: the start of the quietest
 /// frame within `BOUNDARY_SEARCH` of `boundary`. Segment timestamps are
 /// approximate and often land on the first syllable of the next phrase;
@@ -611,7 +804,7 @@ fn live_loop(
     mut transcriber: Transcriber,
     mut source: Box<dyn AudioSource>,
     mut confirmed: String,
-    save_recording_to: Option<PathBuf>,
+    session_audio: Option<SessionAudioSink>,
     stop: Arc<AtomicBool>,
     events: UnboundedSender<DictationEvent>,
 ) -> Result<(Transcriber, String)> {
@@ -644,8 +837,8 @@ fn live_loop(
         let buffer_end = available.min(commit_point + window);
         let at_window = available - commit_point >= window - settle;
         let buffer = source.samples(commit_point..buffer_end);
-        let segments = match transcriber.segments_after(&buffer, &confirmed) {
-            Ok(segments) => segments,
+        let segments = match transcriber.segments_after(&buffer, &confirmed, false) {
+            Ok(segments) => drop_decoder_loops(segments),
             Err(error) => {
                 events
                     .unbounded_send(DictationEvent::Error(error.to_string()))
@@ -671,17 +864,18 @@ fn live_loop(
     let session_pcm = source.samples(0..source.len());
     let captured = session_pcm.len();
     drop(source);
-    if let Some(path) = save_recording_to {
-        match save_recording(&session_pcm, &path) {
-            Ok(()) => log::info!("dictation: saved last recording to {}", path.display()),
-            Err(error) => log::warn!("dictation: saving last recording failed: {error:#}"),
+    if let Some(sink) = session_audio {
+        match sink.append(&session_pcm) {
+            Ok(Some(path)) => log::info!("dictation: session audio saved to {}", path.display()),
+            Ok(None) => {}
+            Err(error) => log::warn!("dictation: saving session audio failed: {error:#}"),
         }
     }
     let tail = session_pcm.get(commit_point..).unwrap_or(&[]);
     // Recognition may have fallen behind a slow backend, so the tail can be
     // longer than one Whisper window.
     for chunk in tail.chunks(window) {
-        match transcriber.segments_after(chunk, &confirmed) {
+        match transcriber.tail_segments(chunk, &confirmed, &pending) {
             Ok(segments) => append_segments(&mut confirmed, &segments),
             Err(error) => {
                 log::warn!("dictation: recognizing the tail failed: {error:#}");
@@ -693,12 +887,6 @@ fn live_loop(
     }
     send(&confirmed, "", captured);
     Ok((transcriber, confirmed))
-}
-
-/// The single WAV the last Dictation Session is written to when
-/// `save_last_recording` is on; every session overwrites it.
-pub fn last_recording_path() -> PathBuf {
-    std::env::temp_dir().join("zed-dictation-last-recording.wav")
 }
 
 /// Writes 16 kHz mono PCM as a WAV that [`load_audio_file`] and the
@@ -746,11 +934,67 @@ mod tests {
         assert!(max_error < 1e-6, "samples changed by up to {max_error}");
     }
 
+    fn segment(text: &str) -> Segment {
+        Segment {
+            start: Duration::ZERO,
+            end: Duration::from_secs(1),
+            text: text.to_string(),
+        }
+    }
+
     #[test]
-    fn last_recording_path_is_fixed_and_in_temp_dir() {
-        let path = last_recording_path();
-        assert_eq!(path, last_recording_path());
-        assert!(path.starts_with(std::env::temp_dir()));
-        assert_eq!(path.extension().and_then(|ext| ext.to_str()), Some("wav"));
+    fn a_phrase_repeated_three_or_more_times_is_a_decoder_loop() {
+        assert!(is_decoder_loop(
+            "git work tree, git work tree, git work tree"
+        ));
+        assert!(is_decoder_loop(
+            "Git work tree. Git work tree. Git work tree. Git work tree. Git work"
+        ));
+        assert!(is_decoder_loop("да да да"));
+        assert!(is_decoder_loop(
+            "Продолжение следует. Продолжение следует. Продолжение следует."
+        ));
+        assert!(is_decoder_loop(
+            "Раз, два, git work tree, git work tree, git work tree."
+        ));
+    }
+
+    #[test]
+    fn speech_with_a_single_repeated_word_is_not_a_decoder_loop() {
+        assert!(!is_decoder_loop("это очень очень важно"));
+        assert!(!is_decoder_loop("1, 2, 3, 4, 5"));
+        assert!(!is_decoder_loop("git work tree, git work tree"));
+        assert!(!is_decoder_loop("да да"));
+        assert!(!is_decoder_loop(""));
+        assert!(!is_decoder_loop("нет, нет, нет, я имею в виду другое"));
+        assert!(!is_decoder_loop("git work tree, git work tree, и всё"));
+    }
+
+    #[test]
+    fn looping_segments_are_dropped_and_speech_is_kept() {
+        let kept = drop_decoder_loops(vec![
+            segment("Раз, два, три."),
+            segment("git work tree, git work tree, git work tree, git work tree"),
+            segment("четыре, пять."),
+        ]);
+        let texts: Vec<&str> = kept.iter().map(|segment| segment.text.as_str()).collect();
+        assert_eq!(texts, vec!["Раз, два, три.", "четыре, пять."]);
+    }
+
+    #[test]
+    fn a_run_of_identical_segments_is_a_decoder_loop_too() {
+        let kept = drop_decoder_loops(vec![
+            segment("Раз, два, три."),
+            segment("git work tree"),
+            segment("Git work tree."),
+            segment("git work tree"),
+            segment("четыре"),
+            segment("четыре"),
+        ]);
+        let texts: Vec<&str> = kept.iter().map(|segment| segment.text.as_str()).collect();
+        assert_eq!(texts, vec!["Раз, два, три.", "четыре", "четыре"]);
+
+        let single_words = drop_decoder_loops(vec![segment("да."), segment("Да."), segment("да")]);
+        assert_eq!(single_words.len(), 3, "single-word segments are speech");
     }
 }

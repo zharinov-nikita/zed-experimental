@@ -37,6 +37,8 @@ pub struct DropdownMenu {
     aria_label: Option<SharedString>,
     aria_description: Option<SharedString>,
     aria_value: Option<SharedString>,
+    /// Local: runs every time the menu opens, before the selection moves.
+    on_open: Option<std::rc::Rc<dyn Fn(&mut Window, &mut App)>>,
 }
 
 impl DropdownMenu {
@@ -63,6 +65,7 @@ impl DropdownMenu {
             aria_label: None,
             aria_description: None,
             aria_value: None,
+            on_open: None,
         }
     }
 
@@ -89,6 +92,7 @@ impl DropdownMenu {
             aria_label: None,
             aria_description: None,
             aria_value: None,
+            on_open: None,
         }
     }
 
@@ -144,6 +148,13 @@ impl DropdownMenu {
 
     pub fn no_chevron(mut self) -> Self {
         self.chevron = false;
+        self
+    }
+
+    /// Local: a callback for every opening of the menu, e.g. to refresh the
+    /// data the next build of the menu will show.
+    pub fn on_open(mut self, on_open: impl Fn(&mut Window, &mut App) + 'static) -> Self {
+        self.on_open = Some(std::rc::Rc::new(on_open));
         self
     }
 
@@ -282,10 +293,14 @@ impl RenderOnce for DropdownMenu {
         // immediately, instead of focusing the bare menu container and
         // announcing only "menu". See the ARIA menu button pattern.
         let menu_for_open = self.menu.clone();
+        let custom_on_open = self.on_open.clone();
         let mut popover = PopoverMenu::new((self.id.clone(), "popover"))
             .full_width(self.full_width)
             .with_handle(handle)
             .on_open(std::rc::Rc::new(move |window, cx| {
+                if let Some(on_open) = &custom_on_open {
+                    on_open(window, cx);
+                }
                 menu_for_open.update(cx, |menu, cx| {
                     menu.select_toggled_or_first(window, cx);
                 });

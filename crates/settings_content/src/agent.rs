@@ -381,12 +381,22 @@ pub struct DictationSettingsContent {
     ///
     /// Default: true
     pub keep_model_loaded: Option<bool>,
-    /// Save the audio of the last dictation session as a WAV file in the
-    /// temporary directory for diagnosing recognition problems.
-    ///
-    /// Default: false
-    pub save_last_recording: Option<bool>,
+    /// Session Audio: the sound of every dictation session, kept locally so
+    /// it can be replayed or used to reproduce a recognition problem.
+    pub session_audio: Option<DictationSessionAudioSettingsContent>,
     pub post_processing: Option<DictationPostProcessingSettingsContent>,
+}
+
+/// Local: Session Audio retention.
+#[with_fallible_options]
+#[derive(Clone, PartialEq, Serialize, Deserialize, JsonSchema, MergeFrom, Debug, Default)]
+pub struct DictationSessionAudioSettingsContent {
+    /// How many dictation sessions keep their audio (16 kHz mono WAV in the
+    /// `dictation/audio` folder of the Zed data directory). The oldest files
+    /// are deleted first; `0` turns Session Audio off.
+    ///
+    /// Default: 20
+    pub keep: Option<u32>,
 }
 
 /// Local: rewriting of the raw transcript by a language model.

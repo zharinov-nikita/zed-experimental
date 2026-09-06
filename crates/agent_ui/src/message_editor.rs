@@ -740,20 +740,10 @@ impl MessageEditor {
         &self.editor
     }
 
-    /// Local: inserts a Dictation Block at the cursor and returns its id.
+    /// Local: inserts a Dictation Block with the given id at the cursor. The
+    /// id is chosen by the Dictation Window so the block's Session Audio,
+    /// written under that id, matches from the start.
     pub fn insert_dictation_block(
-        &mut self,
-        text: String,
-        duration: std::time::Duration,
-        window: &mut Window,
-        cx: &mut Context<Self>,
-    ) -> Option<String> {
-        let id = uuid::Uuid::new_v4().to_string();
-        self.insert_dictation_block_with_id(id.clone(), text, duration, window, cx)
-            .then_some(id)
-    }
-
-    fn insert_dictation_block_with_id(
         &mut self,
         id: String,
         text: String,
@@ -846,7 +836,7 @@ impl MessageEditor {
         cx: &mut Context<Self>,
     ) {
         let Some(block) = self.dictation_blocks.remove(id) else {
-            self.insert_dictation_block(text, duration, window, cx);
+            self.insert_dictation_block(id.to_string(), text, duration, window, cx);
             return;
         };
         self.editor.update(cx, |editor, cx| {
@@ -868,7 +858,7 @@ impl MessageEditor {
         self.mention_set.update(cx, |mention_set, cx| {
             mention_set.remove_mention(&block.crease_id, cx);
         });
-        self.insert_dictation_block_with_id(id.to_string(), text, duration, window, cx);
+        self.insert_dictation_block(id.to_string(), text, duration, window, cx);
     }
 
     pub fn is_empty(&self, cx: &App) -> bool {

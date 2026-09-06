@@ -32,16 +32,9 @@ pub fn ensure_devices_initialized(cx: &mut App) {
     if cx.has_global::<AvailableAudioDevices>() {
         return;
     }
-    cx.default_global::<AvailableAudioDevices>();
-    let task = cx
-        .background_executor()
-        .spawn(async move { get_available_audio_devices() });
-    cx.spawn(async move |cx: &mut AsyncApp| {
-        let devices = task.await;
-        cx.update(|cx| cx.set_global(AvailableAudioDevices(devices)));
-        cx.refresh();
-    })
-    .detach();
+    // Local: the first enumeration goes through the refresh bookkeeping so
+    // `refresh_devices_if_stale` does not repeat it right away.
+    refresh_devices(cx);
 }
 
 #[derive(Default)]
@@ -117,23 +110,66 @@ impl Audio {
 pub fn open_input_stream(
     device_id: Option<DeviceId>,
 ) -> anyhow::Result<rodio::microphone::Microphone> {
+    open_input_stream_reporting(device_id).map(|(stream, _)| stream)
+}
+
+/// Local: which input a microphone stream actually opened.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct OpenedInputDevice {
+    /// Display name of the opened device (see [`device_display_name`]).
+    pub name: String,
+    /// The configured device was not found and the default input was opened instead.
+    pub configured_device_missing: bool,
+}
+
+/// Local: like [`open_input_stream`], also reporting which device was opened
+/// so the caller can show it and say when the configured one was missing.
+pub fn open_input_stream_reporting(
+    device_id: Option<DeviceId>,
+) -> anyhow::Result<(rodio::microphone::Microphone, OpenedInputDevice)> {
     let builder = rodio::microphone::MicrophoneBuilder::new();
-    let builder = if let Some(id) = device_id {
+    let (builder, opened) = if let Some(id) = device_id {
         // TODO(jk): upstream patch
         // if let Some(input_device) = default_host().device_by_id(id) {
         //     builder.device(input_device);
         // }
         match find_input_device(&id) {
-            Some(input) => builder.device(input)?,
+            Some(input) => {
+                let name = input
+                    .clone()
+                    .into_inner()
+                    .description()
+                    .map(|description| device_display_name(&description))
+                    .unwrap_or_else(|_| id.to_string());
+                (
+                    builder.device(input)?,
+                    OpenedInputDevice {
+                        name,
+                        configured_device_missing: false,
+                    },
+                )
+            }
             None => {
                 log::warn!(
                     "Selected audio input device {id} not found, falling back to the default input"
                 );
-                builder.default_device()?
+                (
+                    builder.default_device()?,
+                    OpenedInputDevice {
+                        name: default_input_name(),
+                        configured_device_missing: true,
+                    },
+                )
             }
         }
     } else {
-        builder.default_device()?
+        (
+            builder.default_device()?,
+            OpenedInputDevice {
+                name: default_input_name(),
+                configured_device_missing: false,
+            },
+        )
     };
     let stream = builder
         .default_config()?
@@ -147,7 +183,32 @@ pub fn open_input_stream(
         .prefer_buffer_sizes(512..)
         .open_stream()?;
     log::info!("Opened microphone: {:?}", stream.config());
-    Ok(stream)
+    Ok((stream, opened))
+}
+
+/// Local: the name of the system default input, or a placeholder when the
+/// host cannot describe it.
+fn default_input_name() -> String {
+    default_host()
+        .default_input_device()
+        .and_then(|device| device.description().ok())
+        .map(|description| device_display_name(&description))
+        .unwrap_or_else(|| "Default input".to_string())
+}
+
+/// Local: the name a device is shown under everywhere in Zed. WASAPI reports
+/// the short device description ("Microphone") as the name and puts the
+/// friendly name Windows shows ("Microphone (fifine Microphone)") into the
+/// extended lines, so the first extended line is preferred; without one the
+/// short name is used.
+pub fn device_display_name(description: &DeviceDescription) -> String {
+    description
+        .extended()
+        .iter()
+        .map(|line| line.trim())
+        .find(|line| !line.is_empty())
+        .unwrap_or_else(|| description.name())
+        .to_string()
 }
 
 /// Local: rodio's microphone builder only accepts devices from its own input
@@ -229,6 +290,11 @@ pub struct AudioDeviceInfo {
 }
 
 impl AudioDeviceInfo {
+    /// Local: the name shown in device lists; the id belongs in a tooltip.
+    pub fn display_name(&self) -> String {
+        device_display_name(&self.desc)
+    }
+
     pub fn matches_input(&self, is_input: bool) -> bool {
         if is_input {
             self.desc.supports_input()
@@ -265,3 +331,81 @@ fn get_available_audio_devices() -> Vec<AudioDeviceInfo> {
 pub struct AvailableAudioDevices(pub Vec<AudioDeviceInfo>);
 
 impl Global for AvailableAudioDevices {}
+
+/// Local: bookkeeping for on-demand device refreshes, so a dropdown that is
+/// re-rendered every frame does not enumerate devices every frame.
+#[derive(Default)]
+struct DeviceRefresh {
+    last_started: Option<std::time::Instant>,
+    in_flight: bool,
+}
+
+impl Global for DeviceRefresh {}
+
+/// Local: enumerates the audio devices again on a background thread and
+/// replaces [`AvailableAudioDevices`] when done, so a microphone plugged in
+/// after Zed started shows up without a restart. Concurrent calls coalesce.
+pub fn refresh_devices(cx: &mut App) {
+    {
+        let refresh = cx.default_global::<DeviceRefresh>();
+        if refresh.in_flight {
+            return;
+        }
+        refresh.in_flight = true;
+        refresh.last_started = Some(std::time::Instant::now());
+    }
+    cx.default_global::<AvailableAudioDevices>();
+    let task = cx
+        .background_executor()
+        .spawn(async move { get_available_audio_devices() });
+    cx.spawn(async move |cx: &mut AsyncApp| {
+        let devices = task.await;
+        cx.update(|cx| {
+            cx.set_global(AvailableAudioDevices(devices));
+            cx.default_global::<DeviceRefresh>().in_flight = false;
+        });
+        cx.refresh();
+    })
+    .detach();
+}
+
+/// Local: [`refresh_devices`] unless a refresh started less than `max_age`
+/// ago. Called from render code that wants a fresh list without paying for
+/// it on every frame.
+pub fn refresh_devices_if_stale(max_age: std::time::Duration, cx: &mut App) {
+    let stale = cx
+        .default_global::<DeviceRefresh>()
+        .last_started
+        .is_none_or(|started| started.elapsed() >= max_age);
+    if stale {
+        refresh_devices(cx);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use cpal::DeviceDescriptionBuilder;
+
+    #[test]
+    fn the_friendly_name_is_preferred_over_the_short_name() {
+        let description = DeviceDescriptionBuilder::new("Microphone")
+            .add_extended_line("Microphone (fifine Microphone)")
+            .build();
+        assert_eq!(
+            device_display_name(&description),
+            "Microphone (fifine Microphone)"
+        );
+    }
+
+    #[test]
+    fn without_a_friendly_name_the_short_name_is_used() {
+        let description = DeviceDescriptionBuilder::new("Headset Microphone").build();
+        assert_eq!(device_display_name(&description), "Headset Microphone");
+
+        let blank = DeviceDescriptionBuilder::new("Microphone")
+            .add_extended_line("   ")
+            .build();
+        assert_eq!(device_display_name(&blank), "Microphone");
+    }
+}

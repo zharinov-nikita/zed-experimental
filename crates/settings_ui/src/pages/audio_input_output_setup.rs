@@ -3,12 +3,19 @@ use cpal::DeviceId;
 use gpui::{AnyElement, App, ElementId, ReadGlobal, SharedString, Window};
 use settings::{AudioInputDeviceName, AudioOutputDeviceName, SettingsStore};
 use std::str::FromStr;
-use ui::{ContextMenu, DropdownMenu, DropdownStyle, FluentBuilder, IconPosition, IntoElement};
+use std::time::Duration;
+use ui::{
+    ContextMenu, DropdownMenu, DropdownStyle, FluentBuilder, IconPosition, IntoElement, Tooltip,
+};
 use util::ResultExt;
 
 use crate::{SettingField, SettingsFieldMetadata, SettingsUiFile, update_settings_file};
 
 pub(crate) const SYSTEM_DEFAULT: &str = "System Default";
+
+/// Local: a dropdown rendered within this long after the last enumeration
+/// does not enumerate devices again; opening it always does.
+const DEVICE_LIST_MAX_AGE: Duration = Duration::from_secs(2);
 
 pub(crate) fn get_current_device(
     current_id: Option<&DeviceId>,
@@ -38,8 +45,14 @@ where
     F: Fn(Option<DeviceId>, &mut Window, &mut App) + Clone + 'static,
 {
     audio::ensure_devices_initialized(cx);
+    // Local: a microphone plugged in after Zed started must show up here.
+    audio::refresh_devices_if_stale(DEVICE_LIST_MAX_AGE, cx);
     let devices = cx.global::<AvailableAudioDevices>().0.clone();
     let current_device = get_current_device(current_device_id.as_ref(), is_input, &devices);
+    // Local: the id is shown only in the trigger tooltip; names are the ones Windows uses.
+    let current_device_tooltip: Option<SharedString> = current_device
+        .as_ref()
+        .map(|info| format!("{}\n{}", info.display_name(), info.id).into());
 
     let menu = ContextMenu::build(window, cx, {
         let current_device = current_device.clone();
@@ -66,7 +79,7 @@ where
                 let device_id = device.id.clone();
 
                 menu = menu.toggleable_entry(
-                    device.to_string(),
+                    device.display_name(),
                     is_current,
                     IconPosition::Start,
                     None,
@@ -85,12 +98,16 @@ where
     DropdownMenu::new(
         dropdown_id,
         current_device
-            .map(|info| info.desc.name().to_string())
+            .map(|info| info.display_name())
             .unwrap_or(SYSTEM_DEFAULT.to_string()),
         menu,
     )
     .style(DropdownStyle::Outlined)
     .full_width(true)
+    .on_open(|_, cx| audio::refresh_devices(cx))
+    .when_some(current_device_tooltip, |this, tooltip| {
+        this.trigger_tooltip(Tooltip::text(tooltip))
+    })
     .when_some(aria_label, |this, label| this.aria_label(label))
     .when_some(aria_description, |this, description| {
         this.aria_description(description)

@@ -4548,25 +4548,27 @@ impl ThreadView {
                 text,
                 duration,
                 block_id,
+                replaces_existing,
             } => {
-                self.message_editor
-                    .update(cx, |message_editor, cx| match block_id {
-                        Some(id) => message_editor.replace_dictation_block(
-                            id,
+                self.message_editor.update(cx, |message_editor, cx| {
+                    if *replaces_existing {
+                        message_editor.replace_dictation_block(
+                            block_id,
                             text.clone(),
                             *duration,
                             window,
                             cx,
-                        ),
-                        None => {
-                            message_editor.insert_dictation_block(
-                                text.clone(),
-                                *duration,
-                                window,
-                                cx,
-                            );
-                        }
-                    });
+                        );
+                    } else {
+                        message_editor.insert_dictation_block(
+                            block_id.clone(),
+                            text.clone(),
+                            *duration,
+                            window,
+                            cx,
+                        );
+                    }
+                });
                 self.close_dictation_window(window, cx);
             }
             DictationWindowEvent::RecordingStarted => {

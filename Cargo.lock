@@ -5257,11 +5257,20 @@ name = "dictation"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "async-compression",
+ "async-tar",
  "audio",
  "cpal",
  "futures 0.3.32",
+ "hex",
+ "http_client",
  "log",
+ "paths",
  "rodio",
+ "sha1",
+ "sha2",
+ "smol",
+ "tempfile",
  "transcribe-cpp",
 ]
 
@@ -16971,6 +16980,7 @@ dependencies = [
  "copilot",
  "copilot_ui",
  "cpal",
+ "dictation",
  "edit_prediction",
  "edit_prediction_ui",
  "editor",

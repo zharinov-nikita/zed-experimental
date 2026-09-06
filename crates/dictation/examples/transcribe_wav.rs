@@ -66,6 +66,13 @@ fn main() -> anyhow::Result<()> {
                 segment.text
             );
         }
+        let tail = transcriber.tail_segments(&pcm, "", "")?;
+        println!(
+            "as a stop tail (no-speech gate on trailing segments): {:?}",
+            tail.iter()
+                .map(|segment| segment.text.as_str())
+                .collect::<Vec<_>>()
+        );
     }
     Ok(())
 }

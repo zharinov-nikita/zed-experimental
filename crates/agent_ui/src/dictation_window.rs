@@ -6,19 +6,22 @@
 //! emits [`DictationWindowEvent::Accept`] so the thread view can place a
 //! Dictation Block into the composer. See `CONTEXT.md` for the vocabulary.
 
+use std::path::PathBuf;
 use std::sync::Mutex;
 use std::time::Duration;
 
 use agent_settings::{AgentSettings, DictationSettings};
 use anyhow::{Result, anyhow};
+use dictation::playback::Playback;
 use dictation::{
-    DictationEvent, DictationUpdate, EngineConfig, LiveDictation, Recorder, Transcriber,
+    DictationEvent, DictationUpdate, EngineConfig, LiveDictation, OpenedInputDevice, Recorder,
+    SessionAudioSink, SessionAudioStore, Transcriber,
 };
-use editor::Editor;
+use editor::{Editor, EditorSettingsScrollbarProxy};
 use futures::StreamExt as _;
 use gpui::{
-    Animation, AnimationExt as _, App, Context, Entity, EventEmitter, FocusHandle, Focusable,
-    HighlightStyle, Rems, ScrollHandle, StyledText, Task, Window, pulsating_between,
+    Action as _, Animation, AnimationExt as _, App, Context, Entity, EventEmitter, FocusHandle,
+    Focusable, HighlightStyle, Rems, ScrollHandle, StyledText, Task, Window, pulsating_between,
 };
 use language_model::{
     CompletionIntent, LanguageModel, LanguageModelId, LanguageModelProviderId,
@@ -27,16 +30,29 @@ use language_model::{
 use settings::Settings as _;
 use std::sync::Arc;
 use theme_settings::ThemeSettings;
-use ui::{Callout, Divider, Indicator, KeyBinding, Severity, prelude::*};
+use ui::{
+    Callout, Divider, Indicator, KeyBinding, Scrollbars, Severity, SpinnerLabel, Tooltip,
+    WithScrollbar as _, prelude::*,
+};
 use workspace::Workspace;
 
 use crate::dictation_engine::{EngineCache, EngineLease};
+use crate::dictation_footer::{
+    FooterAction, FooterInput, FooterLabel, FooterPhase, FooterState, ProcessedBy, footer_state,
+};
 use crate::{
-    AcceptDictation, AgentPanel, CancelDictation, ToggleDictation, ToggleDictationRawText,
+    AcceptDictation, AgentPanel, CancelDictation, ToggleDictation, ToggleDictationPlayback,
+    ToggleDictationRawText,
 };
 
 /// The loaded Whisper model is kept between sessions: loading it takes seconds.
 static ENGINE: Mutex<EngineCache<Transcriber>> = Mutex::new(EngineCache::new());
+
+/// The settings path the Raw/Processed label opens: Settings > AI > Dictation.
+const DICTATION_SETTINGS_PATH: &str = "agent.dictation";
+
+/// How much of the Post-processing prompt the label tooltip quotes.
+const PROMPT_PREVIEW_CHARS: usize = 200;
 
 fn engine_config(settings: &DictationSettings) -> Result<EngineConfig> {
     let model_path = settings.model_path.clone().ok_or_else(|| {
@@ -49,6 +65,10 @@ fn engine_config(settings: &DictationSettings) -> Result<EngineConfig> {
         glossary: settings.glossary.clone(),
         threads: 0,
     })
+}
+
+fn session_audio_store(settings: &DictationSettings) -> SessionAudioStore {
+    SessionAudioStore::new(dictation::session_audio_dir(), settings.session_audio_keep)
 }
 
 /// The microphone from `audio.experimental.input_audio_device`, read at every
@@ -65,6 +85,30 @@ fn input_audio_device(cx: &App) -> Option<dictation::DeviceId> {
 fn input_audio_device(_cx: &App) -> Option<dictation::DeviceId> {
     None
 }
+
+/// The output from `audio.experimental.output_audio_device` for playing
+/// Session Audio; `None` is the system default.
+#[cfg(feature = "audio")]
+fn output_audio_device(cx: &App) -> Option<dictation::DeviceId> {
+    audio::AudioSettings::get_global(cx)
+        .output_audio_device
+        .clone()
+}
+
+#[cfg(not(feature = "audio"))]
+fn output_audio_device(_cx: &App) -> Option<dictation::DeviceId> {
+    None
+}
+
+/// Enumerates devices again so the footer names the microphone that exists
+/// now, not the one that existed when Zed started.
+#[cfg(feature = "audio")]
+fn refresh_audio_devices(cx: &mut App) {
+    audio::refresh_devices(cx);
+}
+
+#[cfg(not(feature = "audio"))]
+fn refresh_audio_devices(_cx: &mut App) {}
 
 fn select_post_processing_model(
     settings: &DictationSettings,
@@ -157,6 +201,17 @@ fn format_duration(duration: Duration) -> String {
     format!("{}:{:02}", seconds / 60, seconds % 60)
 }
 
+/// The first lines of the prompt, as the label tooltip quotes them.
+fn prompt_preview(prompt: &str) -> String {
+    let trimmed = prompt.trim();
+    if trimmed.chars().count() <= PROMPT_PREVIEW_CHARS {
+        trimmed.to_string()
+    } else {
+        let head: String = trimmed.chars().take(PROMPT_PREVIEW_CHARS).collect();
+        format!("{}…", head.trim_end())
+    }
+}
+
 enum Phase {
     Starting,
     Recording {
@@ -170,11 +225,14 @@ enum Phase {
 
 #[derive(Clone, Debug)]
 pub enum DictationWindowEvent {
-    /// The user accepted the text; the thread view turns it into a Dictation Block.
+    /// The user accepted the text; the thread view turns it into a Dictation
+    /// Block with `block_id`, replacing the block of that id when
+    /// `replaces_existing` is set.
     Accept {
         text: String,
         duration: Duration,
-        block_id: Option<String>,
+        block_id: String,
+        replaces_existing: bool,
     },
     /// Recording (re)started; focus should return to the composer.
     RecordingStarted,
@@ -186,20 +244,32 @@ pub struct DictationWindow {
     focus_handle: FocusHandle,
     composer_focus_handle: FocusHandle,
     phase: Phase,
-    block_id: Option<String>,
+    /// The Dictation Block this session belongs to. Chosen when the window
+    /// opens so that Session Audio is filed under it from the first second,
+    /// whether or not the text is accepted in the end.
+    block_id: String,
+    /// The block already lives in the composer (the window opened from its chip).
+    replaces_existing: bool,
     /// Text kept verbatim when resuming a Dictation Block.
     prefix: String,
     base_duration: Duration,
     raw: String,
     processed: Option<String>,
+    processed_by: Option<ProcessedBy>,
+    /// The prompt template Post-processing ran with, for the label tooltip.
+    processed_with_prompt: Option<String>,
     post_processing_error: Option<SharedString>,
     /// Why the last Resume could not start; shown in review so the text is kept.
     resume_error: Option<SharedString>,
+    /// Why Session Audio could not be played; shown in review.
+    playback_error: Option<SharedString>,
     /// Set while a Resume is starting so a failure returns to review.
     resuming: bool,
     show_raw: bool,
     duration: Duration,
-    accept_when_done: bool,
+    input_device: Option<OpenedInputDevice>,
+    session_audio_path: Option<PathBuf>,
+    playback: Option<Playback>,
     /// Held while recording; dropping the window frees the session slot.
     engine_lease: Option<EngineLease<Transcriber>>,
     review_editor: Entity<Editor>,
@@ -207,6 +277,7 @@ pub struct DictationWindow {
     _events_task: Option<Task<()>>,
     _engine_task: Option<Task<()>>,
     _post_processing_task: Option<Task<()>>,
+    _playback_task: Option<Task<()>>,
 }
 
 impl EventEmitter<DictationWindowEvent> for DictationWindow {}
@@ -228,29 +299,41 @@ impl DictationWindow {
             let mut editor = Editor::auto_height(1, 10, window, cx);
             editor.set_soft_wrap();
             editor.set_show_indent_guides(false, cx);
+            editor.set_show_vertical_scrollbar(true, cx);
             editor
         });
+        let (block_id, replaces_existing) = match block_id {
+            Some(block_id) => (block_id, true),
+            None => (uuid::Uuid::new_v4().to_string(), false),
+        };
         Self {
             focus_handle: cx.focus_handle(),
             composer_focus_handle,
             phase: Phase::Starting,
             block_id,
+            replaces_existing,
             prefix: String::new(),
             base_duration: Duration::ZERO,
             raw: String::new(),
             processed: None,
+            processed_by: None,
+            processed_with_prompt: None,
             post_processing_error: None,
             resume_error: None,
+            playback_error: None,
             resuming: false,
             show_raw: false,
             duration: Duration::ZERO,
-            accept_when_done: false,
+            input_device: None,
+            session_audio_path: None,
+            playback: None,
             engine_lease: None,
             review_editor,
             scroll_handle: ScrollHandle::new(),
             _events_task: None,
             _engine_task: None,
             _post_processing_task: None,
+            _playback_task: None,
         }
     }
 
@@ -283,12 +366,18 @@ impl DictationWindow {
             editor.set_text(text, window, cx);
         });
         this.phase = Phase::Review;
+        this.refresh_session_audio(cx);
         this.focus_review_editor(window, cx);
         this
     }
 
     pub fn is_recording(&self) -> bool {
         matches!(self.phase, Phase::Recording { .. } | Phase::Starting)
+    }
+
+    fn refresh_session_audio(&mut self, cx: &App) {
+        let settings = &AgentSettings::get_global(cx).dictation;
+        self.session_audio_path = session_audio_store(settings).existing(&self.block_id);
     }
 
     fn start_recording(&mut self, window: &mut Window, cx: &mut Context<Self>) {
@@ -300,19 +389,27 @@ impl DictationWindow {
                 return;
             }
         };
+        self.stop_playback(cx);
         self.phase = Phase::Starting;
         self.processed = None;
+        self.processed_by = None;
         self.post_processing_error = None;
         self.resume_error = None;
+        self.input_device = None;
         cx.notify();
         cx.emit(DictationWindowEvent::RecordingStarted);
+        refresh_audio_devices(cx);
 
         let prefix = self.prefix.clone();
         let device = input_audio_device(cx);
         let keep_model_loaded = settings.keep_model_loaded;
-        let save_recording_to = settings
-            .save_last_recording
-            .then(dictation::last_recording_path);
+        let session_audio = {
+            let store = session_audio_store(&settings);
+            store.is_enabled().then(|| SessionAudioSink {
+                store,
+                block_id: self.block_id.clone(),
+            })
+        };
         self._engine_task = Some(cx.spawn_in(window, async move |this, cx| {
             // Only the slow, cancellable part runs in the background: if the
             // window goes away meanwhile, dropping the lease still returns the
@@ -330,14 +427,16 @@ impl DictationWindow {
                     let transcriber = lease
                         .take_engine()
                         .ok_or_else(|| anyhow!("dictation engine lease is empty"))?;
+                    let input_device = recorder.device().clone();
                     let (live, events) =
-                        LiveDictation::start(transcriber, recorder, prefix, save_recording_to)?;
-                    Ok((lease, live, events))
+                        LiveDictation::start(transcriber, recorder, prefix, session_audio)?;
+                    Ok((lease, live, events, input_device))
                 });
                 match started {
-                    Ok((lease, live, events)) => {
+                    Ok((lease, live, events, input_device)) => {
                         this.engine_lease = Some(lease);
                         this.resuming = false;
+                        this.input_device = Some(input_device);
                         this.phase = Phase::Recording {
                             update: DictationUpdate::default(),
                             live: Some(live),
@@ -398,13 +497,8 @@ impl DictationWindow {
     }
 
     /// Stops recording. The remaining audio is recognized, then the text is
-    /// post-processed and either accepted right away or shown for review.
-    fn stop_recording(
-        &mut self,
-        accept_when_done: bool,
-        window: &mut Window,
-        cx: &mut Context<Self>,
-    ) {
+    /// post-processed and shown for review.
+    fn stop_recording(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         let Phase::Recording { live, update } = &mut self.phase else {
             return;
         };
@@ -412,7 +506,6 @@ impl DictationWindow {
             return;
         };
         let elapsed = update.elapsed;
-        self.accept_when_done = accept_when_done;
         self.phase = Phase::Finishing;
         cx.notify();
 
@@ -447,6 +540,8 @@ impl DictationWindow {
     ) {
         self.raw = text;
         self.duration = self.base_duration + elapsed;
+        self.input_device = None;
+        self.refresh_session_audio(cx);
         if self.raw.trim().is_empty() {
             if self.prefix.trim().is_empty() {
                 cx.emit(DictationWindowEvent::Dismiss);
@@ -455,6 +550,7 @@ impl DictationWindow {
             self.raw = self.prefix.clone();
         }
         self.processed = None;
+        self.processed_by = None;
         self.post_processing_error = None;
         self.show_raw = true;
         let raw = self.raw.clone();
@@ -488,16 +584,25 @@ impl DictationWindow {
             .replace("${output}", &new_part)
             .replace("${glossary}", &settings.glossary.join(", "));
         let model = post_processing_model(settings, cx);
-        if !matches!(self.phase, Phase::Finishing) || !self.accept_when_done {
-            self.phase = Phase::Review;
-            self.focus_review_editor(window, cx);
-        }
+        self.processed_with_prompt = Some(settings.post_processing_prompt.clone());
+        self.phase = Phase::Review;
+        self.focus_review_editor(window, cx);
         cx.notify();
 
         self._post_processing_task = Some(cx.spawn_in(window, async move |this, cx| {
             let result: Result<String> = async {
                 let model = model.await.ok_or_else(|| {
                     anyhow!("No language model is configured for post-processing.")
+                })?;
+                // The label names the model actually used, including the
+                // fallback to the agent's default model.
+                let processed_by = ProcessedBy {
+                    provider: model.provider_name().0.to_string(),
+                    model: model.name().0.to_string(),
+                };
+                this.update(cx, |this, cx| {
+                    this.processed_by = Some(processed_by);
+                    cx.notify();
                 })?;
                 let temperature = cx
                     .update(|_, cx| AgentSettings::temperature_for_model(&model, cx))
@@ -548,9 +653,11 @@ impl DictationWindow {
                 });
             }
             Ok(_) => {
+                self.processed_by = None;
                 self.post_processing_error = Some("Post-processing returned no text.".into());
             }
             Err(error) => {
+                self.processed_by = None;
                 self.post_processing_error = Some(format!("{error:#}").into());
             }
         }
@@ -558,11 +665,6 @@ impl DictationWindow {
     }
 
     fn finish_review(&mut self, window: &mut Window, cx: &mut Context<Self>) {
-        if self.accept_when_done {
-            self.accept_when_done = false;
-            self.emit_accept(cx);
-            return;
-        }
         self.phase = Phase::Review;
         self.focus_review_editor(window, cx);
         cx.notify();
@@ -574,6 +676,7 @@ impl DictationWindow {
     }
 
     fn emit_accept(&mut self, cx: &mut Context<Self>) {
+        self.stop_playback(cx);
         let text = self.review_editor.read(cx).text(cx).trim().to_string();
         if text.is_empty() {
             cx.emit(DictationWindowEvent::Dismiss);
@@ -583,6 +686,7 @@ impl DictationWindow {
             text,
             duration: self.duration,
             block_id: self.block_id.clone(),
+            replaces_existing: self.replaces_existing,
         });
     }
 
@@ -593,24 +697,42 @@ impl DictationWindow {
         self.start_recording(window, cx);
     }
 
+    fn footer_input(&self) -> FooterInput {
+        let phase = match &self.phase {
+            Phase::Starting => FooterPhase::Starting,
+            Phase::Recording { .. } => FooterPhase::Recording,
+            Phase::Finishing => FooterPhase::Recognizing,
+            Phase::Review if self._post_processing_task.is_some() => FooterPhase::PostProcessing,
+            Phase::Review => FooterPhase::Review,
+            Phase::Failed(_) => FooterPhase::Failed,
+        };
+        FooterInput {
+            phase,
+            processed_by: self.processed.as_ref().and(self.processed_by.clone()),
+            show_raw: self.show_raw,
+            session_audio_available: self.session_audio_path.is_some(),
+            playing: self.playback.is_some(),
+            microphone: self.input_device.clone(),
+        }
+    }
+
+    fn footer(&self) -> FooterState {
+        footer_state(&self.footer_input())
+    }
+
     pub fn accept(&mut self, _: &AcceptDictation, window: &mut Window, cx: &mut Context<Self>) {
         match self.phase {
-            Phase::Recording { .. } => self.stop_recording(true, window, cx),
-            Phase::Review => {
-                if self._post_processing_task.is_some() {
-                    self.accept_when_done = true;
-                } else {
-                    self.emit_accept(cx);
-                }
-            }
-            Phase::Starting | Phase::Finishing => self.accept_when_done = true,
+            Phase::Recording { .. } => self.stop_recording(window, cx),
+            Phase::Review if self.footer().is_enabled(FooterAction::Accept) => self.emit_accept(cx),
             Phase::Failed(_) => cx.emit(DictationWindowEvent::Dismiss),
+            Phase::Starting | Phase::Finishing | Phase::Review => {}
         }
     }
 
     pub fn cancel(&mut self, _: &CancelDictation, window: &mut Window, cx: &mut Context<Self>) {
+        self.stop_playback(cx);
         match self.phase {
-            Phase::Recording { .. } => self.stop_recording(false, window, cx),
+            Phase::Recording { .. } => self.stop_recording(window, cx),
             Phase::Starting if self.resuming => {
                 self._engine_task = None;
                 self.resuming = false;
@@ -619,7 +741,6 @@ impl DictationWindow {
                 cx.notify();
             }
             Phase::Starting | Phase::Finishing => {
-                self.accept_when_done = false;
                 self._engine_task = None;
                 cx.emit(DictationWindowEvent::Dismiss);
             }
@@ -633,7 +754,7 @@ impl DictationWindow {
         window: &mut Window,
         cx: &mut Context<Self>,
     ) {
-        if !matches!(self.phase, Phase::Review) {
+        if !self.footer().is_enabled(FooterAction::ToggleRaw) {
             return;
         }
         let Some(processed) = self.processed.clone() else {
@@ -651,6 +772,57 @@ impl DictationWindow {
         cx.notify();
     }
 
+    pub fn toggle_playback(
+        &mut self,
+        _: &ToggleDictationPlayback,
+        _window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        if self.playback.is_some() {
+            self.stop_playback(cx);
+            return;
+        }
+        if !self.footer().is_enabled(FooterAction::TogglePlayback) {
+            return;
+        }
+        let Some(path) = self.session_audio_path.clone() else {
+            return;
+        };
+        self.playback_error = None;
+        let (finished_tx, finished_rx) = futures::channel::oneshot::channel::<Result<()>>();
+        let playback = Playback::start(&path, output_audio_device(cx), move |outcome| {
+            finished_tx.send(outcome).ok();
+        });
+        match playback {
+            Ok(playback) => {
+                self.playback = Some(playback);
+                self._playback_task = Some(cx.spawn(async move |this, cx| {
+                    let outcome = finished_rx.await;
+                    this.update(cx, |this, cx| {
+                        this.playback = None;
+                        if let Ok(Err(error)) = outcome {
+                            this.playback_error = Some(format!("{error:#}").into());
+                        }
+                        cx.notify();
+                    })
+                    .ok();
+                }));
+            }
+            Err(error) => {
+                self.playback_error = Some(format!("{error:#}").into());
+                self.session_audio_path = None;
+            }
+        }
+        cx.notify();
+    }
+
+    fn stop_playback(&mut self, cx: &mut Context<Self>) {
+        if self.playback.take().is_some() {
+            self._playback_task = None;
+            cx.notify();
+        }
+    }
+
     pub fn toggle_dictation(
         &mut self,
         _: &ToggleDictation,
@@ -658,9 +830,10 @@ impl DictationWindow {
         cx: &mut Context<Self>,
     ) {
         match self.phase {
-            Phase::Recording { .. } => self.stop_recording(true, window, cx),
+            Phase::Recording { .. } => self.stop_recording(window, cx),
             Phase::Review => {
                 if self._post_processing_task.is_none() {
+                    self.stop_playback(cx);
                     self.resume(window, cx);
                 }
             }
@@ -677,7 +850,7 @@ impl DictationWindow {
     /// the same so recording and review share one line height.
     const BODY_TEXT_SIZE: Rems = rems(0.875);
 
-    fn render_body(&self, window: &Window, cx: &mut Context<Self>) -> AnyElement {
+    fn render_body(&self, window: &mut Window, cx: &mut Context<Self>) -> AnyElement {
         let line_height_ratio = ThemeSettings::get_global(cx).buffer_line_height.value();
         let max_body_height = Self::BODY_TEXT_SIZE.to_pixels(window.rem_size())
             * line_height_ratio
@@ -731,19 +904,18 @@ impl DictationWindow {
                     .overflow_y_scroll()
                     .track_scroll(&self.scroll_handle)
                     .child(content)
+                    .custom_scrollbars(
+                        Scrollbars::for_settings::<EditorSettingsScrollbarProxy>()
+                            .tracked_scroll_handle(&self.scroll_handle),
+                        window,
+                        cx,
+                    )
                     .into_any_element()
             }
             Phase::Finishing => div()
                 .px_2()
                 .py_1()
-                .child(
-                    Label::new(if self._post_processing_task.is_some() {
-                        "Post-processing…"
-                    } else {
-                        "Recognizing…"
-                    })
-                    .color(Color::Muted),
-                )
+                .child(Label::new("Recognizing…").color(Color::Muted))
                 .into_any_element(),
             Phase::Review => v_flex()
                 .when_some(self.resume_error.clone(), |this, error| {
@@ -764,6 +936,15 @@ impl DictationWindow {
                             .description(error),
                     )
                 })
+                .when_some(self.playback_error.clone(), |this, error| {
+                    this.child(
+                        Callout::new()
+                            .severity(Severity::Warning)
+                            .icon(IconName::Warning)
+                            .title("Playback Unavailable")
+                            .description(error),
+                    )
+                })
                 .child(div().px_2().py_1().child(self.review_editor.clone()))
                 .into_any_element(),
             Phase::Failed(error) => Callout::new()
@@ -777,8 +958,10 @@ impl DictationWindow {
 
     /// A footer control: looks like a muted label with its key, but is a real
     /// button. Keys are drawn smaller than usual so the footer stays one row.
+    /// A disabled hint is dimmed and ignores clicks.
     fn hint(
         label: &'static str,
+        enabled: bool,
         action: &dyn gpui::Action,
         focus_handle: &FocusHandle,
         on_click: impl Fn(&gpui::ClickEvent, &mut Window, &mut App) + 'static,
@@ -787,25 +970,87 @@ impl DictationWindow {
         Button::new(label, label)
             .style(ButtonStyle::Subtle)
             .color(Color::Muted)
+            .disabled(!enabled)
             .key_binding(
                 KeyBinding::for_action_in(action, focus_handle, cx).size(rems_from_px(10.)),
             )
             .on_click(on_click)
     }
 
+    fn render_text_kind_label(
+        &self,
+        label: &FooterLabel,
+        cx: &mut Context<Self>,
+    ) -> Option<AnyElement> {
+        let current_prompt = &AgentSettings::get_global(cx)
+            .dictation
+            .post_processing_prompt;
+        let (text, tooltip_title, tooltip_meta): (SharedString, SharedString, SharedString) =
+            match label {
+                FooterLabel::Raw => (
+                    "Raw".into(),
+                    "Raw transcript from the Transcription Engine".into(),
+                    format!(
+                        "Post-processing prompt:\n{}",
+                        prompt_preview(current_prompt)
+                    )
+                    .into(),
+                ),
+                FooterLabel::Processed(ProcessedBy { provider, model }) => {
+                    let prompt = self
+                        .processed_with_prompt
+                        .as_deref()
+                        .unwrap_or(current_prompt);
+                    (
+                        format!("Processed · {model}").into(),
+                        format!("Rewritten by {provider} · {model}").into(),
+                        format!("Prompt:\n{}", prompt_preview(prompt)).into(),
+                    )
+                }
+                FooterLabel::Microphone(_) => return None,
+            };
+        Some(
+            Button::new("dictation-text-kind", text)
+                .style(ButtonStyle::Subtle)
+                .label_size(LabelSize::Small)
+                .color(Color::Muted)
+                .tooltip(move |_, cx| {
+                    Tooltip::with_meta(
+                        tooltip_title.clone(),
+                        None,
+                        format!("{tooltip_meta}\n\nClick to open Settings › AI › Dictation"),
+                        cx,
+                    )
+                })
+                .on_click(|_, window, cx| {
+                    window.dispatch_action(
+                        zed_actions::OpenSettingsAt {
+                            path: DICTATION_SETTINGS_PATH.to_string(),
+                            target: None,
+                        }
+                        .boxed_clone(),
+                        cx,
+                    );
+                })
+                .into_any_element(),
+        )
+    }
+
     fn render_footer(&self, cx: &mut Context<Self>) -> AnyElement {
         let composer_focus = self.composer_focus_handle.clone();
         let review_focus = self.review_editor.focus_handle(cx);
-        let (timer, recording) = match &self.phase {
-            Phase::Starting => (None, false),
-            Phase::Recording { update, .. } => (Some(self.base_duration + update.elapsed), true),
-            _ => (Some(self.duration), false),
+        let state = self.footer();
+        let timer = match &self.phase {
+            Phase::Starting => None,
+            Phase::Recording { update, .. } => Some(self.base_duration + update.elapsed),
+            _ => Some(self.duration),
         };
-        let processing = self._post_processing_task.is_some();
 
         let left = h_flex()
+            .min_w_0()
+            .flex_1()
             .gap_2()
-            .when(recording, |this| {
+            .when(state.recording_indicator, |this| {
                 this.child(
                     div()
                         .child(Indicator::dot().color(Color::Error))
@@ -825,68 +1070,99 @@ impl DictationWindow {
                         .color(Color::Muted),
                 )
             })
-            .when(processing, |this| {
+            .when_some(state.spinner, |this, text| {
                 this.child(
-                    Label::new("Post-processing…")
-                        .size(LabelSize::Small)
-                        .color(Color::Muted),
+                    h_flex()
+                        .gap_1()
+                        .child(SpinnerLabel::new().size(LabelSize::Small))
+                        .child(Label::new(text).size(LabelSize::Small).color(Color::Muted)),
                 )
+            })
+            .when_some(state.label.as_ref(), |this, label| match label {
+                FooterLabel::Microphone(name) => {
+                    let full_name: SharedString = name.clone().into();
+                    this.child(
+                        div()
+                            .id("dictation-microphone")
+                            .min_w_0()
+                            .overflow_hidden()
+                            .tooltip(Tooltip::text(full_name.clone()))
+                            .child(
+                                Label::new(full_name)
+                                    .size(LabelSize::Small)
+                                    .color(Color::Muted)
+                                    .single_line()
+                                    .truncate(),
+                            ),
+                    )
+                }
+                FooterLabel::Raw | FooterLabel::Processed(_) => {
+                    this.children(self.render_text_kind_label(label, cx))
+                }
             });
 
-        let right = h_flex().gap_2().map(|this| match &self.phase {
-            Phase::Starting => this.child(Self::hint(
-                "Cancel",
-                &editor::actions::Cancel,
-                &composer_focus,
-                cx.listener(|this, _, window, cx| this.cancel(&CancelDictation, window, cx)),
-                cx,
-            )),
-            Phase::Recording { .. } => this.child(Self::hint(
-                "Review",
-                &editor::actions::Cancel,
-                &composer_focus,
-                cx.listener(|this, _, window, cx| this.cancel(&CancelDictation, window, cx)),
-                cx,
-            )),
-            Phase::Review => this
-                .child(Self::hint(
-                    "Accept",
-                    &AcceptDictation,
-                    &review_focus,
-                    cx.listener(|this, _, window, cx| this.accept(&AcceptDictation, window, cx)),
-                    cx,
-                ))
-                .when(self.processed.is_some(), |this| {
-                    this.child(Self::hint(
-                        if self.show_raw { "Processed" } else { "Raw" },
+        let focus_for = |action: FooterAction| match (&self.phase, action) {
+            (Phase::Starting | Phase::Recording { .. }, _) => &composer_focus,
+            (Phase::Failed(_), _) => &self.focus_handle,
+            _ => &review_focus,
+        };
+        let right = h_flex()
+            .flex_none()
+            .gap_2()
+            .children(state.hints.iter().map(|hint| {
+                let focus_handle = focus_for(hint.action);
+                match hint.action {
+                    FooterAction::Accept => Self::hint(
+                        hint.label,
+                        hint.enabled,
+                        &AcceptDictation,
+                        focus_handle,
+                        cx.listener(|this, _, window, cx| {
+                            this.accept(&AcceptDictation, window, cx)
+                        }),
+                        cx,
+                    )
+                    .into_any_element(),
+                    FooterAction::Cancel => Self::hint(
+                        hint.label,
+                        hint.enabled,
+                        &CancelDictation,
+                        focus_handle,
+                        cx.listener(|this, _, window, cx| {
+                            this.cancel(&CancelDictation, window, cx)
+                        }),
+                        cx,
+                    )
+                    .into_any_element(),
+                    FooterAction::ToggleRaw => Self::hint(
+                        hint.label,
+                        hint.enabled,
                         &ToggleDictationRawText,
-                        &review_focus,
+                        focus_handle,
                         cx.listener(|this, _, window, cx| {
                             this.toggle_raw_text(&ToggleDictationRawText, window, cx)
                         }),
                         cx,
-                    ))
-                })
-                .child(Self::hint(
-                    "Cancel",
-                    &CancelDictation,
-                    &review_focus,
-                    cx.listener(|this, _, window, cx| this.cancel(&CancelDictation, window, cx)),
-                    cx,
-                )),
-            Phase::Finishing => this,
-            Phase::Failed(_) => this.child(Self::hint(
-                "Close",
-                &CancelDictation,
-                &self.focus_handle,
-                cx.listener(|this, _, window, cx| this.cancel(&CancelDictation, window, cx)),
-                cx,
-            )),
-        });
+                    )
+                    .into_any_element(),
+                    FooterAction::TogglePlayback => Self::hint(
+                        hint.label,
+                        hint.enabled,
+                        &ToggleDictationPlayback,
+                        focus_handle,
+                        cx.listener(|this, _, window, cx| {
+                            this.toggle_playback(&ToggleDictationPlayback, window, cx)
+                        }),
+                        cx,
+                    )
+                    .into_any_element(),
+                }
+            }));
 
         h_flex()
             .h(px(26.))
             .px_2()
+            .gap_2()
             .justify_between()
             .child(left)
             .child(right)
@@ -903,6 +1179,7 @@ impl Render for DictationWindow {
             .on_action(cx.listener(Self::accept))
             .on_action(cx.listener(Self::cancel))
             .on_action(cx.listener(Self::toggle_raw_text))
+            .on_action(cx.listener(Self::toggle_playback))
             .on_action(cx.listener(Self::toggle_dictation))
             .w_full()
             .rounded_sm()
@@ -965,5 +1242,22 @@ pub(crate) fn block_tooltip(text: &str) -> String {
     } else {
         let short: String = text.chars().take(LIMIT).collect();
         format!("{short}…")
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn prompt_preview_quotes_the_beginning_of_a_long_prompt() {
+        let short = "Clean up this text.";
+        assert_eq!(prompt_preview(short), short);
+
+        let long = "word ".repeat(100);
+        let preview = prompt_preview(&long);
+        assert!(preview.ends_with('…'));
+        assert!(preview.chars().count() <= PROMPT_PREVIEW_CHARS + 1);
+        assert!(long.starts_with(preview.trim_end_matches('…')));
     }
 }

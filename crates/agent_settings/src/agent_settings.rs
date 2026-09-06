@@ -210,7 +210,8 @@ pub struct DictationSettings {
     pub glossary: Vec<String>,
     pub sounds: bool,
     pub keep_model_loaded: bool,
-    pub save_last_recording: bool,
+    /// How many sessions keep their Session Audio; `0` turns it off.
+    pub session_audio_keep: u32,
     pub post_processing_enabled: bool,
     pub post_processing_model: Option<LanguageModelSelection>,
     pub post_processing_prompt: String,
@@ -772,6 +773,7 @@ impl Settings for AgentSettings {
         let agent = content.agent.clone().unwrap();
         let dictation = agent.dictation.clone().unwrap_or_default();
         let post_processing = dictation.post_processing.clone().unwrap_or_default();
+        let session_audio = dictation.session_audio.clone().unwrap_or_default();
         Self {
             enabled: agent.enabled.unwrap(),
             dictation: DictationSettings {
@@ -787,7 +789,7 @@ impl Settings for AgentSettings {
                 glossary: dictation.glossary.unwrap_or_default(),
                 sounds: dictation.sounds.unwrap_or(false),
                 keep_model_loaded: dictation.keep_model_loaded.unwrap_or(true),
-                save_last_recording: dictation.save_last_recording.unwrap_or(false),
+                session_audio_keep: session_audio.keep.unwrap_or(20),
                 post_processing_enabled: post_processing.enabled.unwrap_or(true),
                 post_processing_model: post_processing.model,
                 post_processing_prompt: post_processing.prompt.unwrap_or_default(),
@@ -1158,7 +1160,7 @@ mod tests {
         let dictation = AgentSettings::get_global(cx).dictation.clone();
         assert_eq!(dictation.language, DictationLanguage::English);
         assert!(dictation.keep_model_loaded);
-        assert!(!dictation.save_last_recording);
+        assert_eq!(dictation.session_audio_keep, 20);
         assert!(
             dictation.post_processing_prompt.contains("${glossary}"),
             "default prompt should mention the glossary placeholder"
@@ -1166,6 +1168,10 @@ mod tests {
         assert!(
             dictation.post_processing_prompt.contains("${output}"),
             "default prompt should mention the output placeholder"
+        );
+        assert!(
+            dictation.post_processing_prompt.contains("Thank you"),
+            "default prompt should list \"Thank you\" among the artifact examples"
         );
 
         SettingsStore::update_global(cx, |store, cx| {
@@ -1176,7 +1182,7 @@ mod tests {
                             "dictation": {
                                 "language": "ru",
                                 "keep_model_loaded": false,
-                                "save_last_recording": true
+                                "session_audio": { "keep": 5 }
                             }
                         }
                     }"#,
@@ -1188,14 +1194,14 @@ mod tests {
         assert_eq!(dictation.language, DictationLanguage::Russian);
         assert_eq!(dictation.language.whisper_code(), Some("ru"));
         assert!(!dictation.keep_model_loaded);
-        assert!(dictation.save_last_recording);
+        assert_eq!(dictation.session_audio_keep, 5);
 
         // An unknown language code is reported as a parse error, and the
         // rest of the document still applies with the default language.
         SettingsStore::update_global(cx, |store, cx| {
             let result = store
                 .set_user_settings(
-                    r#"{ "agent": { "dictation": { "language": "klingon", "save_last_recording": true } } }"#,
+                    r#"{ "agent": { "dictation": { "language": "klingon", "session_audio": { "keep": 0 } } } }"#,
                     cx,
                 )
                 .result();
@@ -1203,7 +1209,28 @@ mod tests {
         });
         let dictation = AgentSettings::get_global(cx).dictation.clone();
         assert_eq!(dictation.language, DictationLanguage::English);
-        assert!(dictation.save_last_recording);
+        assert_eq!(dictation.session_audio_keep, 0);
+    }
+
+    #[gpui::test]
+    fn test_dictation_old_save_last_recording_key_is_ignored(cx: &mut gpui::App) {
+        let store = SettingsStore::test(cx);
+        cx.set_global(store);
+        project::DisableAiSettings::register(cx);
+        AgentSettings::register(cx);
+
+        SettingsStore::update_global(cx, |store, cx| {
+            store
+                .set_user_settings(
+                    r#"{ "agent": { "dictation": { "save_last_recording": true, "language": "ru" } } }"#,
+                    cx,
+                )
+                .result()
+                .expect("an old key must not break parsing");
+        });
+        let dictation = AgentSettings::get_global(cx).dictation.clone();
+        assert_eq!(dictation.language, DictationLanguage::Russian);
+        assert_eq!(dictation.session_audio_keep, 20);
     }
 
     #[gpui::test]

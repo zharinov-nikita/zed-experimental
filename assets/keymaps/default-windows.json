@@ -400,6 +400,7 @@
       "shift-enter": "editor::Newline",
       "escape": "agent::CancelDictation",
       "tab": "agent::ToggleDictationRawText",
+      "ctrl-p": "agent::ToggleDictationPlayback",
       "ctrl-alt-space": "agent::ToggleDictation",
     },
   },

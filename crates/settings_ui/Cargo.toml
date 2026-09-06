@@ -30,6 +30,7 @@ context_server.workspace = true
 copilot.workspace = true
 copilot_ui.workspace = true
 cpal.workspace = true
+dictation.workspace = true
 edit_prediction.workspace = true
 edit_prediction_ui.workspace = true
 editor.workspace = true

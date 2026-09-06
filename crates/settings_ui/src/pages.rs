@@ -1,5 +1,6 @@
 mod audio_input_output_setup;
 mod audio_test_window;
+mod dictation_downloads;
 mod dictation_page;
 mod edit_prediction_provider_setup;
 mod external_agents_page;

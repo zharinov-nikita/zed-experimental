@@ -28,9 +28,17 @@ const EXPECTED_WORDS: &[(&str, &[&str])] = &[
     ("handy-1788483884.wav", &["prompt", "подойдет"]),
     ("handy-1788483932.wav", &["вопрос", "понял", "имеешь"]),
     ("handy-1788483948.wav", &["вопрос", "аудио"]),
-    ("handy-1788484168.wav", &["модели", "загружать", "несколько"]),
+    (
+        "handy-1788484168.wav",
+        &["модели", "загружать", "несколько"],
+    ),
     ("handy-1788484196.wav", &["да"]),
 ];
+
+/// Spoken digits followed by silence, synthesized with the Windows speech
+/// engine (see `LOCAL_DEV.md`). Whisper tends to loop on the silent tail and
+/// to invent a closing phrase on stop; neither may reach the text.
+const DIGITS_FIXTURE: &str = "zed-digits-with-silence.wav";
 
 /// One model per test binary: loading takes seconds and a gigabyte of VRAM.
 /// Holding the guard for the whole test also keeps the tests sequential.
@@ -96,7 +104,9 @@ fn fixture() -> Option<Fixture> {
 
 impl Fixture {
     fn take_engine(&mut self) -> Transcriber {
-        self.engine.take().expect("the engine was not returned by a previous test")
+        self.engine
+            .take()
+            .expect("the engine was not returned by a previous test")
     }
 
     fn return_engine(&mut self, transcriber: Transcriber) {
@@ -185,6 +195,32 @@ fn assert_same_speech(name: &str, actual: &str, reference: &str) {
     );
 }
 
+/// The shape of a Decoder Loop, whatever the words: the whole text is one
+/// word repeated three or more times, or a phrase of two or more words is
+/// repeated that often anywhere in `text`. A single word repeated inside a
+/// sentence is speech.
+fn has_repeated_ngram(text: &str) -> bool {
+    let words = words(text);
+    let whole_single_word = words.len() >= 3 && words.iter().all(|word| word == &words[0]);
+    whole_single_word
+        || (2..=words.len() / 3).any(|n| {
+            (0..=words.len() - 3 * n).any(|start| {
+                let unit = &words[start..start + n];
+                (1..3).all(|repeat| {
+                    let from = start + repeat * n;
+                    words.get(from..from + n) == Some(unit)
+                })
+            })
+        })
+}
+
+fn is_digit_word(word: &str) -> bool {
+    matches!(
+        word,
+        "1" | "2" | "3" | "4" | "5" | "один" | "раз" | "два" | "три" | "четыре" | "пять"
+    )
+}
+
 fn file_name(path: &PathBuf) -> String {
     path.file_name()
         .map(|name| name.to_string_lossy().into_owned())
@@ -241,6 +277,64 @@ fn final_text_matches_whole_file_recognition() {
             );
         }
     }
+}
+
+#[test]
+fn digits_with_trailing_silence_yield_only_the_digits() {
+    let Some(mut fixture) = fixture() else {
+        return;
+    };
+    let Some(path) = fixture
+        .recordings
+        .iter()
+        .find(|path| file_name(path) == DIGITS_FIXTURE)
+        .cloned()
+    else {
+        eprintln!("skipping: {DIGITS_FIXTURE} is not among the recordings");
+        return;
+    };
+    let pcm = load_audio_file(&path).expect("decoding");
+    let (updates, final_text) = fixture.run_loop(pcm);
+
+    for update in &updates {
+        assert!(
+            !has_repeated_ngram(&update.pending),
+            "Pending Text contains a Decoder Loop: {:?}",
+            update.pending
+        );
+        assert!(
+            !has_repeated_ngram(&update.confirmed),
+            "Confirmed Text contains a Decoder Loop: {:?}",
+            update.confirmed
+        );
+    }
+    assert!(!has_repeated_ngram(&final_text), "{final_text:?}");
+    let final_words = words(&final_text);
+    let last_digit = final_words
+        .iter()
+        .rposition(|word| is_digit_word(word))
+        .unwrap_or_else(|| panic!("no digits recognized in {final_text:?}"));
+    assert_eq!(
+        last_digit + 1,
+        final_words.len(),
+        "text after the last digit in {final_text:?}"
+    );
+    assert!(
+        final_words.iter().any(|word| word == "5" || word == "пять"),
+        "the last digit is missing from {final_text:?}"
+    );
+}
+
+#[test]
+fn repeated_ngram_detector_matches_loops_only() {
+    assert!(has_repeated_ngram(
+        "раз, git work tree, git work tree, git work tree"
+    ));
+    assert!(has_repeated_ngram("да да да"));
+    assert!(!has_repeated_ngram("это очень очень важно"));
+    assert!(!has_repeated_ngram("нет, нет, нет, я имею в виду другое"));
+    assert!(!has_repeated_ngram("1, 2, 3, 4, 5"));
+    assert!(!has_repeated_ngram(""));
 }
 
 fn longest_recording(fixture: &Fixture) -> PathBuf {

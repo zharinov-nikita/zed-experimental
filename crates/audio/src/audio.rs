@@ -13,6 +13,11 @@ mod audio_pipeline;
 pub use audio_pipeline::Audio;
 pub use audio_pipeline::{AudioDeviceInfo, AvailableAudioDevices};
 pub use audio_pipeline::{ensure_devices_initialized, resolve_device};
+// Local: device display names, on-demand refresh and the opened-input report.
+pub use audio_pipeline::{
+    OpenedInputDevice, device_display_name, open_input_stream_reporting, refresh_devices,
+    refresh_devices_if_stale,
+};
 // TODO(audio) replace with input test functionality in the audio crate
 pub use audio_pipeline::RodioExt;
 pub use audio_pipeline::init;

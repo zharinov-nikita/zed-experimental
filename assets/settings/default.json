@@ -1210,8 +1210,12 @@
       // Keep the Whisper model in memory between sessions so the next one starts instantly.
       // Turn off to free VRAM after each session.
       "keep_model_loaded": true,
-      // Save the audio of the last session as a WAV file in the temp directory for diagnostics.
-      "save_last_recording": false,
+      // Session Audio: the sound of every dictation session, kept as 16 kHz mono WAV files in
+      // the `dictation/audio` folder of the Zed data directory for replay and diagnostics.
+      "session_audio": {
+        // How many sessions keep their audio; the oldest files are deleted first. 0 turns it off.
+        "keep": 20,
+      },
       "post_processing": {
         // Rewrite the raw transcript with a language model before accepting it.
         "enabled": true,
@@ -1219,7 +1223,7 @@
         // Falls back to the agent's default model when null.
         "model": null,
         // `${output}` is replaced with the raw transcript, `${glossary}` with the glossary.
-        "prompt": "Clean up this dictated text. Fix punctuation and casing, remove filler words and repeated words, remove Whisper artifacts like \"Продолжение следует\" or \"Subtitles by\". Keep the language and the meaning. Spell these terms exactly as given: ${glossary}. Output only the cleaned text.\n\n${output}",
+        "prompt": "Clean up this dictated text. Fix punctuation and casing, remove filler words and repeated words, remove Whisper artifacts like \"Продолжение следует\", \"Subtitles by\" or \"Thank you\". Keep the language and the meaning. Spell these terms exactly as given: ${glossary}. Output only the cleaned text.\n\n${output}",
       },
     },
     // When enabled, show voting thumbs for feedback on agent edits.
