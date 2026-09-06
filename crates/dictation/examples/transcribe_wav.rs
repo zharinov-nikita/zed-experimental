@@ -1,11 +1,19 @@
-//! Recognizes audio files with the dictation engine and prints text and timings.
+//! Recognizes audio files with the dictation engine and prints text and timings,
+//! plus where the Speech Gate sees speech begin and end and what the engine
+//! recognizes when the file is cut there, as it is on stop.
 //!
 //! cargo run -p dictation --example transcribe_wav -- <model.bin> <backends_dir> <file.wav>...
 
 use std::path::PathBuf;
 use std::time::Instant;
 
-use dictation::{EngineConfig, Transcriber, load_audio_file};
+use dictation::{
+    ENGINE_SAMPLE_RATE, EngineConfig, GateEvent, SpeechGate, Transcriber, load_audio_file,
+};
+
+fn seconds(samples: usize) -> f32 {
+    samples as f32 / ENGINE_SAMPLE_RATE as f32
+}
 
 fn main() -> anyhow::Result<()> {
     let mut args = std::env::args().skip(1);
@@ -49,7 +57,7 @@ fn main() -> anyhow::Result<()> {
 
     for file in files {
         let pcm = load_audio_file(&file)?;
-        let audio_seconds = pcm.len() as f32 / dictation::ENGINE_SAMPLE_RATE as f32;
+        let audio_seconds = seconds(pcm.len());
         let started = Instant::now();
         let segments = transcriber.segments(&pcm)?;
         let elapsed = started.elapsed().as_secs_f32();
@@ -66,9 +74,22 @@ fn main() -> anyhow::Result<()> {
                 segment.text
             );
         }
-        let tail = transcriber.tail_segments(&pcm, "", "")?;
+
+        let mut gate = SpeechGate::new();
+        let events: Vec<String> = gate
+            .feed(&pcm)
+            .into_iter()
+            .map(|event| match event {
+                GateEvent::Opened { start } => format!("open@{:.2}", seconds(start)),
+                GateEvent::Closed { end } => format!("close@{:.2}", seconds(end)),
+            })
+            .collect();
+        println!("speech gate: {}", events.join("  "));
+        let speech_end = gate.speech_end().unwrap_or(0);
+        let tail = transcriber.segments(&pcm[..speech_end.min(pcm.len())])?;
         println!(
-            "as a stop tail (no-speech gate on trailing segments): {:?}",
+            "as a stop tail (cut at the gate's end of speech, {:.2}s): {:?}",
+            seconds(speech_end),
             tail.iter()
                 .map(|segment| segment.text.as_str())
                 .collect::<Vec<_>>()

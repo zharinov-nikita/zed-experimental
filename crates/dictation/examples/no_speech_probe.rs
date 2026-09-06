@@ -1,11 +1,31 @@
-//! Probes the no-speech gate on cuts of a recording: which prefixes of the
-//! speech survive `tail_segments`, so the gate is never trusted blindly.
+//! Probes what the decoder makes of cuts of a recording and of silence, and
+//! whether the Speech Gate would have let each cut through, so neither is
+//! ever trusted blindly.
 //!
 //! cargo run -p dictation --example no_speech_probe -- <model.bin> <backends_dir> <file.wav>
 
 use std::path::PathBuf;
 
-use dictation::{ENGINE_SAMPLE_RATE, EngineConfig, Transcriber, load_audio_file};
+use dictation::{ENGINE_SAMPLE_RATE, EngineConfig, SpeechGate, Transcriber, load_audio_file};
+
+fn probe(transcriber: &mut Transcriber, label: &str, pcm: &[f32]) -> anyhow::Result<()> {
+    let plain = transcriber.segments(pcm)?;
+    let mut gate = SpeechGate::new();
+    let events = gate.feed(pcm);
+    println!(
+        "{label}: plain={:?} gate={} ({} transitions, speech ends at {})",
+        plain
+            .iter()
+            .map(|segment| segment.text.as_str())
+            .collect::<Vec<_>>(),
+        if gate.is_open() { "open" } else { "closed" },
+        events.len(),
+        gate.speech_end()
+            .map(|end| format!("{:.2}s", end as f32 / ENGINE_SAMPLE_RATE as f32))
+            .unwrap_or_else(|| "never".to_string())
+    );
+    Ok(())
+}
 
 fn main() -> anyhow::Result<()> {
     let mut args = std::env::args().skip(1);
@@ -24,51 +44,22 @@ fn main() -> anyhow::Result<()> {
     let rate = ENGINE_SAMPLE_RATE as f32;
     for seconds in [0.6f32, 1.0, 1.5, 2.0, 3.0, 5.0] {
         let cut = &pcm[..((seconds * rate) as usize).min(pcm.len())];
-        let plain = transcriber.segments(cut)?;
-        let tail = transcriber.tail_segments(cut, "", "")?;
-        println!(
-            "first {seconds:.1}s: plain={:?} tail={:?}",
-            plain
-                .iter()
-                .map(|segment| segment.text.as_str())
-                .collect::<Vec<_>>(),
-            tail.iter()
-                .map(|segment| segment.text.as_str())
-                .collect::<Vec<_>>()
-        );
+        probe(&mut transcriber, &format!("first {seconds:.1}s"), cut)?;
     }
     let silence = vec![0.0f32; (6.0 * rate) as usize];
     for seconds in [1.0f32, 2.0, 3.0] {
         let mut cut = pcm[..((seconds * rate) as usize).min(pcm.len())].to_vec();
         cut.extend_from_slice(&silence);
-        let plain = transcriber.segments(&cut)?;
-        let tail = transcriber.tail_segments(&cut, "", "")?;
-        println!(
-            "first {seconds:.1}s + 6s silence: plain={:?} tail={:?}",
-            plain
-                .iter()
-                .map(|segment| segment.text.as_str())
-                .collect::<Vec<_>>(),
-            tail.iter()
-                .map(|segment| segment.text.as_str())
-                .collect::<Vec<_>>()
-        );
+        probe(
+            &mut transcriber,
+            &format!("first {seconds:.1}s + 6s silence"),
+            &cut,
+        )?;
     }
     let mut silent = vec![0.0f32; (8.0 * rate) as usize];
     for (index, sample) in silent.iter_mut().enumerate() {
         *sample = ((index * 7919) % 1000) as f32 / 1000.0 * 0.002 - 0.001;
     }
-    let plain = transcriber.segments(&silent)?;
-    let tail = transcriber.tail_segments(&silent, "", "")?;
-    println!(
-        "8s near-silence: plain={:?} tail={:?}",
-        plain
-            .iter()
-            .map(|segment| segment.text.as_str())
-            .collect::<Vec<_>>(),
-        tail.iter()
-            .map(|segment| segment.text.as_str())
-            .collect::<Vec<_>>()
-    );
+    probe(&mut transcriber, "8s near-silence", &silent)?;
     Ok(())
 }

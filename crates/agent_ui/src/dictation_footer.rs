@@ -33,6 +33,8 @@ pub struct FooterInput {
     pub playing: bool,
     /// The input the session records from; `None` outside recording.
     pub microphone: Option<OpenedInputDevice>,
+    /// Post-processing is waiting for the Ollama server Zed has started.
+    pub model_server_starting: bool,
 }
 
 /// The model that actually rewrote the text, including the fallback to
@@ -157,7 +159,11 @@ pub fn footer_state(input: &FooterInput) -> FooterState {
         },
         FooterPhase::PostProcessing => FooterState {
             recording_indicator: false,
-            spinner: Some("Post-processing…"),
+            spinner: Some(if input.model_server_starting {
+                "Starting Ollama…"
+            } else {
+                "Post-processing…"
+            }),
             label: Some(FooterLabel::Raw),
             hints: [
                 Some(hint(FooterAction::Accept, "Accept", false)),
@@ -203,6 +209,7 @@ mod tests {
             session_audio_available: false,
             playing: false,
             microphone: None,
+            model_server_starting: false,
         }
     }
 
@@ -314,6 +321,41 @@ mod tests {
         assert!(!state.is_enabled(FooterAction::ToggleRaw));
         assert!(!state.is_enabled(FooterAction::TogglePlayback));
         assert!(state.is_enabled(FooterAction::Cancel));
+    }
+
+    #[test]
+    fn waiting_for_ollama_names_the_wait_and_blocks_accept_and_tab_like_post_processing() {
+        let mut waiting = input(FooterPhase::PostProcessing);
+        waiting.model_server_starting = true;
+        let state = footer_state(&waiting);
+        assert_eq!(state.spinner, Some("Starting Ollama…"));
+        assert_eq!(
+            labels(&state),
+            vec![
+                ("Accept", false),
+                ("Show Processed", false),
+                ("Cancel", true)
+            ]
+        );
+        assert!(!state.is_enabled(FooterAction::Accept));
+        assert!(!state.is_enabled(FooterAction::ToggleRaw));
+        assert!(state.is_enabled(FooterAction::Cancel));
+
+        for phase in [
+            FooterPhase::Starting,
+            FooterPhase::Recording,
+            FooterPhase::Recognizing,
+            FooterPhase::Review,
+            FooterPhase::Failed,
+        ] {
+            let mut waiting = input(phase);
+            waiting.model_server_starting = true;
+            assert_ne!(
+                footer_state(&waiting).spinner,
+                Some("Starting Ollama…"),
+                "{phase:?}: the wait is only shown while Post-processing waits"
+            );
+        }
     }
 
     #[test]

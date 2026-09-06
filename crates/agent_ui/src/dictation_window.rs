@@ -18,7 +18,8 @@ use dictation::{
     SessionAudioSink, SessionAudioStore, Transcriber,
 };
 use editor::{Editor, EditorSettingsScrollbarProxy};
-use futures::StreamExt as _;
+use futures::future::Shared;
+use futures::{FutureExt as _, StreamExt as _};
 use gpui::{
     Action as _, Animation, AnimationExt as _, App, Context, Entity, EventEmitter, FocusHandle,
     Focusable, HighlightStyle, Rems, ScrollHandle, StyledText, Task, Window, pulsating_between,
@@ -27,12 +28,13 @@ use language_model::{
     CompletionIntent, LanguageModel, LanguageModelId, LanguageModelProviderId,
     LanguageModelRegistry, LanguageModelRequest, LanguageModelRequestMessage, Role, SelectedModel,
 };
+use language_models::AllLanguageModelSettings;
 use settings::Settings as _;
 use std::sync::Arc;
 use theme_settings::ThemeSettings;
 use ui::{
-    Callout, Divider, Indicator, KeyBinding, Scrollbars, Severity, SpinnerLabel, Tooltip,
-    WithScrollbar as _, prelude::*,
+    Callout, Divider, Indicator, KeyBinding, ScrollAxes, Scrollbars, Severity, SpinnerLabel,
+    Tooltip, WithScrollbar as _, prelude::*,
 };
 use workspace::Workspace;
 
@@ -40,6 +42,7 @@ use crate::dictation_engine::{EngineCache, EngineLease};
 use crate::dictation_footer::{
     FooterAction, FooterInput, FooterLabel, FooterPhase, FooterState, ProcessedBy, footer_state,
 };
+use crate::dictation_model_server::{self, ServerOutcome};
 use crate::{
     AcceptDictation, AgentPanel, CancelDictation, ToggleDictation, ToggleDictationPlayback,
     ToggleDictationRawText,
@@ -131,22 +134,27 @@ fn select_post_processing_model(
 /// Resolves the post-processing model. Providers such as Ollama list their
 /// models only after they have been asked to authenticate, which nothing does
 /// in a fresh session, so the provider is authenticated first and the lookup
-/// is retried before falling back to the agent's default model.
+/// is retried. A configured model that is still missing is an error, never a
+/// silent switch to another model; the agent's default model is used only
+/// when no Post-processing model is configured at all.
 fn post_processing_model(
     settings: &DictationSettings,
     cx: &mut App,
-) -> Task<Option<Arc<dyn LanguageModel>>> {
+) -> Task<Result<Arc<dyn LanguageModel>>> {
     if let Some(model) = select_post_processing_model(settings, cx) {
-        return Task::ready(Some(model));
+        return Task::ready(Ok(model));
     }
-    let provider = settings
-        .post_processing_model
-        .as_ref()
-        .and_then(|selection| {
-            LanguageModelRegistry::read_global(cx).provider(&LanguageModelProviderId(
-                selection.provider.0.clone().into(),
-            ))
-        });
+    let Some(selection) = settings.post_processing_model.clone() else {
+        return Task::ready(
+            LanguageModelRegistry::read_global(cx)
+                .default_model()
+                .map(|configured| configured.model)
+                .ok_or_else(|| anyhow!("No language model is configured for post-processing.")),
+        );
+    };
+    let provider = LanguageModelRegistry::read_global(cx).provider(&LanguageModelProviderId(
+        selection.provider.0.clone().into(),
+    ));
     let authenticate = provider.map(|provider| provider.authenticate(cx));
     let settings = settings.clone();
     cx.spawn(async move |cx| {
@@ -155,21 +163,76 @@ fn post_processing_model(
         {
             log::warn!("dictation: post-processing provider is unavailable: {error}");
         }
-        cx.update(|cx| {
-            select_post_processing_model(&settings, cx).or_else(|| {
-                if let Some(selection) = &settings.post_processing_model {
-                    log::warn!(
-                        "dictation: post-processing model {}/{} is not available, falling back to the default model",
-                        selection.provider.0,
-                        selection.model
-                    );
-                }
-                LanguageModelRegistry::read_global(cx)
-                    .default_model()
-                    .map(|configured| configured.model)
+        cx.update(|cx| select_post_processing_model(&settings, cx))
+            .ok_or_else(|| {
+                anyhow!(
+                    "The post-processing model {} ({}) is not available.",
+                    selection.model,
+                    selection.provider.0
+                )
             })
-        })
     })
+}
+
+/// What a Dictation Session just did, as far as sounds are concerned.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum SessionTransition {
+    RecordingStarted,
+    Resumed,
+    RecordingStopped,
+    PostProcessingStarted,
+    Accepted,
+    Cancelled,
+    Failed,
+}
+
+/// The sounds the window borrows from calls: the microphone opening and closing.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum DictationSound {
+    Unmute,
+    Mute,
+}
+
+/// Which sound a transition makes when `agent.dictation.sounds` is on.
+/// Recording starting or resuming is the microphone opening; recording
+/// stopping is the microphone closing; reviewing stays quiet.
+pub(crate) fn sound_for(transition: SessionTransition) -> Option<DictationSound> {
+    match transition {
+        SessionTransition::RecordingStarted | SessionTransition::Resumed => {
+            Some(DictationSound::Unmute)
+        }
+        SessionTransition::RecordingStopped => Some(DictationSound::Mute),
+        SessionTransition::PostProcessingStarted
+        | SessionTransition::Accepted
+        | SessionTransition::Cancelled
+        | SessionTransition::Failed => None,
+    }
+}
+
+/// Plays through the audio crate on `audio.experimental.output_audio_device`.
+#[cfg(feature = "audio")]
+fn play_sound(sound: DictationSound, cx: &mut App) {
+    let sound = match sound {
+        DictationSound::Unmute => audio::Sound::Unmute,
+        DictationSound::Mute => audio::Sound::Mute,
+    };
+    audio::Audio::play_sound(sound, cx);
+}
+
+#[cfg(not(feature = "audio"))]
+fn play_sound(_sound: DictationSound, _cx: &mut App) {}
+
+/// A Callout shown in review: what went wrong and why the text is raw.
+#[derive(Clone, Debug, PartialEq, Eq)]
+struct Notice {
+    title: SharedString,
+    description: SharedString,
+}
+
+enum PostProcessingError {
+    /// Zed started Ollama for Post-processing and it did not come up.
+    ServerDidNotStart(String),
+    Other(anyhow::Error),
 }
 
 /// Qwen-style models may wrap reasoning in `<think>` tags; only the answer is wanted.
@@ -258,7 +321,13 @@ pub struct DictationWindow {
     processed_by: Option<ProcessedBy>,
     /// The prompt template Post-processing ran with, for the label tooltip.
     processed_with_prompt: Option<String>,
-    post_processing_error: Option<SharedString>,
+    post_processing_error: Option<Notice>,
+    /// Brings up the local Ollama server while the user dictates, when
+    /// Post-processing needs it; Post-processing awaits it before choosing
+    /// its model. `None` when nothing has to be started.
+    model_server: Option<Shared<Task<ServerOutcome>>>,
+    /// The launcher has not reported yet.
+    model_server_starting: bool,
     /// Why the last Resume could not start; shown in review so the text is kept.
     resume_error: Option<SharedString>,
     /// Why Session Audio could not be played; shown in review.
@@ -300,6 +369,7 @@ impl DictationWindow {
             editor.set_soft_wrap();
             editor.set_show_indent_guides(false, cx);
             editor.set_show_vertical_scrollbar(true, cx);
+            editor.set_show_horizontal_scrollbar(false, cx);
             editor
         });
         let (block_id, replaces_existing) = match block_id {
@@ -319,6 +389,8 @@ impl DictationWindow {
             processed_by: None,
             processed_with_prompt: None,
             post_processing_error: None,
+            model_server: None,
+            model_server_starting: false,
             resume_error: None,
             playback_error: None,
             resuming: false,
@@ -399,6 +471,7 @@ impl DictationWindow {
         cx.notify();
         cx.emit(DictationWindowEvent::RecordingStarted);
         refresh_audio_devices(cx);
+        self.start_model_server(&settings, cx);
 
         let prefix = self.prefix.clone();
         let device = input_audio_device(cx);
@@ -434,6 +507,11 @@ impl DictationWindow {
                 });
                 match started {
                     Ok((lease, live, events, input_device)) => {
+                        let transition = if this.resuming {
+                            SessionTransition::Resumed
+                        } else {
+                            SessionTransition::RecordingStarted
+                        };
                         this.engine_lease = Some(lease);
                         this.resuming = false;
                         this.input_device = Some(input_device);
@@ -442,6 +520,7 @@ impl DictationWindow {
                             live: Some(live),
                         };
                         this.listen(events, cx);
+                        this.play(transition, cx);
                         cx.notify();
                     }
                     Err(error) => this.start_failed(format!("{error:#}").into(), window, cx),
@@ -451,9 +530,72 @@ impl DictationWindow {
         }));
     }
 
+    /// Plays the sound for `transition`, if it has one and sounds are on.
+    fn play(&self, transition: SessionTransition, cx: &mut App) {
+        if !AgentSettings::get_global(cx).dictation.sounds {
+            return;
+        }
+        if let Some(sound) = sound_for(transition) {
+            play_sound(sound, cx);
+        }
+    }
+
+    /// Brings up Ollama in the background when Post-processing is going to
+    /// need it: only for the Ollama provider at its default local address,
+    /// and only when the server is not answering. Runs while the user
+    /// dictates so the start-up hides behind the dictation; a failure is
+    /// reported by Post-processing and the next session simply tries again.
+    fn start_model_server(&mut self, settings: &DictationSettings, cx: &mut Context<Self>) {
+        self.model_server = None;
+        self.model_server_starting = false;
+        if !settings.post_processing_enabled {
+            return;
+        }
+        let provider = settings
+            .post_processing_model
+            .as_ref()
+            .map(|selection| selection.provider.0.as_str());
+        let api_url = dictation_model_server::ollama_api_url(
+            &AllLanguageModelSettings::get_global(cx).ollama.api_url,
+        );
+        if !dictation_model_server::should_start_ollama(provider, &api_url) {
+            return;
+        }
+        let http_client = cx.http_client();
+        let executor = cx.background_executor().clone();
+        self.model_server_starting = true;
+        self.model_server = Some(
+            cx.spawn(async move |this, cx| {
+                let outcome = dictation_model_server::ensure_server(
+                    || {
+                        dictation_model_server::ollama_answers(
+                            http_client.clone(),
+                            api_url.clone(),
+                            executor.clone(),
+                        )
+                    },
+                    dictation_model_server::start_ollama,
+                    |duration| executor.timer(duration),
+                )
+                .await;
+                if let ServerOutcome::Failed(reason) = &outcome {
+                    log::warn!("dictation: Ollama did not start: {reason}");
+                }
+                this.update(cx, |this, cx| {
+                    this.model_server_starting = false;
+                    cx.notify();
+                })
+                .ok();
+                outcome
+            })
+            .shared(),
+        );
+    }
+
     /// A failed start of a fresh session closes with a Callout; a failed
     /// Resume returns to review so the text already there is not lost.
     fn start_failed(&mut self, error: SharedString, window: &mut Window, cx: &mut Context<Self>) {
+        self.play(SessionTransition::Failed, cx);
         if self.resuming {
             self.resuming = false;
             self.resume_error = Some(error);
@@ -507,6 +649,7 @@ impl DictationWindow {
         };
         let elapsed = update.elapsed;
         self.phase = Phase::Finishing;
+        self.play(SessionTransition::RecordingStopped, cx);
         cx.notify();
 
         let lease = self.engine_lease.take();
@@ -583,52 +726,68 @@ impl DictationWindow {
             .post_processing_prompt
             .replace("${output}", &new_part)
             .replace("${glossary}", &settings.glossary.join(", "));
-        let model = post_processing_model(settings, cx);
+        let model_server = self.model_server.clone();
+        let settings = settings.clone();
         self.processed_with_prompt = Some(settings.post_processing_prompt.clone());
         self.phase = Phase::Review;
         self.focus_review_editor(window, cx);
+        self.play(SessionTransition::PostProcessingStarted, cx);
         cx.notify();
 
         self._post_processing_task = Some(cx.spawn_in(window, async move |this, cx| {
-            let result: Result<String> = async {
-                let model = model.await.ok_or_else(|| {
-                    anyhow!("No language model is configured for post-processing.")
-                })?;
-                // The label names the model actually used, including the
-                // fallback to the agent's default model.
-                let processed_by = ProcessedBy {
-                    provider: model.provider_name().0.to_string(),
-                    model: model.name().0.to_string(),
-                };
-                this.update(cx, |this, cx| {
-                    this.processed_by = Some(processed_by);
-                    cx.notify();
-                })?;
-                let temperature = cx
-                    .update(|_, cx| AgentSettings::temperature_for_model(&model, cx))
-                    .ok()
-                    .flatten();
-                let request = LanguageModelRequest {
-                    intent: Some(CompletionIntent::UserPrompt),
-                    messages: vec![LanguageModelRequestMessage {
-                        role: Role::User,
-                        content: vec![prompt.into()],
-                        cache: false,
-                        reasoning_details: None,
-                    }],
-                    temperature,
-                    thinking_allowed: false,
-                    ..Default::default()
-                };
-                let stream = model.stream_completion_text(request, cx);
-                let mut messages = stream.await?;
-                let mut text = String::new();
-                while let Some(chunk) = messages.stream.next().await {
-                    text.push_str(&chunk?);
+            // Ollama started by Zed may still be coming up; the model can
+            // only be resolved once the server lists it. When the server
+            // never came up, Post-processing does not run at all.
+            let server_failure = match model_server {
+                Some(model_server) => match model_server.await {
+                    ServerOutcome::Ready => None,
+                    ServerOutcome::Failed(reason) => Some(reason),
+                },
+                None => None,
+            };
+            let result = match server_failure {
+                Some(reason) => Err(PostProcessingError::ServerDidNotStart(reason)),
+                None => async {
+                    let model = cx
+                        .update(|_, cx| post_processing_model(&settings, cx))?
+                        .await?;
+                    // The label names the model actually used, including the
+                    // fallback to the agent's default model.
+                    let processed_by = ProcessedBy {
+                        provider: model.provider_name().0.to_string(),
+                        model: model.name().0.to_string(),
+                    };
+                    this.update(cx, |this, cx| {
+                        this.processed_by = Some(processed_by);
+                        cx.notify();
+                    })?;
+                    let temperature = cx
+                        .update(|_, cx| AgentSettings::temperature_for_model(&model, cx))
+                        .ok()
+                        .flatten();
+                    let request = LanguageModelRequest {
+                        intent: Some(CompletionIntent::UserPrompt),
+                        messages: vec![LanguageModelRequestMessage {
+                            role: Role::User,
+                            content: vec![prompt.into()],
+                            cache: false,
+                            reasoning_details: None,
+                        }],
+                        temperature,
+                        thinking_allowed: false,
+                        ..Default::default()
+                    };
+                    let stream = model.stream_completion_text(request, cx);
+                    let mut messages = stream.await?;
+                    let mut text = String::new();
+                    while let Some(chunk) = messages.stream.next().await {
+                        text.push_str(&chunk?);
+                    }
+                    anyhow::Ok(strip_thinking(&text))
                 }
-                Ok(strip_thinking(&text))
-            }
-            .await;
+                .await
+                .map_err(PostProcessingError::Other),
+            };
             this.update_in(cx, |this, window, cx| {
                 this.post_processing_done(result, window, cx);
             })
@@ -638,11 +797,15 @@ impl DictationWindow {
 
     fn post_processing_done(
         &mut self,
-        result: Result<String>,
+        result: Result<String, PostProcessingError>,
         window: &mut Window,
         cx: &mut Context<Self>,
     ) {
         self._post_processing_task = None;
+        let unavailable = |description: String| Notice {
+            title: "Post-processing Unavailable".into(),
+            description: description.into(),
+        };
         match result {
             Ok(text) if !text.trim().is_empty() => {
                 let full = join_text(&self.prefix, &text);
@@ -654,11 +817,19 @@ impl DictationWindow {
             }
             Ok(_) => {
                 self.processed_by = None;
-                self.post_processing_error = Some("Post-processing returned no text.".into());
+                self.post_processing_error =
+                    Some(unavailable("Post-processing returned no text.".into()));
             }
-            Err(error) => {
+            Err(PostProcessingError::ServerDidNotStart(reason)) => {
                 self.processed_by = None;
-                self.post_processing_error = Some(format!("{error:#}").into());
+                self.post_processing_error = Some(Notice {
+                    title: "Ollama did not start".into(),
+                    description: format!("{reason} The text is shown as recognized.").into(),
+                });
+            }
+            Err(PostProcessingError::Other(error)) => {
+                self.processed_by = None;
+                self.post_processing_error = Some(unavailable(format!("{error:#}")));
             }
         }
         self.finish_review(window, cx);
@@ -677,6 +848,7 @@ impl DictationWindow {
 
     fn emit_accept(&mut self, cx: &mut Context<Self>) {
         self.stop_playback(cx);
+        self.play(SessionTransition::Accepted, cx);
         let text = self.review_editor.read(cx).text(cx).trim().to_string();
         if text.is_empty() {
             cx.emit(DictationWindowEvent::Dismiss);
@@ -713,6 +885,7 @@ impl DictationWindow {
             session_audio_available: self.session_audio_path.is_some(),
             playing: self.playback.is_some(),
             microphone: self.input_device.clone(),
+            model_server_starting: self.model_server_starting,
         }
     }
 
@@ -744,7 +917,10 @@ impl DictationWindow {
                 self._engine_task = None;
                 cx.emit(DictationWindowEvent::Dismiss);
             }
-            Phase::Review | Phase::Failed(_) => cx.emit(DictationWindowEvent::Dismiss),
+            Phase::Review | Phase::Failed(_) => {
+                self.play(SessionTransition::Cancelled, cx);
+                cx.emit(DictationWindowEvent::Dismiss);
+            }
         }
     }
 
@@ -904,9 +1080,13 @@ impl DictationWindow {
                     .overflow_y_scroll()
                     .track_scroll(&self.scroll_handle)
                     .child(content)
+                    // Vertical only: a scrollbar along both axes lets the text
+                    // grow sideways instead of wrapping.
                     .custom_scrollbars(
-                        Scrollbars::for_settings::<EditorSettingsScrollbarProxy>()
-                            .tracked_scroll_handle(&self.scroll_handle),
+                        Scrollbars::for_settings_along::<EditorSettingsScrollbarProxy>(
+                            ScrollAxes::Vertical,
+                        )
+                        .tracked_scroll_handle(&self.scroll_handle),
                         window,
                         cx,
                     )
@@ -927,13 +1107,13 @@ impl DictationWindow {
                             .description(error),
                     )
                 })
-                .when_some(self.post_processing_error.clone(), |this, error| {
+                .when_some(self.post_processing_error.clone(), |this, notice| {
                     this.child(
                         Callout::new()
                             .severity(Severity::Warning)
                             .icon(IconName::Warning)
-                            .title("Post-processing Unavailable")
-                            .description(error),
+                            .title(notice.title)
+                            .description(notice.description),
                     )
                 })
                 .when_some(self.playback_error.clone(), |this, error| {
@@ -1248,6 +1428,38 @@ pub(crate) fn block_tooltip(text: &str) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn starting_and_resuming_open_the_microphone_audibly() {
+        assert_eq!(
+            sound_for(SessionTransition::RecordingStarted),
+            Some(DictationSound::Unmute)
+        );
+        assert_eq!(
+            sound_for(SessionTransition::Resumed),
+            Some(DictationSound::Unmute)
+        );
+    }
+
+    #[test]
+    fn stopping_closes_the_microphone_audibly() {
+        assert_eq!(
+            sound_for(SessionTransition::RecordingStopped),
+            Some(DictationSound::Mute)
+        );
+    }
+
+    #[test]
+    fn review_post_processing_and_failure_are_silent() {
+        for transition in [
+            SessionTransition::PostProcessingStarted,
+            SessionTransition::Accepted,
+            SessionTransition::Cancelled,
+            SessionTransition::Failed,
+        ] {
+            assert_eq!(sound_for(transition), None, "{transition:?}");
+        }
+    }
 
     #[test]
     fn prompt_preview_quotes_the_beginning_of_a_long_prompt() {

@@ -28,8 +28,10 @@ pub use cpal::DeviceId;
 pub mod engine_download;
 pub mod playback;
 pub mod session_audio;
+pub mod speech_gate;
 
 pub use session_audio::{SessionAudioSink, SessionAudioStore};
+pub use speech_gate::{GateEvent, SpeechGate};
 
 /// Where everything the dictation feature stores lives: `dictation` in the
 /// Zed data directory. Engine Assets go into its `models` and `backends`
@@ -191,27 +193,14 @@ impl Transcriber {
     /// Recognizes 16 kHz mono PCM in `[-1, 1]` and returns the phrases with
     /// their timestamps relative to the start of `pcm`.
     pub fn segments(&mut self, pcm: &[f32]) -> Result<Vec<Segment>> {
-        Ok(drop_decoder_loops(self.segments_after(pcm, "", false)?))
+        Ok(drop_decoder_loops(self.segments_after(pcm, "")?))
     }
 
     /// Like `segments`, with the text spoken right before `pcm` given to the
     /// model as context, the way whisper.cpp's stream example carries the
     /// previous iteration's tokens over. Short buffers cut out of a sentence
     /// are decoded far more consistently with the sentence in front of them.
-    ///
-    /// With `gate_no_speech` the decoder's own no-speech verdict is trusted
-    /// outright: whisper.cpp drops a window only when its no-speech
-    /// probability is above the threshold *and* the average log-probability
-    /// is below `logprob_thold`, so raising that bound to zero (log
-    /// probabilities never exceed it) leaves the probability alone in charge.
-    /// Used for the tail on stop, where a silent window otherwise turns into
-    /// a Recognizer Artifact (ADR 0001).
-    fn segments_after(
-        &mut self,
-        pcm: &[f32],
-        preceding_text: &str,
-        gate_no_speech: bool,
-    ) -> Result<Vec<Segment>> {
+    fn segments_after(&mut self, pcm: &[f32], preceding_text: &str) -> Result<Vec<Segment>> {
         if pcm.is_empty() {
             return Ok(Vec::new());
         }
@@ -224,20 +213,15 @@ impl Transcriber {
         };
         let context = tail_chars(preceding_text, CONTEXT_CHARS);
         let adjusted;
-        let run_options = if context.is_empty() && !gate_no_speech {
+        let run_options = if context.is_empty() {
             &self.run_options
         } else {
             let mut options = self.run_options.clone();
             if let Some(RunExtension::Whisper(whisper)) = &mut options.family {
-                if !context.is_empty() {
-                    whisper.initial_prompt = Some(match &self.glossary_prompt {
-                        Some(glossary) => format!("{glossary}\n{context}"),
-                        None => context.to_string(),
-                    });
-                }
-                if gate_no_speech {
-                    whisper.logprob_thold = Some(0.0);
-                }
+                whisper.initial_prompt = Some(match &self.glossary_prompt {
+                    Some(glossary) => format!("{glossary}\n{context}"),
+                    None => context.to_string(),
+                });
             }
             adjusted = options;
             &adjusted
@@ -258,47 +242,28 @@ impl Transcriber {
             .collect())
     }
 
-    /// Recognizes the audio left over when the user stops. Whisper scores
-    /// no-speech per window, and a window that mixes the last words with the
-    /// silence after them scores as speech, so each trailing segment is
-    /// decoded again on its own span with the no-speech gate armed: a
-    /// segment the decoder itself calls silence when it stands alone is a
-    /// decoder failure on the silent tail ("Thank you.") and is dropped.
-    /// Real last words survive the check and end the search.
-    ///
-    /// Segments that already stood in the Live Transcript (`pending_text`,
-    /// the Pending Text at the moment of the stop) were produced while audio
-    /// was still arriving and are never questioned: the gate only judges
-    /// what appeared at the stop itself.
-    pub fn tail_segments(
+    /// Recognizes audio that will not grow anymore (a phrase the Speech Gate
+    /// has closed behind, or the tail on stop) and appends it to `confirmed`.
+    /// Recognition may have fallen behind a slow backend, so the audio can
+    /// be longer than one Whisper window. Errors are reported per window and
+    /// do not stop the remaining windows from being recognized.
+    fn recognize_final(
         &mut self,
         pcm: &[f32],
-        preceding_text: &str,
-        pending_text: &str,
-    ) -> Result<Vec<Segment>> {
-        let mut segments = drop_decoder_loops(self.segments_after(pcm, preceding_text, false)?);
-        let pending_words = loop_words(pending_text);
-        while let Some(last) = segments.last() {
-            let last_words = loop_words(&last.text);
-            if !last_words.is_empty() && contains_run(&pending_words, &last_words) {
-                break;
-            }
-            let start = duration_to_samples(last.start).min(pcm.len());
-            let end = duration_to_samples(last.end + SETTLE).clamp(start, pcm.len());
-            if end - start < duration_to_samples(BOUNDARY_FRAME) {
-                // Timestamps outside the audio give the decoder nothing to
-                // judge; without a verdict the words stay.
-                break;
-            }
-            let alone = self.segments_after(&pcm[start..end], preceding_text, true)?;
-            if alone.iter().all(|segment| segment.text.is_empty()) {
-                log::info!("dictation: dropped no-speech tail segment {:?}", last.text);
-                segments.pop();
-            } else {
-                break;
+        confirmed: &mut String,
+        events: &UnboundedSender<DictationEvent>,
+    ) {
+        for chunk in pcm.chunks(duration_to_samples(WINDOW)) {
+            match self.segments_after(chunk, confirmed) {
+                Ok(segments) => append_segments(confirmed, &drop_decoder_loops(segments)),
+                Err(error) => {
+                    log::warn!("dictation: recognizing a finished phrase failed: {error:#}");
+                    events
+                        .unbounded_send(DictationEvent::Error(error.to_string()))
+                        .ok();
+                }
             }
         }
-        Ok(segments)
     }
 
     pub fn backend(&self) -> String {
@@ -618,7 +583,7 @@ impl Drop for LiveDictation {
     }
 }
 
-fn duration_to_samples(duration: Duration) -> usize {
+pub(crate) fn duration_to_samples(duration: Duration) -> usize {
     (duration.as_secs_f64() * ENGINE_SAMPLE_RATE as f64) as usize
 }
 
@@ -680,14 +645,6 @@ fn loop_words(text: &str) -> Vec<String> {
         .filter(|word| !word.is_empty())
         .map(str::to_lowercase)
         .collect()
-}
-
-/// Whether `needle` occurs in `haystack` as a contiguous run of words.
-fn contains_run(haystack: &[String], needle: &[String]) -> bool {
-    !needle.is_empty()
-        && haystack
-            .windows(needle.len())
-            .any(|window| window == needle)
 }
 
 /// Minimum repetitions of one n-gram that make a segment a Decoder Loop.
@@ -800,6 +757,37 @@ fn segments_to_confirm(segments: &[Segment], buffer: Duration, at_window: bool) 
         .count()
 }
 
+/// The speech the Speech Gate has let through since the commit point, as the
+/// live loop tracks it: where it began, and where it ended if the gate has
+/// closed since. `None` for `start` means silence since the commit point.
+#[derive(Default)]
+struct SpeechSinceCommit {
+    start: Option<usize>,
+    end: Option<usize>,
+}
+
+impl SpeechSinceCommit {
+    /// Applies the gate's transitions. When speech begins after silence the
+    /// commit point jumps to its start, so the silence never enters the
+    /// recognition window; speech that begins while earlier speech is still
+    /// being decoded simply extends it.
+    fn apply(&mut self, events: impl IntoIterator<Item = GateEvent>, commit_point: &mut usize) {
+        for event in events {
+            match event {
+                GateEvent::Opened { start } => {
+                    if self.start.is_none() {
+                        let start = start.max(*commit_point);
+                        *commit_point = start;
+                        self.start = Some(start);
+                    }
+                    self.end = None;
+                }
+                GateEvent::Closed { end } => self.end = Some(end),
+            }
+        }
+    }
+}
+
 fn live_loop(
     mut transcriber: Transcriber,
     mut source: Box<dyn AudioSource>,
@@ -813,7 +801,10 @@ fn live_loop(
     let settle = duration_to_samples(SETTLE);
     let mut commit_point = 0usize;
     let mut recognized_up_to = 0usize;
+    let mut last_recognized_end = 0usize;
     let mut pending = String::new();
+    let mut gate = SpeechGate::new();
+    let mut speech = SpeechSinceCommit::default();
 
     let send = |confirmed: &str, pending: &str, captured: usize| {
         events
@@ -834,10 +825,43 @@ fn live_loop(
             continue;
         }
         recognized_up_to = available;
-        let buffer_end = available.min(commit_point + window);
-        let at_window = available - commit_point >= window - settle;
+        let new_audio = source.samples(gate.position()..available);
+        speech.apply(gate.feed(&new_audio), &mut commit_point);
+
+        if speech.start.is_none() {
+            // The gate is closed and nothing since the commit point was
+            // speech: the decoder does not run and the Pending Text is empty.
+            send(&confirmed, "", available);
+            continue;
+        }
+        if let Some(end) = speech.end {
+            // The gate closed behind a phrase: it is complete, so it is
+            // recognized once without the silence after it and confirmed
+            // whole, and the loop waits for the next phrase.
+            let phrase_end = end.clamp(commit_point, available);
+            let phrase = source.samples(commit_point..phrase_end);
+            transcriber.recognize_final(&phrase, &mut confirmed, &events);
+            commit_point = phrase_end;
+            pending.clear();
+            speech = SpeechSinceCommit::default();
+            send(&confirmed, &pending, available);
+            continue;
+        }
+
+        // The gate is open: recognize up to where speech was last heard,
+        // never the silence after it, so a Recognizer Artifact has nothing to
+        // grow from even before the gate closes. Silence adds no audio to
+        // the buffer, so the same buffer is not recognized twice.
+        let speech_end = gate.speech_end().unwrap_or(available);
+        let buffer_end = available.min(speech_end).min(commit_point + window);
+        if buffer_end <= last_recognized_end {
+            send(&confirmed, &pending, available);
+            continue;
+        }
+        last_recognized_end = buffer_end;
+        let at_window = buffer_end.saturating_sub(commit_point) >= window - settle;
         let buffer = source.samples(commit_point..buffer_end);
-        let segments = match transcriber.segments_after(&buffer, &confirmed, false) {
+        let segments = match transcriber.segments_after(&buffer, &confirmed) {
             Ok(segments) => drop_decoder_loops(segments),
             Err(error) => {
                 events
@@ -871,20 +895,18 @@ fn live_loop(
             Err(error) => log::warn!("dictation: saving session audio failed: {error:#}"),
         }
     }
-    let tail = session_pcm.get(commit_point..).unwrap_or(&[]);
-    // Recognition may have fallen behind a slow backend, so the tail can be
-    // longer than one Whisper window.
-    for chunk in tail.chunks(window) {
-        match transcriber.tail_segments(chunk, &confirmed, &pending) {
-            Ok(segments) => append_segments(&mut confirmed, &segments),
-            Err(error) => {
-                log::warn!("dictation: recognizing the tail failed: {error:#}");
-                events
-                    .unbounded_send(DictationEvent::Error(error.to_string()))
-                    .ok();
-            }
-        }
+    // The tail is cut where the gate saw speech end, so the silence between
+    // the last word and the stop is never decoded.
+    let unseen = session_pcm.get(gate.position()..).unwrap_or(&[]);
+    speech.apply(gate.feed(unseen), &mut commit_point);
+    let tail_end = match (speech.start, speech.end) {
+        (None, _) => commit_point,
+        (Some(_), Some(end)) => end,
+        (Some(_), None) => gate.speech_end().unwrap_or(captured),
     }
+    .clamp(commit_point.min(captured), captured);
+    let tail = session_pcm.get(commit_point..tail_end).unwrap_or(&[]);
+    transcriber.recognize_final(tail, &mut confirmed, &events);
     send(&confirmed, "", captured);
     Ok((transcriber, confirmed))
 }

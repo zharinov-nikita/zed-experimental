@@ -12,8 +12,11 @@ use std::env;
 use std::path::PathBuf;
 use std::sync::{Mutex, MutexGuard, PoisonError};
 
+use std::time::Duration;
+
 use dictation::{
-    DictationEvent, DictationUpdate, EngineConfig, LiveDictation, Transcriber, load_audio_file,
+    DictationEvent, DictationUpdate, EngineConfig, LiveDictation, SpeechGate, Transcriber,
+    load_audio_file,
 };
 use futures::StreamExt as _;
 
@@ -39,6 +42,24 @@ const EXPECTED_WORDS: &[(&str, &[&str])] = &[
 /// engine (see `LOCAL_DEV.md`). Whisper tends to loop on the silent tail and
 /// to invent a closing phrase on stop; neither may reach the text.
 const DIGITS_FIXTURE: &str = "zed-digits-with-silence.wav";
+
+/// Session Audio of the user counting to ten into the real microphone, then
+/// nine seconds of the room. The Speech Gate must keep the room out of the
+/// Live Transcript.
+const MIC_DIGITS_FIXTURE: &str = "zed-mic-digits-then-silence.wav";
+/// Counting to ten, an eight-second pause, counting to twenty; cut together
+/// from two Session Audio recordings of the same microphone so the pause
+/// carries its real noise floor. Speech resumes at about 19 s.
+const MIC_PAUSE_FIXTURE: &str = "zed-mic-phrase-pause-continuation.wav";
+/// Speech is over at 10.5 s of `MIC_PAUSE_FIXTURE` and `MIC_DIGITS_FIXTURE`;
+/// by this point the Speech Gate has had its three seconds of silence and the
+/// loop has confirmed the phrase…
+const MIC_PHRASE_OVER: Duration = Duration::from_millis(14_500);
+/// …and at this point of `MIC_PAUSE_FIXTURE` it has not resumed yet.
+const MIC_PAUSE_OVER: Duration = Duration::from_millis(18_900);
+/// Almost a minute of the user not speaking: breaths, clicks, the chair. The
+/// engine used to read «Продолжение следует» into it.
+const MIC_SILENCE_FIXTURE: &str = "zed-mic-silence.wav";
 
 /// One model per test binary: loading takes seconds and a gigabyte of VRAM.
 /// Holding the guard for the whole test also keeps the tests sequential.
@@ -146,6 +167,30 @@ impl Fixture {
         self.return_engine(transcriber);
         text
     }
+
+    /// The reference for the live loop: one pass over the speech the Speech
+    /// Gate lets through, without the silence after the last word, which is
+    /// where a single pass invents its own closing phrase.
+    fn transcribe_speech(&mut self, pcm: &[f32]) -> String {
+        let mut gate = SpeechGate::new();
+        gate.feed(pcm);
+        match gate.speech_end() {
+            Some(end) => self.transcribe_whole(&pcm[..end.min(pcm.len())]),
+            None => String::new(),
+        }
+    }
+
+    fn recording(&self, name: &str) -> Option<PathBuf> {
+        let found = self
+            .recordings
+            .iter()
+            .find(|path| file_name(path) == name)
+            .cloned();
+        if found.is_none() {
+            eprintln!("skipping: {name} is not among the recordings");
+        }
+        found
+    }
 }
 
 /// Lowercased words without punctuation, so two transcripts can be compared
@@ -221,6 +266,48 @@ fn is_digit_word(word: &str) -> bool {
     )
 }
 
+/// The numbers the microphone fixtures count through, as numerals or as the
+/// Russian words Whisper sometimes writes instead.
+fn is_number_word(word: &str) -> bool {
+    word.parse::<u32>()
+        .is_ok_and(|number| (1..=20).contains(&number))
+        || matches!(
+            word,
+            "один"
+                | "раз"
+                | "два"
+                | "три"
+                | "четыре"
+                | "пять"
+                | "шесть"
+                | "семь"
+                | "восемь"
+                | "девять"
+                | "десять"
+                | "одиннадцать"
+                | "двенадцать"
+                | "тринадцать"
+                | "четырнадцать"
+                | "пятнадцать"
+                | "шестнадцать"
+                | "семнадцать"
+                | "восемнадцать"
+                | "девятнадцать"
+                | "двадцать"
+        )
+}
+
+fn assert_only_numbers(name: &str, text: &str) {
+    let stray: Vec<String> = words(text)
+        .into_iter()
+        .filter(|word| !is_number_word(word))
+        .collect();
+    assert!(
+        stray.is_empty(),
+        "{name}: words that were never spoken in {text:?}: {stray:?}"
+    );
+}
+
 fn file_name(path: &PathBuf) -> String {
     path.file_name()
         .map(|name| name.to_string_lossy().into_owned())
@@ -260,7 +347,7 @@ fn final_text_matches_whole_file_recognition() {
     };
     for path in fixture.recordings.clone() {
         let pcm = load_audio_file(&path).expect("decoding");
-        let whole = fixture.transcribe_whole(&pcm);
+        let whole = fixture.transcribe_speech(&pcm);
         let (_, final_text) = fixture.run_loop(pcm);
         let name = file_name(&path);
         assert_same_speech(&name, &final_text, &whole);
@@ -284,13 +371,7 @@ fn digits_with_trailing_silence_yield_only_the_digits() {
     let Some(mut fixture) = fixture() else {
         return;
     };
-    let Some(path) = fixture
-        .recordings
-        .iter()
-        .find(|path| file_name(path) == DIGITS_FIXTURE)
-        .cloned()
-    else {
-        eprintln!("skipping: {DIGITS_FIXTURE} is not among the recordings");
+    let Some(path) = fixture.recording(DIGITS_FIXTURE) else {
         return;
     };
     let pcm = load_audio_file(&path).expect("decoding");
@@ -337,10 +418,13 @@ fn repeated_ngram_detector_matches_loops_only() {
     assert!(!has_repeated_ngram(""));
 }
 
+/// The longest Handy recording: continuous speech that ends right after the
+/// last word, which is what the tail tests need.
 fn longest_recording(fixture: &Fixture) -> PathBuf {
     fixture
         .recordings
         .iter()
+        .filter(|path| file_name(path).starts_with("handy-"))
         .max_by_key(|path| {
             std::fs::metadata(path)
                 .map(|metadata| metadata.len())
@@ -412,4 +496,141 @@ fn stopping_mid_file_keeps_the_tail() {
         final_text.len() > confirmed_before_stop.len(),
         "{name}: stopping added nothing after {confirmed_before_stop:?}"
     );
+}
+
+/// Updates whose `elapsed` falls into `range`, so a test can look at what
+/// the Live Transcript showed during a known stretch of the recording.
+fn updates_between(
+    updates: &[DictationUpdate],
+    from: Duration,
+    to: Duration,
+) -> Vec<&DictationUpdate> {
+    updates
+        .iter()
+        .filter(|update| update.elapsed >= from && update.elapsed <= to)
+        .collect()
+}
+
+/// While the user is silent after counting, the Speech Gate keeps the room
+/// out of the decoder: the Pending Text stays empty, the digits are confirmed
+/// and nothing follows the last one.
+#[test]
+fn microphone_silence_after_the_digits_stays_out_of_the_transcript() {
+    let Some(mut fixture) = fixture() else {
+        return;
+    };
+    let Some(path) = fixture.recording(MIC_DIGITS_FIXTURE) else {
+        return;
+    };
+    let pcm = load_audio_file(&path).expect("decoding");
+    let total = Duration::from_secs_f64(pcm.len() as f64 / dictation::ENGINE_SAMPLE_RATE as f64);
+    let (updates, final_text) = fixture.run_loop(pcm);
+    let name = file_name(&path);
+
+    let silent = updates_between(&updates, MIC_PHRASE_OVER, total);
+    assert!(!silent.is_empty(), "{name}: no updates during the silence");
+    for update in &silent {
+        assert_eq!(
+            update.pending,
+            "",
+            "{name}: Pending Text at {:.1}s while silent",
+            update.elapsed.as_secs_f32()
+        );
+        assert!(
+            words(&update.confirmed)
+                .iter()
+                .any(|word| word == "10" || word == "десять"),
+            "{name}: the last digit is not confirmed at {:.1}s: {:?}",
+            update.elapsed.as_secs_f32(),
+            update.confirmed
+        );
+    }
+    assert_only_numbers(&name, &final_text);
+    assert!(
+        words(&final_text).len() >= 9,
+        "{name}: quiet digits were lost in {final_text:?}"
+    );
+}
+
+/// A long pause between two phrases: the pause shows an empty Pending Text,
+/// the second phrase is confirmed right after the first one without a
+/// Recognizer Artifact in between, and the last word is the last thing said.
+#[test]
+fn microphone_pause_between_phrases_leaves_no_artifact() {
+    let Some(mut fixture) = fixture() else {
+        return;
+    };
+    let Some(path) = fixture.recording(MIC_PAUSE_FIXTURE) else {
+        return;
+    };
+    let pcm = load_audio_file(&path).expect("decoding");
+    let (updates, final_text) = fixture.run_loop(pcm);
+    let name = file_name(&path);
+
+    let paused = updates_between(&updates, MIC_PHRASE_OVER, MIC_PAUSE_OVER);
+    assert!(!paused.is_empty(), "{name}: no updates during the pause");
+    for update in &paused {
+        assert_eq!(
+            update.pending,
+            "",
+            "{name}: Pending Text at {:.1}s during the pause",
+            update.elapsed.as_secs_f32()
+        );
+    }
+    let before_pause = paused
+        .last()
+        .map(|update| update.confirmed.clone())
+        .unwrap_or_default();
+    assert!(
+        words(&before_pause)
+            .iter()
+            .any(|word| word == "10" || word == "десять"),
+        "{name}: the first phrase is not confirmed by the end of the pause: {before_pause:?}"
+    );
+
+    assert!(
+        final_text.starts_with(&before_pause),
+        "{name}: {final_text:?} does not extend {before_pause:?}"
+    );
+    let continuation = final_text[before_pause.len()..].to_string();
+    let continuation_words = words(&continuation);
+    assert_eq!(
+        continuation_words.first().map(String::as_str),
+        Some("1"),
+        "{name}: the text after the pause does not start with the first spoken word: {continuation:?}"
+    );
+    assert_only_numbers(&name, &final_text);
+    assert_eq!(
+        words(&final_text).last().map(String::as_str),
+        Some("20"),
+        "{name}: something follows the last word in {final_text:?}"
+    );
+    assert!(
+        words(&final_text).len() >= 27,
+        "{name}: quiet numbers were lost in {final_text:?}"
+    );
+}
+
+/// Almost a minute of not speaking yields nothing at all: no Pending Text,
+/// no Confirmed Text, an empty result.
+#[test]
+fn microphone_silence_alone_yields_no_text() {
+    let Some(mut fixture) = fixture() else {
+        return;
+    };
+    let Some(path) = fixture.recording(MIC_SILENCE_FIXTURE) else {
+        return;
+    };
+    let pcm = load_audio_file(&path).expect("decoding");
+    let (updates, final_text) = fixture.run_loop(pcm);
+    let name = file_name(&path);
+    for update in &updates {
+        assert_eq!(
+            (update.confirmed.as_str(), update.pending.as_str()),
+            ("", ""),
+            "{name}: text at {:.1}s",
+            update.elapsed.as_secs_f32()
+        );
+    }
+    assert_eq!(final_text, "", "{name}");
 }

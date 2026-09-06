@@ -13,6 +13,7 @@ pub(crate) mod conversation_view;
 mod diagnostics;
 mod dictation_engine;
 mod dictation_footer;
+mod dictation_model_server;
 mod dictation_window;
 pub mod draft_prompt_store;
 mod entry_view_state;

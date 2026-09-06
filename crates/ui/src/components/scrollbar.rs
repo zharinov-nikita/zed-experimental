@@ -403,6 +403,16 @@ impl Scrollbars {
     pub fn for_settings<S: ScrollbarVisibility + Default>() -> Scrollbars {
         Scrollbars::new_with_setting(ScrollAxes::Both, |cx| S::default().visibility(cx))
     }
+
+    /// Local: like [`Self::for_settings`], but along `show_along` only.
+    /// `show_along` on an existing `Scrollbars` can add an axis but never
+    /// remove one, so a vertical-only scrollbar that follows the settings
+    /// has to start out vertical.
+    pub fn for_settings_along<S: ScrollbarVisibility + Default>(
+        show_along: ScrollAxes,
+    ) -> Scrollbars {
+        Scrollbars::new_with_setting(show_along, |cx| S::default().visibility(cx))
+    }
 }
 
 impl Scrollbars {

@@ -59,19 +59,33 @@ cargo run --profile release-fast -- --user-data-dir "$env:LOCALAPPDATA\Zed-Local
 - Сборка крейта `dictation` компилирует ggml/transcribe.cpp через cmake (первый раз ~4–7 мин). DLL (`transcribe.dll`,
   `ggml*.dll`) кладутся рядом с `zed.exe` скриптом сборки крейта `transcribe-cpp-sys`.
 - Проверка движка без UI: `cargo run --profile release-fast -p dictation --example transcribe_wav -- <model.bin> <backends_dir> <file.wav>`
-  (печатает сегменты и то, что останется после защиты хвоста при остановке); `--example no_speech_probe` показывает,
-  как no-speech-гейт ведёт себя на срезах записи и на тишине.
+  (печатает сегменты, переходы Speech Gate и то, что распознаётся, если обрезать файл по концу речи, как при остановке);
+  `--example no_speech_probe` показывает, что декодер и гейт делают со срезами записи и с тишиной.
 - Интеграционные тесты цикла распознавания (`crates/dictation/tests/recognition_loop.rs`) гоняют записи Handy и
   включаются только переменными окружения: `ZED_DICTATION_MODEL=<model.bin>`, `ZED_DICTATION_BACKENDS=<backends_dir>`,
   `ZED_DICTATION_RECORDINGS=%APPDATA%\com.pais.handy\recordings`; затем `cargo test --profile release-fast -p dictation`.
   Без переменных тесты выходят сразу. Фикстура `zed-digits-with-silence.wav` в той же папке (цифры «один … пять» с
   6 с тишины в конце, синтезирована голосом Windows «Microsoft Pavel» через `System.Speech`) проверяет, что Decoder Loop
   не попадает в Live Transcript и после последней цифры ничего нет; без этого файла тест пропускается.
+  Фикстуры Speech Gate там же, это Session Audio с реальным микрофоном (шумовой пол драйвера: тихие кадры обнулены):
+  `zed-mic-digits-then-silence.wav` (счёт до десяти и 9 с молчания), `zed-mic-silence.wav` (48 с молчания с дыханием
+  и щелчками, движок раньше читал в них «Продолжение следует») и `zed-mic-phrase-pause-continuation.wav` (счёт до десяти,
+  пауза 8 с, счёт до двадцати; склеена из двух Session Audio того же микрофона, чтобы пауза несла настоящий шум).
+  Тесты на них проверяют пустой Pending Text во время молчания, подтверждение речи после паузы без артефакта впереди
+  и что после последнего слова ничего нет. Эталон для сравнения с потоковым текстом теперь считается по файлу,
+  обрезанному по концу речи гейта.
 - Decoder Loop (одна n-грамма три и более раз подряд, или три одинаковых сегмента подряд) отбрасывается движком по форме
-  вывода (`is_decoder_loop`, ADR 0001). При остановке хвостовой сегмент, которого не было в Pending Text, декодируется
-  отдельно с включённым no-speech-гейтом whisper (`logprob_thold = 0`) и отбрасывается, если декодер считает его тишиной.
-  На пробах гейт сохраняет человеческую речь от 0,6 с, но на синтетической тишине не срабатывает, так что «Thank you»
-  дополнительно убирает промпт Post-processing.
+  вывода (`is_decoder_loop`, ADR 0001).
+- Speech Gate (`crates/dictation/src/speech_gate.rs`, ADR 0002): чистый автомат над кадрами 20 мс с константами движка, без
+  настроек. Шумовой пол сессии — минимум уровня кадров, растёт не быстрее 3 дБ/с и не ниже −70 дБFS; кадр считается речью
+  при уровне ≥ max(пол + 10 дБ, −50 дБFS). Гейт открывается после 100 мс речи и сообщает её начало с запасом 0,4 с,
+  закрывается после 3 с тишины (паузы «на подумать» внутри фразы доходят до 2,2 с, а деление там теряет слова) и
+  сообщает конец речи как последний громкий кадр + 0,5 с. Пока гейт закрыт, цикл не декодирует и шлёт пустой Pending Text;
+  при открытии точка фиксации прыгает к началу речи, так что тишина не заполняет окно; при закрытии фраза декодируется
+  один раз без тишины после неё и подтверждается целиком. Живой буфер тоже режется по концу речи, так что артефакт не
+  растёт из тишины и до закрытия. При остановке хвост режется там же; гейта no-speech и `logprob_thold` в движке больше нет.
+  Константы подобраны по записям Handy и Session Audio; на них гейт не открывается на щелчках и дыхании, но открывается
+  на громком шорохе (−39 дБFS, 0,7 с), который Whisper читает как «Время обновления», это остаётся Post-processing.
 - Микрофон берётся из `audio.experimental.input_audio_device` (страница Audio в Settings); пустое или неизвестное
   значение даёт устройство по умолчанию, в подвале записи тогда стоит «<устройство> · configured device not found».
   Устройства везде называются как в Windows (friendly name из WASAPI), идентификатор в тултипе выпадающего списка;
@@ -92,7 +106,19 @@ cargo run --profile release-fast -- --user-data-dir "$env:LOCALAPPDATA\Zed-Local
   процесс-глобально (закрытие Settings её не отменяет), по завершении путь пишется в `settings.json`.
 - В подвале Dictation Window во время «Recognizing…» и Post-processing доступен только Cancel; в просмотре слева метка
   «Raw» / «Processed · <модель>» (тултип с началом промпта, клик открывает Settings › AI › Dictation), `tab` — «Show Raw» /
-  «Show Processed». Тело секции со scrollbar по `scrollbar.show`.
+  «Show Processed». Тело секции только с вертикальным scrollbar по `scrollbar.show` (текст переносится, вбок не
+  прокручивается); для этого в `ui` добавлен `Scrollbars::for_settings_along`, потому что `show_along` ось не убирает.
+- Запуск Ollama (`crates/agent_ui/src/dictation_model_server.rs`): если провайдер Post-processing это `ollama` с адресом
+  по умолчанию (`http://localhost:11434`, пустой `language_models.ollama.api_url` считается им же) и `/api/version` не
+  отвечает, в начале Dictation Session Zed запускает `ollama app.exe` рядом с `ollama.exe` из PATH (сервер живёт в трее), а
+  без приложения — `ollama serve` скрытым процессом, и опрашивает сервер каждые 0,5 с до 20 с. Post-processing ждёт
+  лаунчер прежде чем выбирать модель, в подвале тогда спиннер «Starting Ollama…». Если сервер не поднялся, просмотр
+  показывает Callout «Ollama did not start» и сырой текст. Настроенная, но недоступная модель Post-processing теперь
+  ошибка («Post-processing Unavailable»), а не тихая подмена моделью агента; подмена остаётся только когда модель вообще
+  не задана. Удалённый адрес и другие провайдеры ничего не запускают; неудача не мешает следующей сессии попробовать снова.
+- Звуки (`agent.dictation.sounds`, по умолчанию `false`): старт записи и Resume играют `unmute`, остановка записи (`esc`,
+  хоткей, подсказка Review) — `mute`, всё через `audio::Audio::play_sound` на `audio.experimental.output_audio_device`.
+  Accept, Cancel, Post-processing и ошибки беззвучны; какой переход чем звучит, решает `sound_for` в `dictation_window.rs`.
 
 ## Ветки и форк
 

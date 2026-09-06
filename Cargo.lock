@@ -516,6 +516,7 @@ dependencies = [
  "multi_buffer",
  "node_runtime",
  "notifications",
+ "ollama",
  "ordered-float 2.10.1",
  "parking_lot",
  "paths",
@@ -562,6 +563,7 @@ dependencies = [
  "uuid",
  "vim",
  "watch",
+ "which 6.0.3",
  "workspace",
  "zed_actions",
 ]
