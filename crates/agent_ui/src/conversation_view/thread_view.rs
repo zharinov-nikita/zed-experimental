@@ -23,7 +23,10 @@ use editor::actions::OpenExcerpts;
 use sandbox::{SandboxFsPolicy, SandboxNetPolicy, SandboxPolicy};
 
 use crate::completion_provider::{AvailableSkill, PromptLocalCommand, pluralize};
-use crate::dictation_window::{DictationWindow, DictationWindowEvent};
+use crate::dictation_host::{self, AcceptDestination, DictationHost, StartDecision};
+use crate::dictation_window::{
+    DictationButtonState, DictationWindow, DictationWindowEvent, dictation_button,
+};
 use crate::message_editor::SharedSessionCapabilities;
 use crate::ui::{
     SandboxGroup, SandboxRow, SandboxSection, SandboxStatusTooltip, TerminalSandboxWarning,
@@ -50,7 +53,8 @@ use util::markdown::{source_position_from_fragment, split_local_url_fragment};
 use workspace::{OpenOptions, SERIALIZATION_THROTTLE_TIME};
 
 use super::elicitation::{
-    ElicitationCard, ElicitationCardHandlers, ElicitationFormState, should_render_elicitation,
+    AnswerFieldDictation, ElicitationCard, ElicitationCardHandlers, ElicitationFormState,
+    should_render_elicitation,
 };
 use super::*;
 
@@ -564,6 +568,13 @@ impl PermissionSelection {
     }
 }
 
+/// Local: the Dictation Window together with the field it is open over.
+struct DictationSession {
+    window: Entity<DictationWindow>,
+    host: DictationHost,
+    _subscription: Subscription,
+}
+
 pub struct ThreadView {
     pub(crate) root_thread_id: ThreadId,
     pub session_id: acp::SessionId,
@@ -625,9 +636,8 @@ pub struct ThreadView {
     pub add_context_menu_handle: PopoverMenuHandle<ContextMenu>,
     pub thinking_effort_menu_handle: PopoverMenuHandle<ContextMenu>,
     pub fast_mode_menu_handle: PopoverMenuHandle<ContextMenu>,
-    /// Local: the Dictation Window, present only during a Dictation Session.
-    dictation_window: Option<Entity<DictationWindow>>,
-    _dictation_subscription: Option<Subscription>,
+    /// Local: the Dictation Session in progress, if any.
+    dictation: Option<DictationSession>,
     pub project: WeakEntity<Project>,
     /// Cache + worktree snapshot for resolving paths in markdown code spans.
     /// Cloned from the parent `ConversationView` so the cache is shared and the
@@ -1041,8 +1051,7 @@ impl ThreadView {
             add_context_menu_handle: PopoverMenuHandle::default(),
             thinking_effort_menu_handle: PopoverMenuHandle::default(),
             fast_mode_menu_handle: PopoverMenuHandle::default(),
-            dictation_window: None,
-            _dictation_subscription: None,
+            dictation: None,
             project,
             code_span_resolver,
             show_external_source_prompt_warning,
@@ -1138,13 +1147,9 @@ impl ThreadView {
             MessageEditorEvent::Send => self.send(window, cx),
             MessageEditorEvent::SendImmediately => self.interrupt_and_send(window, cx),
             MessageEditorEvent::Cancel => {
-                if let Some(dictation_window) = self.dictation_window.clone()
-                    && dictation_window.read(cx).is_recording()
+                if !self.cancel_dictation_recording(&DictationHost::Composer, window, cx)
+                    && !self.close_thread_search(window, cx)
                 {
-                    dictation_window.update(cx, |dictation_window, cx| {
-                        dictation_window.cancel(&crate::CancelDictation, window, cx);
-                    });
-                } else if !self.close_thread_search(window, cx) {
                     self.cancel_generation(cx);
                 }
             }
@@ -2627,6 +2632,7 @@ impl ThreadView {
                 .insert(id, ElicitationFormState::new(&schema, window, cx));
         } else if !is_pending {
             self.elicitation_form_states.remove(&id);
+            self.answer_fields_gone(&id, window, cx);
         }
     }
 
@@ -4394,7 +4400,7 @@ impl ThreadView {
                     .gap_2()
                     // Local: the Dictation Window unfolds as a section above the
                     // Composer, pushing it down, for the duration of a session.
-                    .children(self.dictation_window.clone())
+                    .children(self.dictation_window_over(&DictationHost::Composer))
                     .child(
                         v_flex()
                             .relative()
@@ -4483,17 +4489,79 @@ impl ThreadView {
         window: &mut Window,
         cx: &mut Context<Self>,
     ) {
-        if let Some(dictation_window) = self.dictation_window.clone() {
-            dictation_window.update(cx, |dictation_window, cx| {
-                dictation_window.toggle_dictation(&crate::ToggleDictation, window, cx);
-            });
-            return;
-        }
-        self.open_dictation_window(
-            |composer_focus, window, cx| DictationWindow::start(composer_focus, window, cx),
+        self.toggle_dictation_over(DictationHost::Composer, window, cx);
+    }
+
+    /// The hotkey or microphone button of an Answer Field.
+    pub(crate) fn toggle_answer_field_dictation(
+        &mut self,
+        question: ElicitationEntryId,
+        field: String,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        self.toggle_dictation_over(DictationHost::AnswerField { question, field }, window, cx);
+    }
+
+    /// Escape in an Answer Field; true when it stopped a recording there.
+    pub(crate) fn cancel_answer_field_dictation(
+        &mut self,
+        question: ElicitationEntryId,
+        field: String,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) -> bool {
+        self.cancel_dictation_recording(
+            &DictationHost::AnswerField { question, field },
             window,
             cx,
-        );
+        )
+    }
+
+    /// One session at a time: the field that hosts it toggles it, any other
+    /// field is refused until the session ends.
+    fn toggle_dictation_over(
+        &mut self,
+        host: DictationHost,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        match dictation_host::start_decision(self.dictation_host(), &host) {
+            StartDecision::Toggle => {
+                if let Some(session) = &self.dictation {
+                    session.window.update(cx, |dictation_window, cx| {
+                        dictation_window.toggle_dictation(&crate::ToggleDictation, window, cx);
+                    });
+                }
+            }
+            StartDecision::Refuse => {}
+            StartDecision::Open => self.open_dictation_window(
+                host,
+                |host_focus, window, cx| DictationWindow::start(host_focus, window, cx),
+                window,
+                cx,
+            ),
+        }
+    }
+
+    /// Stops the recording of the session hosted by `host`, if that is what
+    /// is going on; the caller falls back to its usual Escape otherwise.
+    fn cancel_dictation_recording(
+        &mut self,
+        host: &DictationHost,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) -> bool {
+        let Some(session) = &self.dictation else {
+            return false;
+        };
+        if session.host != *host || !session.window.read(cx).is_recording() {
+            return false;
+        }
+        session.window.update(cx, |dictation_window, cx| {
+            dictation_window.cancel(&crate::CancelDictation, window, cx);
+        });
+        true
     }
 
     /// Opens an existing Dictation Block for review. One session at a time:
@@ -4504,15 +4572,16 @@ impl ThreadView {
         window: &mut Window,
         cx: &mut Context<Self>,
     ) {
-        if self.dictation_window.is_some() {
+        if self.dictation.is_some() {
             return;
         }
         let Some((text, duration)) = self.message_editor.read(cx).dictation_block(&id) else {
             return;
         };
         self.open_dictation_window(
-            move |composer_focus, window, cx| {
-                DictationWindow::review(composer_focus, id, text, duration, window, cx)
+            DictationHost::Composer,
+            move |host_focus, window, cx| {
+                DictationWindow::review(host_focus, id, text, duration, window, cx)
             },
             window,
             cx,
@@ -4521,18 +4590,81 @@ impl ThreadView {
 
     fn open_dictation_window(
         &mut self,
+        host: DictationHost,
         build: impl FnOnce(FocusHandle, &mut Window, &mut Context<DictationWindow>) -> DictationWindow,
         window: &mut Window,
         cx: &mut Context<Self>,
     ) {
-        let composer_focus = self.message_editor.focus_handle(cx);
-        let dictation_window = cx.new(|cx| build(composer_focus, window, cx));
-        self._dictation_subscription = Some(cx.subscribe_in(
-            &dictation_window,
-            window,
-            Self::handle_dictation_window_event,
-        ));
-        self.dictation_window = Some(dictation_window);
+        let Some(host_focus) = self.dictation_host_focus_handle(&host, cx) else {
+            return;
+        };
+        let dictation_window = cx.new(|cx| build(host_focus, window, cx));
+        let subscription =
+            cx.subscribe_in(&dictation_window, window, Self::handle_dictation_window_event);
+        self.dictation = Some(DictationSession {
+            window: dictation_window,
+            host,
+            _subscription: subscription,
+        });
+        cx.notify();
+    }
+
+    pub(crate) fn dictation_host(&self) -> Option<&DictationHost> {
+        self.dictation.as_ref().map(|session| &session.host)
+    }
+
+    /// The window to render above `host`, when the session is over it.
+    fn dictation_window_over(&self, host: &DictationHost) -> Option<Entity<DictationWindow>> {
+        self.dictation
+            .as_ref()
+            .filter(|session| session.host == *host)
+            .map(|session| session.window.clone())
+    }
+
+    /// The editor of an Answer Field, as long as its Agent Question is still
+    /// waiting for an answer.
+    fn answer_field_editor(&self, host: &DictationHost, cx: &App) -> Option<Entity<Editor>> {
+        let DictationHost::AnswerField { question, field } = host else {
+            return None;
+        };
+        let (_, elicitation) = self.thread.read(cx).elicitation(question)?;
+        if !matches!(elicitation.status, ElicitationStatus::Pending { .. }) {
+            return None;
+        }
+        self.elicitation_form_states.get(question)?.text_field(field)
+    }
+
+    fn dictation_host_focus_handle(&self, host: &DictationHost, cx: &App) -> Option<FocusHandle> {
+        match host {
+            DictationHost::Composer => Some(self.message_editor.focus_handle(cx)),
+            DictationHost::AnswerField { .. } => self
+                .answer_field_editor(host, cx)
+                .map(|editor| editor.focus_handle(cx)),
+        }
+    }
+
+    /// The Agent Question `question` no longer takes answers. A session over
+    /// one of its fields moves above the Composer and wraps up there: the
+    /// text becomes a Dictation Block instead of being lost with the card.
+    fn answer_fields_gone(
+        &mut self,
+        question: &ElicitationEntryId,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        let Some(session) = &mut self.dictation else {
+            return;
+        };
+        let DictationHost::AnswerField { question: hosted, .. } = &session.host else {
+            return;
+        };
+        if hosted != question {
+            return;
+        }
+        session.host = DictationHost::Composer;
+        session.window.update(cx, |dictation_window, cx| {
+            dictation_window.accept_when_ready(window, cx);
+        });
         cx.notify();
     }
 
@@ -4550,78 +4682,149 @@ impl ThreadView {
                 block_id,
                 replaces_existing,
             } => {
-                self.message_editor.update(cx, |message_editor, cx| {
-                    if *replaces_existing {
-                        message_editor.replace_dictation_block(
-                            block_id,
-                            text.clone(),
-                            *duration,
-                            window,
-                            cx,
-                        );
-                    } else {
-                        message_editor.insert_dictation_block(
-                            block_id.clone(),
-                            text.clone(),
-                            *duration,
-                            window,
-                            cx,
-                        );
+                let Some(host) = self.dictation_host().cloned() else {
+                    return;
+                };
+                let answer_field = self.answer_field_editor(&host, cx);
+                let destination =
+                    dictation_host::accept_destination(&host, answer_field.is_some());
+                match (destination, answer_field) {
+                    (AcceptDestination::AnswerField, Some(editor)) => {
+                        editor.update(cx, |editor, cx| {
+                            dictation_host::insert_at_cursor(editor, text, window, cx);
+                        });
                     }
-                });
+                    (AcceptDestination::AnswerField, None) | (AcceptDestination::Composer, _) => {
+                        self.message_editor.update(cx, |message_editor, cx| {
+                            if *replaces_existing {
+                                message_editor.replace_dictation_block(
+                                    block_id,
+                                    text.clone(),
+                                    *duration,
+                                    window,
+                                    cx,
+                                );
+                            } else {
+                                message_editor.insert_dictation_block(
+                                    block_id.clone(),
+                                    text.clone(),
+                                    *duration,
+                                    window,
+                                    cx,
+                                );
+                            }
+                        });
+                    }
+                }
                 self.close_dictation_window(window, cx);
             }
             DictationWindowEvent::RecordingStarted => {
-                window.focus(&self.message_editor.focus_handle(cx), cx);
+                if let Some(host) = self.dictation_host().cloned()
+                    && let Some(host_focus) = self.dictation_host_focus_handle(&host, cx)
+                {
+                    window.focus(&host_focus, cx);
+                }
             }
             DictationWindowEvent::Dismiss => self.close_dictation_window(window, cx),
         }
     }
 
+    /// Closes the window and returns focus to the field it was open over, or
+    /// to the Composer when that field is gone.
     fn close_dictation_window(&mut self, window: &mut Window, cx: &mut Context<Self>) {
-        self.dictation_window = None;
-        self._dictation_subscription = None;
-        window.focus(&self.message_editor.focus_handle(cx), cx);
+        let host = self.dictation.take().map(|session| session.host);
+        let host_focus = host
+            .and_then(|host| self.dictation_host_focus_handle(&host, cx))
+            .unwrap_or_else(|| self.message_editor.focus_handle(cx));
+        window.focus(&host_focus, cx);
         cx.notify();
     }
 
+    /// The microphone button of the Composer. Off while a session runs over
+    /// an Answer Field; red while the Composer's own session records.
     fn render_dictation_button(&self, cx: &mut Context<Self>) -> impl IntoElement {
-        let recording = self
-            .dictation_window
-            .as_ref()
-            .is_some_and(|dictation_window| dictation_window.read(cx).is_recording());
-        let focus_handle = self.message_editor.focus_handle(cx);
-        IconButton::new("dictation", IconName::Mic)
-            .icon_size(IconSize::Small)
-            .map(|this| {
-                if recording {
-                    this.style(ButtonStyle::Tinted(TintColor::Error))
-                        .icon_color(Color::Error)
+        let state = match &self.dictation {
+            None => DictationButtonState::Idle,
+            Some(session) if session.host == DictationHost::Composer => {
+                if session.window.read(cx).is_recording() {
+                    DictationButtonState::Recording
                 } else {
-                    this.icon_color(Color::Muted)
+                    DictationButtonState::Idle
                 }
-            })
-            // The footer of the Dictation Window shows only esc/enter/tab
-            // hints, so this tooltip is where the hotkey is documented.
-            .tooltip(Tooltip::element(move |_, cx| {
-                let hotkey =
-                    || KeyBinding::for_action_in(&crate::ToggleDictation, &focus_handle, cx);
-                let row = |label: &'static str, key: KeyBinding| {
-                    h_flex()
-                        .gap_4()
-                        .justify_between()
-                        .child(Label::new(label))
-                        .child(key)
-                };
-                v_flex()
-                    .gap_1()
-                    .child(row("Start / Stop dictation", hotkey()))
-                    .child(row("Resume selected block", hotkey()))
-                    .into_any_element()
-            }))
-            .on_click(cx.listener(|this, _, window, cx| {
+            }
+            Some(_) => DictationButtonState::Disabled,
+        };
+        dictation_button(
+            "dictation",
+            state,
+            self.message_editor.focus_handle(cx),
+            true,
+            cx.listener(|this, _, window, cx| {
                 this.toggle_dictation(&crate::ToggleDictation, window, cx);
-            }))
+            }),
+        )
+    }
+
+    /// What the card of `question` shows of the session: the window over one
+    /// of its fields, and whether the other fields' buttons are off.
+    fn answer_field_dictation(
+        &self,
+        question: &ElicitationEntryId,
+        cx: &App,
+    ) -> AnswerFieldDictation {
+        let Some(session) = &self.dictation else {
+            return AnswerFieldDictation::default();
+        };
+        let window = match &session.host {
+            DictationHost::AnswerField { question: hosted, field } if hosted == question => {
+                Some((field.clone(), session.window.clone().into()))
+            }
+            _ => None,
+        };
+        AnswerFieldDictation {
+            recording: window.is_some() && session.window.read(cx).is_recording(),
+            window,
+            blocked: true,
+        }
+    }
+
+    #[cfg(test)]
+    pub(crate) fn dictation_window(&self) -> Option<Entity<DictationWindow>> {
+        self.dictation.as_ref().map(|session| session.window.clone())
+    }
+
+    #[cfg(test)]
+    pub(crate) fn answer_field(&self, host: &DictationHost, cx: &App) -> Option<Entity<Editor>> {
+        self.answer_field_editor(host, cx)
+    }
+
+    /// Test seam: opens a session over `host` straight in review, with
+    /// `text` already recognized, so no engine or microphone is needed.
+    #[cfg(test)]
+    pub(crate) fn open_dictation_review_over(
+        &mut self,
+        host: DictationHost,
+        text: String,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) -> Option<Entity<DictationWindow>> {
+        let block_id = uuid::Uuid::new_v4().to_string();
+        self.open_dictation_window(
+            host,
+            move |host_focus, window, cx| {
+                DictationWindow::review(
+                    host_focus,
+                    block_id,
+                    text,
+                    std::time::Duration::from_secs(3),
+                    window,
+                    cx,
+                )
+            },
+            window,
+            cx,
+        );
+        self.dictation.as_ref().map(|session| session.window.clone())
     }
 
     fn render_queue_steer_button(
@@ -6787,6 +6990,7 @@ impl ThreadView {
             self.elicitation_form_states.get(&elicitation.id),
             self.elicitation_card_handlers(cx),
         )
+        .with_dictation(self.answer_field_dictation(&elicitation.id, cx))
         .render(cx)
     }
 
@@ -6855,14 +7059,34 @@ impl ThreadView {
                     .log_err();
                 }
             },
-            move |elicitation_id, field_name, value, selected, cx| {
+            {
+                let view = view.clone();
+                move |elicitation_id, field_name, value, selected, cx| {
+                    view.update(cx, |this, cx| {
+                        if let Some(form) = this.elicitation_form_states.get_mut(&elicitation_id) {
+                            form.set_multi_select(&field_name, value, selected);
+                            cx.notify();
+                        }
+                    })
+                    .log_err();
+                }
+            },
+        )
+        .with_dictation(
+            {
+                let view = view.clone();
+                move |elicitation_id, field_name, window, cx| {
+                    view.update(cx, |this, cx| {
+                        this.toggle_answer_field_dictation(elicitation_id, field_name, window, cx);
+                    })
+                    .log_err();
+                }
+            },
+            move |elicitation_id, field_name, window, cx| {
                 view.update(cx, |this, cx| {
-                    if let Some(form) = this.elicitation_form_states.get_mut(&elicitation_id) {
-                        form.set_multi_select(&field_name, value, selected);
-                        cx.notify();
-                    }
+                    this.cancel_answer_field_dictation(elicitation_id, field_name, window, cx)
                 })
-                .log_err();
+                .unwrap_or(false)
             },
         )
     }

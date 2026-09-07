@@ -49,6 +49,14 @@ cargo run --profile release-fast -- --user-data-dir "$env:LOCALAPPDATA\Zed-Local
   Dictation Window разворачивается секцией над композером на всю его ширину (тело до 10 строк, дальше прокрутка);
   в подвале только короткие подсказки `esc`/`enter`/`tab`, хоткей старта, остановки и Resume показывает тултип
   кнопки микрофона.
+- Диктовка в Answer Field (текстовое поле карточки Agent Question, `elicitation.rs`): тот же хоткей и кнопка
+  микрофона у поля, Dictation Window разворачивается внутри карточки над полем. Accept вставляет обычный текст
+  у курсора поля (пробел добавляется только там, где слова слиплись бы), ничего не отправляет, Dictation Block
+  не создаёт; отправка как обычно кнопкой Submit. Поле авто-высоты с переносом, лимит строк как у Composer.
+  Одна сессия на панель: пока окно открыто, кнопки и хоткей других полей и Composer погашены. Если вопрос
+  исчезает во время сессии (ответ отправлен иначе, агент остановлен), окно переезжает над Composer, запись
+  останавливается и текст становится Dictation Block с тем же `block_id` (Session Audio под ним же).
+  Кто хостит окно и куда идёт Accept — `crates/agent_ui/src/dictation_host.rs`.
 - Настройки в окне Settings: AI → General → Dictation (поиск по «whisper», «microphone»). Подстраница правит
   `agent.dictation` и `audio.experimental.input_audio_device` в `settings.json`; провайдер и модель Post-processing
   пишутся парой в `agent.dictation.post_processing.model` (как `agent.default_model`), «Agent default model» удаляет
