@@ -4528,12 +4528,22 @@ impl ThreadView {
         window: &mut Window,
         cx: &mut Context<Self>,
     ) {
-        if self.dictation.is_some() {
-            return;
-        }
         let Some(quote) = self.selected_quote(entry_ix, cx) else {
             return;
         };
+        self.reply_with_quote(quote, window, cx);
+    }
+
+    /// A Quoted Fragment at the cursor of the Composer, ready to be typed after.
+    pub(crate) fn reply_with_quote(
+        &mut self,
+        quote: String,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        if self.dictation.is_some() {
+            return;
+        }
         self.message_editor.update(cx, |message_editor, cx| {
             message_editor.insert_quoted_fragment(quote, window, cx);
         });
@@ -8143,6 +8153,9 @@ impl ThreadView {
                         has_selection,
                         this.dictation.is_some(),
                     );
+                    // Taken now: the click on a menu item clears the selection
+                    // before the item's handler runs.
+                    let selected_quote = this.selected_quote(entry_ix, cx);
 
                     let context_menu_link = chunks.and_then(|chunks| {
                         chunks.iter().find_map(|chunk| {
@@ -8225,10 +8238,13 @@ impl ThreadView {
                                     .disabled(!enabled)
                                     .handler({
                                         let entity = entity.clone();
+                                        let quote = selected_quote.clone();
                                         move |window, cx| {
-                                            entity.update(cx, |this, cx| {
-                                                this.reply_to_selection(entry_ix, window, cx);
-                                            });
+                                            if let Some(quote) = quote.clone() {
+                                                entity.update(cx, |this, cx| {
+                                                    this.reply_with_quote(quote, window, cx);
+                                                });
+                                            }
                                         }
                                     }),
                             )
@@ -8237,12 +8253,13 @@ impl ThreadView {
                                     .disabled(!enabled)
                                     .handler({
                                         let entity = entity.clone();
+                                        let quote = selected_quote.clone();
                                         move |window, cx| {
-                                            entity.update(cx, |this, cx| {
-                                                this.dictate_reply_to_selection(
-                                                    entry_ix, window, cx,
-                                                );
-                                            });
+                                            if let Some(quote) = quote.clone() {
+                                                entity.update(cx, |this, cx| {
+                                                    this.dictate_reply(quote, window, cx);
+                                                });
+                                            }
                                         }
                                     }),
                             )

@@ -984,10 +984,15 @@ impl MessageEditor {
                 .creases()
                 .find(|(id, _)| *id == crease_id)
                 .map(|(_, crease)| crease.range().to_offset(&buffer_snapshot));
-            let Some(range) = range else {
+            let Some(mut range) = range else {
                 return;
             };
             editor.remove_creases([crease_id], cx);
+            // The space put after the block goes with it; otherwise every
+            // replacement would leave one more behind.
+            if buffer_snapshot.chars_at(range.end).next() == Some(' ') {
+                range.end = MultiBufferOffset(range.end.0 + 1);
+            }
             editor.edit([(range.clone(), "")], cx);
             editor.change_selections(Default::default(), window, cx, |selections| {
                 selections.select_ranges([range.start..range.start]);
@@ -4485,7 +4490,7 @@ mod tests {
     async fn test_quote_reply_block_keeps_its_quote_while_the_comment_changes(
         cx: &mut TestAppContext,
     ) {
-        let (message_editor, _editor, cx) = message_editor_for_blocks(cx).await;
+        let (message_editor, editor, cx) = message_editor_for_blocks(cx).await;
         message_editor.update_in(cx, |message_editor, window, cx| {
             assert!(message_editor.insert_quote_reply_block(
                 "block-1".to_string(),
@@ -4517,6 +4522,11 @@ mod tests {
             panic!("expected one Quote Reply Block, got {contents:?}");
         };
         assert_eq!(uri.name(), "fix the loop please…");
+        let text = editor.read_with(cx, |editor, cx| editor.text(cx));
+        assert!(
+            !text.contains("  "),
+            "a replacement leaves no extra space behind: {text:?}"
+        );
         assert_eq!(
             content,
             "> quoted\n\n(quoting your reply above)\n\nfix the loop please now"
