@@ -2016,6 +2016,15 @@ impl MessageEditor {
                     else {
                         continue;
                     };
+                    // Local: a quote and its comment are shown as they were
+                    // sent, so the message says what the comment refers to.
+                    if matches!(
+                        mention_uri,
+                        MentionUri::Quote { .. } | MentionUri::QuoteReply { .. }
+                    ) {
+                        append_normalized(&mut text, resource.text);
+                        continue;
+                    }
                     let start = text.len();
                     append_normalized(&mut text, mention_uri.as_link().to_string());
                     let end = text.len();
@@ -4531,6 +4540,31 @@ mod tests {
             assert!(message_editor.quote_reply_block("block-1").is_none());
             assert!(message_editor.is_empty(cx));
         });
+    }
+
+    #[gpui::test]
+    async fn test_sent_quote_reply_shows_its_quote_and_comment(cx: &mut TestAppContext) {
+        let (message_editor, editor, cx) = message_editor_for_blocks(cx).await;
+        let sent = "> quoted\n\n(quoting your reply above)\n\nmy comment";
+        let uri = MentionUri::QuoteReply {
+            id: "block-1".to_string(),
+            label: "my comment".to_string(),
+            duration_secs: 3,
+            word_count: 2,
+        };
+        message_editor.update_in(cx, |message_editor, window, cx| {
+            message_editor.set_message(
+                vec![acp::ContentBlock::Resource(acp::EmbeddedResource::new(
+                    acp::EmbeddedResourceResource::TextResourceContents(
+                        acp::TextResourceContents::new(sent.to_string(), uri.to_uri().to_string()),
+                    ),
+                ))],
+                window,
+                cx,
+            );
+        });
+        assert_eq!(editor.read_with(cx, |editor, cx| editor.text(cx)), sent);
+        assert!(block_contents(&message_editor, cx).await.is_empty());
     }
 
     #[gpui::test]

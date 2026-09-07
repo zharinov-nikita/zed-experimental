@@ -639,6 +639,9 @@ pub struct ThreadView {
     pub fast_mode_menu_handle: PopoverMenuHandle<ContextMenu>,
     /// Local: the Dictation Session in progress, if any.
     dictation: Option<DictationSession>,
+    /// Local: a block to open once the current window has closed, when the
+    /// user switched to another block from a review.
+    dictation_block_to_open: Option<String>,
     pub project: WeakEntity<Project>,
     /// Cache + worktree snapshot for resolving paths in markdown code spans.
     /// Cloned from the parent `ConversationView` so the cache is shared and the
@@ -1053,6 +1056,7 @@ impl ThreadView {
             thinking_effort_menu_handle: PopoverMenuHandle::default(),
             fast_mode_menu_handle: PopoverMenuHandle::default(),
             dictation: None,
+            dictation_block_to_open: None,
             project,
             code_span_resolver,
             show_external_source_prompt_warning,
@@ -4673,7 +4677,21 @@ impl ThreadView {
         window: &mut Window,
         cx: &mut Context<Self>,
     ) {
-        if self.dictation.is_some() {
+        if let Some(session) = &self.dictation {
+            // Switching to another block from a review that only waits for
+            // the user: the review is accepted into its block first, and the
+            // other block opens once the window has closed.
+            let window_state = session.window.read(cx);
+            if session.host != DictationHost::Composer
+                || window_state.block_id() == id
+                || !window_state.is_idle_review()
+            {
+                return;
+            }
+            self.dictation_block_to_open = Some(id);
+            session.window.update(cx, |dictation_window, cx| {
+                dictation_window.accept_when_ready(window, cx);
+            });
             return;
         }
         if let Some((quote, comment, duration)) =
@@ -4865,6 +4883,9 @@ impl ThreadView {
             .unwrap_or_else(|| self.message_editor.focus_handle(cx));
         window.focus(&host_focus, cx);
         cx.notify();
+        if let Some(id) = self.dictation_block_to_open.take() {
+            self.edit_dictation_block(id, window, cx);
+        }
     }
 
     /// The microphone button of the Composer. Off while a session runs over
@@ -8196,15 +8217,34 @@ impl ThreadView {
                             Box::new(markdown::CopyAsMarkdown),
                         )
                         .when_some(quote_reply_items, |menu, enabled| {
-                            menu.action_disabled_when(
-                                !enabled,
-                                "Reply to Selection",
-                                Box::new(crate::ReplyToSelection),
+                            // Handled by the thread view directly: a right
+                            // click does not focus the response, so an action
+                            // sent to the focused element would go astray.
+                            menu.item(
+                                ContextMenuEntry::new("Reply to Selection")
+                                    .disabled(!enabled)
+                                    .handler({
+                                        let entity = entity.clone();
+                                        move |window, cx| {
+                                            entity.update(cx, |this, cx| {
+                                                this.reply_to_selection(entry_ix, window, cx);
+                                            });
+                                        }
+                                    }),
                             )
-                            .action_disabled_when(
-                                !enabled,
-                                "Dictate Reply to Selection",
-                                Box::new(crate::DictateReplyToSelection),
+                            .item(
+                                ContextMenuEntry::new("Dictate Reply to Selection")
+                                    .disabled(!enabled)
+                                    .handler({
+                                        let entity = entity.clone();
+                                        move |window, cx| {
+                                            entity.update(cx, |this, cx| {
+                                                this.dictate_reply_to_selection(
+                                                    entry_ix, window, cx,
+                                                );
+                                            });
+                                        }
+                                    }),
                             )
                         })
                         .item(copy_this_agent_response)

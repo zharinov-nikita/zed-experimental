@@ -4519,6 +4519,54 @@ pub(crate) mod tests {
     }
 
     #[gpui::test]
+    async fn test_opening_another_block_accepts_the_review_first(cx: &mut TestAppContext) {
+        init_test(cx);
+        let (conversation_view, cx) =
+            setup_conversation_view(StubAgentServer::new(StubAgentConnection::new()), cx).await;
+        let thread = active_thread(&conversation_view, cx);
+        thread.update_in(cx, |thread, window, cx| {
+            thread.message_editor.update(cx, |message_editor, cx| {
+                for (id, comment) in [("block-a", "one"), ("block-b", "two")] {
+                    message_editor.insert_quote_reply_block(
+                        id.to_string(),
+                        "quoted".to_string(),
+                        comment.to_string(),
+                        std::time::Duration::from_secs(1),
+                        window,
+                        cx,
+                    );
+                }
+            });
+            thread.edit_dictation_block("block-a".to_string(), window, cx);
+        });
+        let first_window = thread
+            .read_with(cx, |thread, _cx| thread.dictation_window())
+            .expect("block-a should open for review");
+        first_window.update_in(cx, |dictation_window, window, cx| {
+            dictation_window.set_review_text("one edited", window, cx);
+        });
+
+        thread.update_in(cx, |thread, window, cx| {
+            thread.edit_dictation_block("block-b".to_string(), window, cx);
+        });
+        cx.run_until_parked();
+
+        thread.read_with(cx, |thread, cx| {
+            let dictation_window = thread.dictation_window().expect("block-b should be open");
+            assert_eq!(dictation_window.read(cx).block_id(), "block-b");
+            assert_eq!(
+                thread
+                    .message_editor
+                    .read(cx)
+                    .quote_reply_block("block-a")
+                    .map(|(_, comment, _)| comment),
+                Some("one edited".to_string()),
+                "the review of block-a is kept when switching"
+            );
+        });
+    }
+
+    #[gpui::test]
     async fn test_discarding_an_empty_quote_reply_removes_its_block(cx: &mut TestAppContext) {
         init_test(cx);
         let (conversation_view, cx) =

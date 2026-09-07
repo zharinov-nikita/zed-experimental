@@ -478,6 +478,13 @@ impl DictationWindow {
         matches!(self.phase, Phase::Recording { .. } | Phase::Starting)
     }
 
+    /// Review with nothing running: the window only waits for the user.
+    pub fn is_idle_review(&self) -> bool {
+        matches!(self.phase, Phase::Review)
+            && self._post_processing_task.is_none()
+            && !self.resuming
+    }
+
     /// The block this session belongs to; Session Audio is filed under it
     /// whichever field the text ends up in.
     pub fn block_id(&self) -> &str {
