@@ -8,10 +8,9 @@ use crate::{
         PromptLocalCommand, SlashCommandCompletion,
     },
     mention_set::{Mention, MentionImage, MentionSet, insert_crease_for_mention},
+    quote_reply,
 };
 use acp_thread::MentionUri;
-
-use crate::quote_reply;
 use agent::ThreadStore;
 use agent_client_protocol::schema::v1 as acp;
 use anyhow::{Result, anyhow};
@@ -794,7 +793,7 @@ impl MessageEditor {
             .map(|block| (block.text.clone(), block.duration))
     }
 
-    /// Local: replaces a Dictation Block in place. If its chip was deleted
+    /// Local: replaces a Dictation Block in place. If its crease was deleted
     /// meanwhile, the new block goes to the cursor instead.
     pub fn replace_dictation_block(
         &mut self,
@@ -812,7 +811,7 @@ impl MessageEditor {
 
     /// Local: a Quoted Fragment of the agent's response at the cursor. The
     /// agent receives it quoted back with a note; the reply the user types
-    /// after the chip follows as ordinary text.
+    /// after the block follows as ordinary text.
     pub fn insert_quoted_fragment(
         &mut self,
         quote: String,
@@ -872,7 +871,7 @@ impl MessageEditor {
     }
 
     /// Local: gives a Quote Reply Block a new comment; the quote stays as it
-    /// was selected. If its chip was deleted meanwhile, the block goes to
+    /// was selected. If its crease was deleted meanwhile, the block goes to
     /// the cursor instead.
     pub fn replace_quote_reply_block(
         &mut self,
@@ -889,7 +888,7 @@ impl MessageEditor {
         self.insert_quote_reply_block(id.to_string(), block.quote, comment, duration, window, cx);
     }
 
-    /// Local: removes a Quote Reply Block whole, chip and all.
+    /// Local: removes a Quote Reply Block whole.
     pub fn remove_quote_reply_block(
         &mut self,
         id: &str,
@@ -911,7 +910,7 @@ impl MessageEditor {
         )
     }
 
-    /// Local: a block chip at the cursor: a folded crease whose mention
+    /// Local: a block at the cursor: a folded crease whose mention
     /// carries `content`, the text the agent receives for it.
     fn insert_block_crease(
         &mut self,
@@ -970,8 +969,8 @@ impl MessageEditor {
         Some(crease_id)
     }
 
-    /// Local: removes a block chip and its mention. The cursor lands where
-    /// the chip was, so a replacement goes to the same place.
+    /// Local: removes a block's crease and its mention. The cursor lands
+    /// where the block was, so a replacement goes to the same place.
     fn remove_block_crease(
         &mut self,
         crease_id: CreaseId,
@@ -4321,7 +4320,7 @@ mod tests {
         );
     }
 
-    /// Local: a composer for block chip tests, with nothing typed yet.
+    /// Local: a composer for block tests, with nothing typed yet.
     async fn message_editor_for_blocks(
         cx: &mut TestAppContext,
     ) -> (
@@ -4359,7 +4358,7 @@ mod tests {
         (message_editor, editor, cx)
     }
 
-    /// Local: the mentions behind the chips, as (uri, text the agent gets).
+    /// Local: the mentions behind the blocks, as (uri, text the agent gets).
     async fn block_contents(
         message_editor: &Entity<MessageEditor>,
         cx: &mut VisualTestContext,
@@ -4439,7 +4438,7 @@ mod tests {
         });
         assert_eq!(block_contents(&message_editor, cx).await.len(), 1);
 
-        // Backspace over the trailing space and then over the chip.
+        // Backspace over the trailing space and then over the block.
         editor.update_in(cx, |editor, window, cx| {
             editor.backspace(&Default::default(), window, cx);
             editor.backspace(&Default::default(), window, cx);

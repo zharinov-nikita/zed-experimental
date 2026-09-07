@@ -1,5 +1,5 @@
 //! Local: Quote Reply, the pure parts. How a Quoted Fragment and a Quote
-//! Reply Block read to the agent and on their chips, and when the context
+//! Reply Block read to the agent and in the Composer, and when the context
 //! menu of an agent response offers them. See `CONTEXT.md` and ADR 0003.
 
 /// The note that tells the agent the quote is its own words, in the language
@@ -41,10 +41,10 @@ pub(crate) fn quote_reply_text(quote: &str, note: &str, comment: &str) -> String
     }
 }
 
-/// How many words of the comment the chip shows.
+/// How many words of the comment the block's label shows.
 const LABEL_WORDS: usize = 4;
 
-/// The chip label: the first words of the comment, an ellipsis when there
+/// The block's label: the first words of the comment, an ellipsis when there
 /// are more. Empty while nothing has been dictated yet.
 pub(crate) fn quote_reply_label(comment: &str) -> String {
     let words: Vec<&str> = comment.split_whitespace().collect();
@@ -60,7 +60,7 @@ pub(crate) fn quote_reply_label(comment: &str) -> String {
     label
 }
 
-/// The chip tooltip: both parts, each shortened like a Dictation Block's.
+/// The block's tooltip: both parts, each shortened like a Dictation Block's.
 pub(crate) fn quote_reply_tooltip(quote: &str, comment: &str) -> String {
     let quote = crate::dictation_window::block_tooltip(quote);
     if comment.trim().is_empty() {

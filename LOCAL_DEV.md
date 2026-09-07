@@ -61,8 +61,8 @@ cargo run --profile release-fast -- --user-data-dir "$env:LOCALAPPDATA\Zed-Local
   в Composer как Quoted Fragment (crease `MentionUri::Quote`, удаляется целиком), «Dictate Reply to Selection»
   и `ctrl-alt-space` при фокусе в ответе с выделением создают у курсора Quote Reply Block (`MentionUri::QuoteReply`)
   с пустым комментарием и открывают над Composer Dictation Window с плашкой цитаты над транскриптом. Accept
-  заполняет комментарий, Discard пустого комментария удаляет блок; Resume и правка из чипа касаются только
-  комментария. Агенту уходит `> цитата`, пометка на языке `agent.dictation.language` («(из твоего ответа выше)»
+  заполняет комментарий, Discard пустого комментария удаляет блок; Resume и правка открытого из Composer
+  блока касаются только комментария. Агенту уходит `> цитата`, пометка на языке `agent.dictation.language` («(из твоего ответа выше)»
   для `ru`, иначе «(quoting your reply above)») и комментарий. Оба пункта погашены без выделения и во время
   Dictation Session. Чистые функции: `crates/agent_ui/src/quote_reply.rs`.
 - Настройки в окне Settings: AI → General → Dictation (поиск по «whisper», «microphone»). Подстраница правит

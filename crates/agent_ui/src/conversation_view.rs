@@ -4484,6 +4484,41 @@ pub(crate) mod tests {
     }
 
     #[gpui::test]
+    async fn test_quote_reply_is_refused_while_a_session_runs(cx: &mut TestAppContext) {
+        init_test(cx);
+        let (conversation_view, cx) =
+            setup_conversation_view(StubAgentServer::new(StubAgentConnection::new()), cx).await;
+        let thread = active_thread(&conversation_view, cx);
+        let dictation_window = thread
+            .update_in(cx, |thread, window, cx| {
+                thread.open_dictation_review_over(
+                    crate::dictation_host::DictationHost::Composer,
+                    "in review".to_string(),
+                    window,
+                    cx,
+                )
+            })
+            .expect("a session should open over the Composer");
+
+        thread.update_in(cx, |thread, window, cx| {
+            thread.dictate_reply("quoted words".to_string(), window, cx);
+        });
+        cx.run_until_parked();
+
+        thread.read_with(cx, |thread, cx| {
+            assert_eq!(
+                thread.dictation_window().map(|window| window.entity_id()),
+                Some(dictation_window.entity_id()),
+                "the running session stays"
+            );
+            assert!(
+                thread.message_editor.read(cx).is_empty(cx),
+                "no Quote Reply Block is created while a session runs"
+            );
+        });
+    }
+
+    #[gpui::test]
     async fn test_discarding_an_empty_quote_reply_removes_its_block(cx: &mut TestAppContext) {
         init_test(cx);
         let (conversation_view, cx) =

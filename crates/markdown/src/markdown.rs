@@ -3158,6 +3158,10 @@ impl Element for MarkdownElement {
     ) {
         let mut context = KeyContext::default();
         context.add("Markdown");
+        // Local: lets keymaps bind selection-only actions (Quote Reply).
+        if self.markdown.read(cx).has_selection() {
+            context.add("has_selection");
+        }
         window.set_key_context(context);
         window.on_action(std::any::TypeId::of::<crate::Copy>(), {
             let entity = self.markdown.clone();

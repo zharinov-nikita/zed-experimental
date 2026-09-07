@@ -234,7 +234,13 @@
     "use_key_equivalents": true,
     "bindings": {
       "ctrl-c": "markdown::CopyAsMarkdown",
-      // Local: dictate a reply to the selected fragment of an agent response.
+    },
+  },
+  // Local: Quote Reply by voice on the selected fragment of an agent response.
+  {
+    "context": "AgentPanel > Markdown && has_selection",
+    "use_key_equivalents": true,
+    "bindings": {
       "ctrl-alt-space": "agent::DictateReplyToSelection",
     },
   },
