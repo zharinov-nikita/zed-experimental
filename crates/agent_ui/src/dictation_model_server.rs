@@ -62,37 +62,42 @@ pub fn ollama_api_url(configured: &str) -> String {
 
 /// Makes sure the server answers: when `reachable` says it does not, `start`
 /// is called once and the server is polled every [`POLL`] (sleeping with
-/// `wait`) until it answers or [`START_LIMIT`] has passed. Nothing is started
-/// when the server answers at once.
-pub async fn ensure_server<Reachable, Answer, Wait, Sleep>(
+/// `wait`) until it answers or `elapsed`, the time since the launcher began,
+/// reaches [`START_LIMIT`]. Probes take time too, so the limit is measured
+/// with a clock rather than counted in polls. Nothing is started when the
+/// server answers at once.
+pub async fn ensure_server<Reachable, Answer, Start, Started, Wait, Sleep>(
     reachable: Reachable,
-    start: impl FnOnce() -> Result<()>,
+    start: Start,
     wait: Wait,
+    elapsed: impl Fn() -> Duration,
 ) -> ServerOutcome
 where
     Reachable: Fn() -> Answer,
     Answer: Future<Output = bool>,
+    Start: FnOnce() -> Started,
+    Started: Future<Output = Result<()>>,
     Wait: Fn(Duration) -> Sleep,
     Sleep: Future<Output = ()>,
 {
     if reachable().await {
         return ServerOutcome::Ready;
     }
-    if let Err(error) = start() {
+    if let Err(error) = start().await {
         return ServerOutcome::Failed(format!("{error:#}"));
     }
-    let mut waited = Duration::ZERO;
-    while waited < START_LIMIT {
+    loop {
         wait(POLL).await;
-        waited += POLL;
         if reachable().await {
             return ServerOutcome::Ready;
         }
+        if elapsed() >= START_LIMIT {
+            return ServerOutcome::Failed(format!(
+                "Ollama did not answer within {} seconds of being started.",
+                START_LIMIT.as_secs()
+            ));
+        }
     }
-    ServerOutcome::Failed(format!(
-        "Ollama did not answer within {} seconds of being started.",
-        START_LIMIT.as_secs()
-    ))
 }
 
 /// Asks the server for its version, which Ollama answers without loading a
@@ -165,7 +170,11 @@ mod tests {
     struct FakeServer {
         answers: RefCell<VecDeque<bool>>,
         starts: Cell<usize>,
+        /// Time slept in `wait`; also drives the fake clock.
         waited: Cell<Duration>,
+        /// Time every probe takes on the fake clock.
+        probe_cost: Duration,
+        clock: Cell<Duration>,
     }
 
     impl FakeServer {
@@ -175,12 +184,15 @@ mod tests {
                 answers: RefCell::new(sequence.iter().copied().collect()),
                 starts: Cell::new(0),
                 waited: Cell::new(Duration::ZERO),
+                probe_cost: Duration::ZERO,
+                clock: Cell::new(Duration::ZERO),
             }
         }
 
         fn run(&self, start_result: impl FnOnce() -> Result<()>) -> ServerOutcome {
             futures::executor::block_on(ensure_server(
                 || async {
+                    self.clock.set(self.clock.get() + self.probe_cost);
                     let mut answers = self.answers.borrow_mut();
                     let answer = answers.front().copied().unwrap_or(false);
                     if answers.len() > 1 {
@@ -190,12 +202,15 @@ mod tests {
                 },
                 || {
                     self.starts.set(self.starts.get() + 1);
-                    start_result()
+                    let result = start_result();
+                    async { result }
                 },
                 |duration| {
                     self.waited.set(self.waited.get() + duration);
+                    self.clock.set(self.clock.get() + duration);
                     async {}
                 },
+                || self.clock.get(),
             ))
         }
     }
@@ -226,6 +241,20 @@ mod tests {
         );
         assert_eq!(server.starts.get(), 1);
         assert_eq!(server.waited.get(), START_LIMIT);
+    }
+
+    #[test]
+    fn slow_probes_count_towards_the_limit() {
+        let mut server = FakeServer::answering(&[false]);
+        server.probe_cost = Duration::from_secs(2);
+        let outcome = server.run(|| Ok(()));
+        assert!(matches!(outcome, ServerOutcome::Failed(_)), "{outcome:?}");
+        assert!(
+            server.waited.get() < START_LIMIT / 2,
+            "polled for {:?} of sleep although every probe took two seconds",
+            server.waited.get()
+        );
+        assert!(server.clock.get() >= START_LIMIT);
     }
 
     #[test]

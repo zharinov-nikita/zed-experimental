@@ -182,7 +182,7 @@ pub(crate) enum SessionTransition {
     RecordingStopped,
     PostProcessingStarted,
     Accepted,
-    Cancelled,
+    Discarded,
     Failed,
 }
 
@@ -204,7 +204,7 @@ pub(crate) fn sound_for(transition: SessionTransition) -> Option<DictationSound>
         SessionTransition::RecordingStopped => Some(DictationSound::Mute),
         SessionTransition::PostProcessingStarted
         | SessionTransition::Accepted
-        | SessionTransition::Cancelled
+        | SessionTransition::Discarded
         | SessionTransition::Failed => None,
     }
 }
@@ -566,6 +566,7 @@ impl DictationWindow {
         self.model_server_starting = true;
         self.model_server = Some(
             cx.spawn(async move |this, cx| {
+                let started = std::time::Instant::now();
                 let outcome = dictation_model_server::ensure_server(
                     || {
                         dictation_model_server::ollama_answers(
@@ -574,8 +575,11 @@ impl DictationWindow {
                             executor.clone(),
                         )
                     },
-                    dictation_model_server::start_ollama,
+                    // Looking up the executable and spawning it touch the
+                    // file system; the foreground thread must not wait.
+                    || executor.spawn(async { dictation_model_server::start_ollama() }),
                     |duration| executor.timer(duration),
+                    move || started.elapsed(),
                 )
                 .await;
                 if let ServerOutcome::Failed(reason) = &outcome {
@@ -918,7 +922,7 @@ impl DictationWindow {
                 cx.emit(DictationWindowEvent::Dismiss);
             }
             Phase::Review | Phase::Failed(_) => {
-                self.play(SessionTransition::Cancelled, cx);
+                self.play(SessionTransition::Discarded, cx);
                 cx.emit(DictationWindowEvent::Dismiss);
             }
         }
@@ -1454,7 +1458,7 @@ mod tests {
         for transition in [
             SessionTransition::PostProcessingStarted,
             SessionTransition::Accepted,
-            SessionTransition::Cancelled,
+            SessionTransition::Discarded,
             SessionTransition::Failed,
         ] {
             assert_eq!(sound_for(transition), None, "{transition:?}");

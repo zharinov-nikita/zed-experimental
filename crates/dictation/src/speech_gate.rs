@@ -13,7 +13,7 @@
 
 use std::time::Duration;
 
-use crate::{ENGINE_SAMPLE_RATE, duration_to_samples};
+use crate::duration_to_samples;
 
 /// Loudness is measured per frame of this length.
 pub const FRAME: Duration = Duration::from_millis(20);
@@ -53,11 +53,8 @@ pub enum GateEvent {
 pub struct SpeechGate {
     open: bool,
     floor_db: f32,
-    /// Speech frames in a row.
-    run: usize,
-    /// Silent frames in a row.
-    silent: usize,
-    /// Samples consumed into whole frames.
+    speech_frames: usize,
+    silent_frames: usize,
     position: usize,
     /// Samples of an incomplete frame, kept until the next `feed`.
     partial: Vec<f32>,
@@ -78,8 +75,8 @@ impl SpeechGate {
         Self {
             open: false,
             floor_db: FLOOR_MIN_DB,
-            run: 0,
-            silent: 0,
+            speech_frames: 0,
+            silent_frames: 0,
             position: 0,
             partial: Vec::with_capacity(frame_samples()),
             last_speech_end: None,
@@ -136,11 +133,11 @@ impl SpeechGate {
         self.position += frame_samples();
 
         if level_db >= threshold {
-            self.run += 1;
-            self.silent = 0;
-            if !self.open && self.run >= OPEN_FRAMES {
+            self.speech_frames += 1;
+            self.silent_frames = 0;
+            if !self.open && self.speech_frames >= OPEN_FRAMES {
                 self.open = true;
-                let run_start = self.position - self.run * frame_samples();
+                let run_start = self.position - self.speech_frames * frame_samples();
                 self.last_speech_end = Some(self.position);
                 return Some(GateEvent::Opened {
                     start: run_start.saturating_sub(duration_to_samples(OPEN_MARGIN)),
@@ -150,11 +147,13 @@ impl SpeechGate {
                 self.last_speech_end = Some(self.position);
             }
         } else {
-            self.run = 0;
-            self.silent += 1;
-            if self.open && self.silent * frame_samples() >= duration_to_samples(CLOSE_SILENCE) {
+            self.speech_frames = 0;
+            self.silent_frames += 1;
+            if self.open
+                && self.silent_frames * frame_samples() >= duration_to_samples(CLOSE_SILENCE)
+            {
                 self.open = false;
-                self.silent = 0;
+                self.silent_frames = 0;
                 return self.speech_end().map(|end| GateEvent::Closed { end });
             }
         }
@@ -176,12 +175,11 @@ fn level_db(frame: &[f32]) -> f32 {
     20.0 * mean_square.sqrt().max(1e-7).log10()
 }
 
-/// Samples per second the gate works with; re-exported so tests can build signals.
-pub const SAMPLE_RATE: usize = ENGINE_SAMPLE_RATE as usize;
-
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    const SAMPLE_RATE: usize = crate::ENGINE_SAMPLE_RATE as usize;
 
     /// Deterministic noise at exactly `rms` per frame, so a frame's level is
     /// the same no matter how the buffer is cut.

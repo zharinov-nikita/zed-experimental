@@ -757,32 +757,49 @@ fn segments_to_confirm(segments: &[Segment], buffer: Duration, at_window: bool) 
         .count()
 }
 
-/// The speech the Speech Gate has let through since the commit point, as the
-/// live loop tracks it: where it began, and where it ended if the gate has
-/// closed since. `None` for `start` means silence since the commit point.
-#[derive(Default)]
-struct SpeechSinceCommit {
-    start: Option<usize>,
-    end: Option<usize>,
+/// The text of the session and how far into the audio it reaches, as the
+/// live loop keeps them between iterations.
+struct Transcript {
+    confirmed: String,
+    pending: String,
+    /// Audio before this point is either confirmed or silence; recognition
+    /// starts here.
+    commit_point: usize,
+    /// Where the speech since the commit point began; `None` is silence
+    /// since the commit point, and then nothing is recognized.
+    speech_start: Option<usize>,
 }
 
-impl SpeechSinceCommit {
-    /// Applies the gate's transitions. When speech begins after silence the
-    /// commit point jumps to its start, so the silence never enters the
-    /// recognition window; speech that begins while earlier speech is still
-    /// being decoded simply extends it.
-    fn apply(&mut self, events: impl IntoIterator<Item = GateEvent>, commit_point: &mut usize) {
-        for event in events {
-            match event {
-                GateEvent::Opened { start } => {
-                    if self.start.is_none() {
-                        let start = start.max(*commit_point);
-                        *commit_point = start;
-                        self.start = Some(start);
-                    }
-                    self.end = None;
+impl Transcript {
+    /// Handles one Speech Gate transition. Speech beginning after silence
+    /// moves the commit point to its start, so the silence never enters the
+    /// recognition window; speech beginning while earlier speech is still
+    /// being recognized simply extends it. The gate closing behind a phrase
+    /// makes the phrase complete: it is recognized once without the silence
+    /// after it and confirmed whole. `samples` reads session audio by
+    /// position; `available` is how much of it exists.
+    fn apply_gate_event(
+        &mut self,
+        event: GateEvent,
+        available: usize,
+        samples: impl FnOnce(Range<usize>) -> Vec<f32>,
+        transcriber: &mut Transcriber,
+        events: &UnboundedSender<DictationEvent>,
+    ) {
+        match event {
+            GateEvent::Opened { start } => {
+                if self.speech_start.is_none() {
+                    self.commit_point = self.commit_point.max(start);
+                    self.speech_start = Some(self.commit_point);
                 }
-                GateEvent::Closed { end } => self.end = Some(end),
+            }
+            GateEvent::Closed { end } => {
+                let phrase_end = end.clamp(self.commit_point.min(available), available);
+                let phrase = samples(self.commit_point..phrase_end);
+                transcriber.recognize_final(&phrase, &mut self.confirmed, events);
+                self.commit_point = phrase_end;
+                self.pending.clear();
+                self.speech_start = None;
             }
         }
     }
@@ -791,7 +808,7 @@ impl SpeechSinceCommit {
 fn live_loop(
     mut transcriber: Transcriber,
     mut source: Box<dyn AudioSource>,
-    mut confirmed: String,
+    confirmed: String,
     session_audio: Option<SessionAudioSink>,
     stop: Arc<AtomicBool>,
     events: UnboundedSender<DictationEvent>,
@@ -799,12 +816,15 @@ fn live_loop(
     let window = duration_to_samples(WINDOW);
     let step = duration_to_samples(STEP);
     let settle = duration_to_samples(SETTLE);
-    let mut commit_point = 0usize;
     let mut recognized_up_to = 0usize;
     let mut last_recognized_end = 0usize;
-    let mut pending = String::new();
     let mut gate = SpeechGate::new();
-    let mut speech = SpeechSinceCommit::default();
+    let mut transcript = Transcript {
+        confirmed,
+        pending: String::new(),
+        commit_point: 0,
+        speech_start: None,
+    };
 
     let send = |confirmed: &str, pending: &str, captured: usize| {
         events
@@ -815,7 +835,7 @@ fn live_loop(
             }))
             .ok();
     };
-    send(&confirmed, &pending, 0);
+    send(&transcript.confirmed, &transcript.pending, 0);
 
     while !stop.load(Ordering::Relaxed) {
         let Some(available) = source.wait_for(recognized_up_to + step, &stop) else {
@@ -826,25 +846,19 @@ fn live_loop(
         }
         recognized_up_to = available;
         let new_audio = source.samples(gate.position()..available);
-        speech.apply(gate.feed(&new_audio), &mut commit_point);
-
-        if speech.start.is_none() {
-            // The gate is closed and nothing since the commit point was
-            // speech: the decoder does not run and the Pending Text is empty.
-            send(&confirmed, "", available);
-            continue;
+        for event in gate.feed(&new_audio) {
+            transcript.apply_gate_event(
+                event,
+                available,
+                |range| source.samples(range),
+                &mut transcriber,
+                &events,
+            );
         }
-        if let Some(end) = speech.end {
-            // The gate closed behind a phrase: it is complete, so it is
-            // recognized once without the silence after it and confirmed
-            // whole, and the loop waits for the next phrase.
-            let phrase_end = end.clamp(commit_point, available);
-            let phrase = source.samples(commit_point..phrase_end);
-            transcriber.recognize_final(&phrase, &mut confirmed, &events);
-            commit_point = phrase_end;
-            pending.clear();
-            speech = SpeechSinceCommit::default();
-            send(&confirmed, &pending, available);
+        if transcript.speech_start.is_none() {
+            // Silence since the commit point: the decoder does not run and
+            // the Pending Text is empty.
+            send(&transcript.confirmed, "", available);
             continue;
         }
 
@@ -852,16 +866,17 @@ fn live_loop(
         // never the silence after it, so a Recognizer Artifact has nothing to
         // grow from even before the gate closes. Silence adds no audio to
         // the buffer, so the same buffer is not recognized twice.
+        let commit_point = transcript.commit_point;
         let speech_end = gate.speech_end().unwrap_or(available);
         let buffer_end = available.min(speech_end).min(commit_point + window);
         if buffer_end <= last_recognized_end {
-            send(&confirmed, &pending, available);
+            send(&transcript.confirmed, &transcript.pending, available);
             continue;
         }
         last_recognized_end = buffer_end;
         let at_window = buffer_end.saturating_sub(commit_point) >= window - settle;
         let buffer = source.samples(commit_point..buffer_end);
-        let segments = match transcriber.segments_after(&buffer, &confirmed) {
+        let segments = match transcriber.segments_after(&buffer, &transcript.confirmed) {
             Ok(segments) => drop_decoder_loops(segments),
             Err(error) => {
                 events
@@ -873,15 +888,15 @@ fn live_loop(
         let confirm = segments_to_confirm(&segments, samples_to_duration(buffer.len()), at_window);
         let (confirmed_now, still_pending) = segments.split_at(confirm);
         if let Some(last) = confirmed_now.last() {
-            append_segments(&mut confirmed, confirmed_now);
-            commit_point += quietest_point(&buffer, duration_to_samples(last.end));
+            append_segments(&mut transcript.confirmed, confirmed_now);
+            transcript.commit_point += quietest_point(&buffer, duration_to_samples(last.end));
         } else if at_window && segments.is_empty() {
             // A full window with nothing in it is silence; drop it so the
             // loop keeps looking at fresh audio.
-            commit_point = buffer_end - settle;
+            transcript.commit_point = buffer_end - settle;
         }
-        pending = join_text(still_pending.iter().map(|segment| segment.text.as_str()));
-        send(&confirmed, &pending, available);
+        transcript.pending = join_text(still_pending.iter().map(|segment| segment.text.as_str()));
+        send(&transcript.confirmed, &transcript.pending, available);
     }
 
     source.stop();
@@ -895,20 +910,30 @@ fn live_loop(
             Err(error) => log::warn!("dictation: saving session audio failed: {error:#}"),
         }
     }
-    // The tail is cut where the gate saw speech end, so the silence between
-    // the last word and the stop is never decoded.
+    // The gate sees the last audio; a phrase it closes behind is confirmed
+    // like any other, and whatever is still open is the tail, cut where the
+    // gate saw speech end so the silence before the stop is never decoded.
     let unseen = session_pcm.get(gate.position()..).unwrap_or(&[]);
-    speech.apply(gate.feed(unseen), &mut commit_point);
-    let tail_end = match (speech.start, speech.end) {
-        (None, _) => commit_point,
-        (Some(_), Some(end)) => end,
-        (Some(_), None) => gate.speech_end().unwrap_or(captured),
+    for event in gate.feed(unseen) {
+        transcript.apply_gate_event(
+            event,
+            captured,
+            |range| session_pcm.get(range).unwrap_or(&[]).to_vec(),
+            &mut transcriber,
+            &events,
+        );
     }
-    .clamp(commit_point.min(captured), captured);
-    let tail = session_pcm.get(commit_point..tail_end).unwrap_or(&[]);
-    transcriber.recognize_final(tail, &mut confirmed, &events);
-    send(&confirmed, "", captured);
-    Ok((transcriber, confirmed))
+    if transcript.speech_start.is_some() {
+        let commit_point = transcript.commit_point.min(captured);
+        let tail_end = gate
+            .speech_end()
+            .unwrap_or(captured)
+            .clamp(commit_point, captured);
+        let tail = session_pcm.get(commit_point..tail_end).unwrap_or(&[]);
+        transcriber.recognize_final(tail, &mut transcript.confirmed, &events);
+    }
+    send(&transcript.confirmed, "", captured);
+    Ok((transcriber, transcript.confirmed))
 }
 
 /// Writes 16 kHz mono PCM as a WAV that [`load_audio_file`] and the
