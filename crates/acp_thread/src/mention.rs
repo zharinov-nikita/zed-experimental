@@ -81,6 +81,21 @@ pub enum MentionUri {
         duration_secs: u32,
         word_count: u32,
     },
+    /// Local: a Quoted Fragment of an agent response, quoted back to it.
+    /// The quote itself lives in the mention content.
+    Quote {
+        id: String,
+        line_count: u32,
+    },
+    /// Local: a Quote Reply Block, a Quoted Fragment with a dictated comment.
+    /// `label` is the first words of the comment; both parts live in the
+    /// mention content.
+    QuoteReply {
+        id: String,
+        label: String,
+        duration_secs: u32,
+        word_count: u32,
+    },
 }
 
 impl MentionUri {
@@ -280,6 +295,29 @@ impl MentionUri {
                         source: source.context("missing skill source")?,
                         skill_file_path: skill_file_path.context("missing skill file path")?,
                     })
+                } else if path.starts_with("/agent/quote-reply") {
+                    validate_query_params(&url, &["id", "label", "seconds", "words"])?;
+                    let id = query_param(&url, "id").context("missing quote reply id")?;
+                    let label = query_param(&url, "label").unwrap_or_default();
+                    let duration_secs = query_param(&url, "seconds")
+                        .and_then(|value| value.parse::<u32>().ok())
+                        .unwrap_or(0);
+                    let word_count = query_param(&url, "words")
+                        .and_then(|value| value.parse::<u32>().ok())
+                        .unwrap_or(0);
+                    Ok(Self::QuoteReply {
+                        id,
+                        label,
+                        duration_secs,
+                        word_count,
+                    })
+                } else if path.starts_with("/agent/quote") {
+                    validate_query_params(&url, &["id", "lines"])?;
+                    let id = query_param(&url, "id").context("missing quote id")?;
+                    let line_count = query_param(&url, "lines")
+                        .and_then(|value| value.parse::<u32>().ok())
+                        .unwrap_or(1);
+                    Ok(Self::Quote { id, line_count })
                 } else if path.starts_with("/agent/dictation") {
                     validate_query_params(&url, &["id", "seconds", "words"])?;
                     let id = query_param(&url, "id").context("missing dictation id")?;
@@ -350,7 +388,9 @@ impl MentionUri {
             | MentionUri::TerminalSelection { .. }
             | MentionUri::GitDiff { .. }
             | MentionUri::MergeConflict { .. }
-            | MentionUri::Dictation { .. } => None,
+            | MentionUri::Dictation { .. }
+            | MentionUri::Quote { .. }
+            | MentionUri::QuoteReply { .. } => None,
         }
     }
 
@@ -398,6 +438,20 @@ impl MentionUri {
                 duration_secs % 60,
                 word_count
             ),
+            MentionUri::Quote { line_count, .. } => {
+                if *line_count == 1 {
+                    "Quote (1 line)".to_string()
+                } else {
+                    format!("Quote ({line_count} lines)")
+                }
+            }
+            MentionUri::QuoteReply { label, .. } => {
+                if label.is_empty() {
+                    "Quote Reply".to_string()
+                } else {
+                    label.clone()
+                }
+            }
         }
     }
 
@@ -484,6 +538,9 @@ impl MentionUri {
             MentionUri::MergeConflict { .. } => IconName::GitMergeConflict.path().into(),
             MentionUri::Skill { .. } => IconName::Sparkle.path().into(),
             MentionUri::Dictation { .. } => IconName::Mic.path().into(),
+            MentionUri::Quote { .. } | MentionUri::QuoteReply { .. } => {
+                IconName::Quote.path().into()
+            }
         }
     }
 
@@ -623,6 +680,27 @@ impl MentionUri {
                 let mut url = Url::parse("zed:///agent/dictation").unwrap();
                 url.query_pairs_mut()
                     .append_pair("id", id)
+                    .append_pair("seconds", &duration_secs.to_string())
+                    .append_pair("words", &word_count.to_string());
+                url
+            }
+            MentionUri::Quote { id, line_count } => {
+                let mut url = Url::parse("zed:///agent/quote").unwrap();
+                url.query_pairs_mut()
+                    .append_pair("id", id)
+                    .append_pair("lines", &line_count.to_string());
+                url
+            }
+            MentionUri::QuoteReply {
+                id,
+                label,
+                duration_secs,
+                word_count,
+            } => {
+                let mut url = Url::parse("zed:///agent/quote-reply").unwrap();
+                url.query_pairs_mut()
+                    .append_pair("id", id)
+                    .append_pair("label", label)
                     .append_pair("seconds", &duration_secs.to_string())
                     .append_pair("words", &word_count.to_string());
                 url
@@ -1444,6 +1522,33 @@ mod tests {
 
         assert_eq!(parsed, dictation_uri);
         assert_eq!(dictation_uri.name(), "Dictation · 1:03 · 46 words");
+    }
+
+    #[test]
+    fn test_parse_quote_uris_round_trip() {
+        let quote_uri = MentionUri::Quote {
+            id: "b3f1c2d4".to_string(),
+            line_count: 3,
+        };
+        let serialized = quote_uri.to_uri().to_string();
+        assert_eq!(
+            MentionUri::parse(&serialized, PathStyle::local()).unwrap(),
+            quote_uri
+        );
+        assert_eq!(quote_uri.name(), "Quote (3 lines)");
+
+        let reply_uri = MentionUri::QuoteReply {
+            id: "b3f1c2d4".to_string(),
+            label: "fix the loop…".to_string(),
+            duration_secs: 7,
+            word_count: 12,
+        };
+        let serialized = reply_uri.to_uri().to_string();
+        assert_eq!(
+            MentionUri::parse(&serialized, PathStyle::local()).unwrap(),
+            reply_uri
+        );
+        assert_eq!(reply_uri.name(), "fix the loop…");
     }
 
     #[test]

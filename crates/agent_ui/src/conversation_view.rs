@@ -4444,6 +4444,147 @@ pub(crate) mod tests {
     }
 
     #[gpui::test]
+    async fn test_reply_to_selection_needs_a_selection(cx: &mut TestAppContext) {
+        init_test(cx);
+        let connection = StubAgentConnection::new();
+        let (conversation_view, cx) =
+            setup_conversation_view(StubAgentServer::new(connection.clone()), cx).await;
+        connection.set_next_prompt_updates(vec![acp::SessionUpdate::AgentMessageChunk(
+            acp::ContentChunk::new("Response".into()),
+        )]);
+        message_editor(&conversation_view, cx).update_in(cx, |editor, window, cx| {
+            editor.set_text("Hello", window, cx);
+        });
+        active_thread(&conversation_view, cx).update_in(cx, |view, window, cx| {
+            view.send(window, cx);
+        });
+        cx.run_until_parked();
+
+        let thread = active_thread(&conversation_view, cx);
+        let response_ix = thread.read_with(cx, |thread, cx| {
+            thread
+                .thread
+                .read(cx)
+                .entries()
+                .iter()
+                .position(|entry| matches!(entry, AgentThreadEntry::AssistantMessage(_)))
+                .expect("the agent should have answered")
+        });
+
+        // Nothing is selected in the response: neither item does anything.
+        thread.update_in(cx, |thread, window, cx| {
+            thread.reply_to_selection(response_ix, window, cx);
+            thread.dictate_reply_to_selection(response_ix, window, cx);
+        });
+        cx.run_until_parked();
+        thread.read_with(cx, |thread, cx| {
+            assert!(thread.dictation_host().is_none());
+            assert!(thread.message_editor.read(cx).is_empty(cx));
+        });
+    }
+
+    #[gpui::test]
+    async fn test_discarding_an_empty_quote_reply_removes_its_block(cx: &mut TestAppContext) {
+        init_test(cx);
+        let (conversation_view, cx) =
+            setup_conversation_view(StubAgentServer::new(StubAgentConnection::new()), cx).await;
+        let thread = active_thread(&conversation_view, cx);
+
+        thread.update_in(cx, |thread, window, cx| {
+            thread.dictate_reply("quoted words".to_string(), window, cx);
+        });
+        cx.run_until_parked();
+        let dictation_window = thread
+            .read_with(cx, |thread, _cx| thread.dictation_window())
+            .expect("the session should open over the Composer");
+        let block_id = dictation_window.read_with(cx, |window, _cx| window.block_id().to_string());
+        thread.read_with(cx, |thread, cx| {
+            assert_eq!(
+                thread.dictation_host(),
+                Some(&crate::dictation_host::DictationHost::Composer)
+            );
+            assert_eq!(
+                thread
+                    .message_editor
+                    .read(cx)
+                    .quote_reply_block(&block_id)
+                    .map(|(quote, comment, _)| (quote, comment)),
+                Some(("quoted words".to_string(), String::new())),
+                "the block waits for its comment"
+            );
+        });
+
+        dictation_window.update_in(cx, |dictation_window, window, cx| {
+            dictation_window.cancel(&crate::CancelDictation, window, cx);
+        });
+        cx.run_until_parked();
+        thread.read_with(cx, |thread, cx| {
+            assert!(
+                thread.dictation_host().is_none(),
+                "Discard closes the window"
+            );
+            assert!(
+                thread
+                    .message_editor
+                    .read(cx)
+                    .quote_reply_block(&block_id)
+                    .is_none(),
+                "a block without a comment is removed"
+            );
+            assert!(thread.message_editor.read(cx).is_empty(cx));
+        });
+    }
+
+    #[gpui::test]
+    async fn test_accepting_a_quote_reply_fills_only_the_comment(cx: &mut TestAppContext) {
+        init_test(cx);
+        let (conversation_view, cx) =
+            setup_conversation_view(StubAgentServer::new(StubAgentConnection::new()), cx).await;
+        let thread = active_thread(&conversation_view, cx);
+
+        thread.update_in(cx, |thread, window, cx| {
+            thread.message_editor.update(cx, |message_editor, cx| {
+                message_editor.insert_quote_reply_block(
+                    "block-1".to_string(),
+                    "quoted words".to_string(),
+                    String::new(),
+                    std::time::Duration::ZERO,
+                    window,
+                    cx,
+                );
+            });
+            thread.edit_dictation_block("block-1".to_string(), window, cx);
+        });
+        let dictation_window = thread
+            .read_with(cx, |thread, _cx| thread.dictation_window())
+            .expect("the block should open for review");
+        dictation_window.update_in(cx, |dictation_window, window, cx| {
+            dictation_window.set_review_text("my dictated comment", window, cx);
+            dictation_window.accept(&crate::AcceptDictation, window, cx);
+        });
+        cx.run_until_parked();
+
+        thread.read_with(cx, |thread, cx| {
+            assert!(
+                thread.dictation_host().is_none(),
+                "Accept closes the window"
+            );
+            assert_eq!(
+                thread
+                    .message_editor
+                    .read(cx)
+                    .quote_reply_block("block-1")
+                    .map(|(quote, comment, _)| (quote, comment)),
+                Some((
+                    "quoted words".to_string(),
+                    "my dictated comment".to_string()
+                )),
+                "the quote stays, the comment is filled"
+            );
+        });
+    }
+
+    #[gpui::test]
     async fn test_question_withdrawn_during_review_moves_text_to_the_composer(
         cx: &mut TestAppContext,
     ) {

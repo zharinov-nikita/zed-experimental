@@ -461,8 +461,10 @@ impl UserMessage {
                             let label = format!("{} ({})", name, source);
                             write!(&mut skills_context, "\nSkill: {}\n{}\n", label, content).ok();
                         }
-                        // Local: dictated text is part of the message itself, not context.
-                        MentionUri::Dictation { .. } => {
+                        // Local: dictated text and quotes are part of the message itself, not context.
+                        MentionUri::Dictation { .. }
+                        | MentionUri::Quote { .. }
+                        | MentionUri::QuoteReply { .. } => {
                             message
                                 .content
                                 .push(language_model::MessageContent::Text(content.to_string()));

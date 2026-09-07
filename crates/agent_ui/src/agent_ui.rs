@@ -29,6 +29,7 @@ mod mode_selector;
 mod model_selector;
 mod model_selector_popover;
 mod profile_selector;
+mod quote_reply;
 mod terminal_codegen;
 mod terminal_inline_assistant;
 pub mod terminal_thread_metadata_store;
@@ -341,6 +342,10 @@ actions!(
         ToggleDictationRawText,
         /// Local: plays or stops the Session Audio of the dictation under review.
         ToggleDictationPlayback,
+        /// Local: quotes the selected fragment of an agent response into the composer.
+        ReplyToSelection,
+        /// Local: quotes the selected fragment of an agent response and dictates a comment on it.
+        DictateReplyToSelection,
     ]
 );
 

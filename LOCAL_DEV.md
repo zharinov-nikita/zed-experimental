@@ -57,6 +57,14 @@ cargo run --profile release-fast -- --user-data-dir "$env:LOCALAPPDATA\Zed-Local
   исчезает во время сессии (ответ отправлен иначе, агент остановлен), окно переезжает над Composer, запись
   останавливается и текст становится Dictation Block с тем же `block_id` (Session Audio под ним же).
   Кто хостит окно и куда идёт Accept — `crates/agent_ui/src/dictation_host.rs`.
+- Quote Reply (ADR 0003): в контекстном меню ответа агента «Reply to Selection» кладёт выделенный markdown
+  в Composer как Quoted Fragment (crease `MentionUri::Quote`, удаляется целиком), «Dictate Reply to Selection»
+  и `ctrl-alt-space` при фокусе в ответе с выделением создают у курсора Quote Reply Block (`MentionUri::QuoteReply`)
+  с пустым комментарием и открывают над Composer Dictation Window с плашкой цитаты над транскриптом. Accept
+  заполняет комментарий, Discard пустого комментария удаляет блок; Resume и правка из чипа касаются только
+  комментария. Агенту уходит `> цитата`, пометка на языке `agent.dictation.language` («(из твоего ответа выше)»
+  для `ru`, иначе «(quoting your reply above)») и комментарий. Оба пункта погашены без выделения и во время
+  Dictation Session. Чистые функции: `crates/agent_ui/src/quote_reply.rs`.
 - Настройки в окне Settings: AI → General → Dictation (поиск по «whisper», «microphone»). Подстраница правит
   `agent.dictation` и `audio.experimental.input_audio_device` в `settings.json`; провайдер и модель Post-processing
   пишутся парой в `agent.dictation.post_processing.model` (как `agent.default_model`), «Agent default model» удаляет

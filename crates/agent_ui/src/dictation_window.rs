@@ -348,6 +348,9 @@ pub struct DictationWindow {
     playback: Option<Playback>,
     /// Held while recording; dropping the window frees the session slot.
     engine_lease: Option<EngineLease<Transcriber>>,
+    /// The Quoted Fragment a Quote Reply Block comments on, shown read-only
+    /// above the transcript.
+    quote: Option<String>,
     review_editor: Entity<Editor>,
     scroll_handle: ScrollHandle,
     _events_task: Option<Task<()>>,
@@ -408,6 +411,7 @@ impl DictationWindow {
             session_audio_path: None,
             playback: None,
             engine_lease: None,
+            quote: None,
             review_editor,
             scroll_handle: ScrollHandle::new(),
             _events_task: None,
@@ -451,15 +455,41 @@ impl DictationWindow {
         this
     }
 
+    /// Opens the window and starts recording for a block that already lives
+    /// in the Composer, such as a Quote Reply Block awaiting its comment.
+    pub fn start_block(
+        host_focus_handle: FocusHandle,
+        block_id: String,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) -> Self {
+        let mut this = Self::build(host_focus_handle, Some(block_id), window, cx);
+        this.start_recording(window, cx);
+        this
+    }
+
+    /// Shows `quote` above the transcript for the whole session.
+    pub fn with_quote(mut self, quote: String) -> Self {
+        self.quote = Some(quote);
+        self
+    }
+
     pub fn is_recording(&self) -> bool {
         matches!(self.phase, Phase::Recording { .. } | Phase::Starting)
     }
 
-    /// The Dictation Block this session belongs to; Session Audio is filed
-    /// under it whichever field the text ends up in.
-    #[cfg(test)]
+    /// The block this session belongs to; Session Audio is filed under it
+    /// whichever field the text ends up in.
     pub fn block_id(&self) -> &str {
         &self.block_id
+    }
+
+    /// Test seam: the text under review, as if it had been recognized.
+    #[cfg(test)]
+    pub fn set_review_text(&mut self, text: &str, window: &mut Window, cx: &mut Context<Self>) {
+        self.review_editor.update(cx, |editor, cx| {
+            editor.set_text(text, window, cx);
+        });
     }
 
     /// The host field is going away. Recording stops, and whatever the
@@ -1079,6 +1109,31 @@ impl DictationWindow {
     /// the same so recording and review share one line height.
     const BODY_TEXT_SIZE: Rems = rems(0.875);
 
+    /// The Quoted Fragment of a Quote Reply Block, read-only above the
+    /// transcript so the user sees what they are commenting on.
+    fn render_quote(&self, cx: &Context<Self>) -> Option<AnyElement> {
+        let quote = self.quote.clone()?;
+        let colors = cx.theme().colors();
+        Some(
+            div()
+                .px_2()
+                .pt_1()
+                .child(
+                    div()
+                        .id("dictation-quote")
+                        .pl_2()
+                        .border_l_2()
+                        .border_color(colors.border_variant)
+                        .max_h(px(96.))
+                        .overflow_y_scroll()
+                        .text_size(Self::BODY_TEXT_SIZE)
+                        .text_color(colors.text_muted)
+                        .child(StyledText::new(quote)),
+                )
+                .into_any_element(),
+        )
+    }
+
     fn render_body(&self, window: &mut Window, cx: &mut Context<Self>) -> AnyElement {
         let line_height_ratio = ThemeSettings::get_global(cx).buffer_line_height.value();
         let max_body_height = Self::BODY_TEXT_SIZE.to_pixels(window.rem_size())
@@ -1420,6 +1475,7 @@ impl Render for DictationWindow {
             .border_color(colors.border)
             .bg(colors.surface_background)
             .py_1()
+            .children(self.render_quote(cx))
             .child(self.render_body(window, cx))
             .child(Divider::horizontal())
             .child(self.render_footer(cx))

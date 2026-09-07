@@ -168,6 +168,8 @@ impl MentionSet {
             | MentionUri::TerminalSelection { .. }
             | MentionUri::MergeConflict { .. }
             | MentionUri::Dictation { .. }
+            | MentionUri::Quote { .. }
+            | MentionUri::QuoteReply { .. }
             | MentionUri::Rule { .. } => {
                 Task::ready(Err(anyhow!("Unsupported mention URI type for paste")))
             }
@@ -353,9 +355,11 @@ impl MentionSet {
                 debug_panic!("unexpected rule URI");
                 Task::ready(Err(anyhow!("unexpected rule URI")))
             }
-            MentionUri::Dictation { .. } => {
+            MentionUri::Dictation { .. }
+            | MentionUri::Quote { .. }
+            | MentionUri::QuoteReply { .. } => {
                 debug_panic!(
-                    "dictation blocks are inserted by the dictation window, not completions"
+                    "dictation and quote blocks are inserted by the thread view, not completions"
                 );
                 Task::ready(Err(anyhow!("unexpected dictation URI")))
             }

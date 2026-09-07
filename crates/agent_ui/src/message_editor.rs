@@ -10,6 +10,8 @@ use crate::{
     mention_set::{Mention, MentionImage, MentionSet, insert_crease_for_mention},
 };
 use acp_thread::MentionUri;
+
+use crate::quote_reply;
 use agent::ThreadStore;
 use agent_client_protocol::schema::v1 as acp;
 use anyhow::{Result, anyhow};
@@ -209,6 +211,8 @@ pub struct MessageEditor {
     thread_store: Option<Entity<ThreadStore>>,
     /// Local: Dictation Blocks living in this composer, by block id.
     dictation_blocks: std::collections::HashMap<String, DictationBlock>,
+    /// Local: Quote Reply Blocks living in this composer, by block id.
+    quote_reply_blocks: std::collections::HashMap<String, QuoteReplyBlock>,
     _subscriptions: Vec<Subscription>,
     _parse_slash_command_task: Task<()>,
 }
@@ -216,6 +220,15 @@ pub struct MessageEditor {
 /// Local: one Dictation Block as stored behind its chip in the composer.
 struct DictationBlock {
     text: String,
+    duration: std::time::Duration,
+    crease_id: CreaseId,
+}
+
+/// Local: one Quote Reply Block as stored behind its chip in the composer.
+/// The quote never changes; only the comment is dictated, resumed or edited.
+struct QuoteReplyBlock {
+    quote: String,
+    comment: String,
     duration: std::time::Duration,
     crease_id: CreaseId,
 }
@@ -619,6 +632,7 @@ impl MessageEditor {
             agent_id,
             thread_store,
             dictation_blocks: Default::default(),
+            quote_reply_blocks: Default::default(),
             _subscriptions: subscriptions,
             _parse_slash_command_task: Task::ready(()),
         }
@@ -751,16 +765,165 @@ impl MessageEditor {
         window: &mut Window,
         cx: &mut Context<Self>,
     ) -> bool {
-        let word_count = text.split_whitespace().count() as u32;
         let mention_uri = MentionUri::Dictation {
             id: id.clone(),
             duration_secs: duration.as_secs() as u32,
-            word_count,
+            word_count: text.split_whitespace().count() as u32,
         };
+        let tooltip: SharedString = crate::dictation_window::block_tooltip(&text).into();
+        let Some(crease_id) =
+            self.insert_block_crease(mention_uri, tooltip, text.clone(), window, cx)
+        else {
+            return false;
+        };
+        self.dictation_blocks.insert(
+            id,
+            DictationBlock {
+                text,
+                duration,
+                crease_id,
+            },
+        );
+        true
+    }
+
+    /// Local: text and duration of a Dictation Block in this composer.
+    pub fn dictation_block(&self, id: &str) -> Option<(String, std::time::Duration)> {
+        self.dictation_blocks
+            .get(id)
+            .map(|block| (block.text.clone(), block.duration))
+    }
+
+    /// Local: replaces a Dictation Block in place. If its chip was deleted
+    /// meanwhile, the new block goes to the cursor instead.
+    pub fn replace_dictation_block(
+        &mut self,
+        id: &str,
+        text: String,
+        duration: std::time::Duration,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        if let Some(block) = self.dictation_blocks.remove(id) {
+            self.remove_block_crease(block.crease_id, window, cx);
+        }
+        self.insert_dictation_block(id.to_string(), text, duration, window, cx);
+    }
+
+    /// Local: a Quoted Fragment of the agent's response at the cursor. The
+    /// agent receives it quoted back with a note; the reply the user types
+    /// after the chip follows as ordinary text.
+    pub fn insert_quoted_fragment(
+        &mut self,
+        quote: String,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) -> bool {
+        let mention_uri = MentionUri::Quote {
+            id: uuid::Uuid::new_v4().to_string(),
+            line_count: quote.lines().count().max(1) as u32,
+        };
+        let tooltip: SharedString = crate::dictation_window::block_tooltip(&quote).into();
+        let content = quote_reply::quoted_fragment_text(&quote, self.quote_note(cx));
+        self.insert_block_crease(mention_uri, tooltip, content, window, cx)
+            .is_some()
+    }
+
+    /// Local: a Quote Reply Block at the cursor: the quote and the dictated
+    /// comment as one unit, labelled with the first words of the comment.
+    pub fn insert_quote_reply_block(
+        &mut self,
+        id: String,
+        quote: String,
+        comment: String,
+        duration: std::time::Duration,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) -> bool {
+        let mention_uri = MentionUri::QuoteReply {
+            id: id.clone(),
+            label: quote_reply::quote_reply_label(&comment),
+            duration_secs: duration.as_secs() as u32,
+            word_count: comment.split_whitespace().count() as u32,
+        };
+        let tooltip: SharedString = quote_reply::quote_reply_tooltip(&quote, &comment).into();
+        let content = quote_reply::quote_reply_text(&quote, self.quote_note(cx), &comment);
+        let Some(crease_id) = self.insert_block_crease(mention_uri, tooltip, content, window, cx)
+        else {
+            return false;
+        };
+        self.quote_reply_blocks.insert(
+            id,
+            QuoteReplyBlock {
+                quote,
+                comment,
+                duration,
+                crease_id,
+            },
+        );
+        true
+    }
+
+    /// Local: quote, comment and duration of a Quote Reply Block in this composer.
+    pub fn quote_reply_block(&self, id: &str) -> Option<(String, String, std::time::Duration)> {
+        self.quote_reply_blocks
+            .get(id)
+            .map(|block| (block.quote.clone(), block.comment.clone(), block.duration))
+    }
+
+    /// Local: gives a Quote Reply Block a new comment; the quote stays as it
+    /// was selected. If its chip was deleted meanwhile, the block goes to
+    /// the cursor instead.
+    pub fn replace_quote_reply_block(
+        &mut self,
+        id: &str,
+        comment: String,
+        duration: std::time::Duration,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        let Some(block) = self.quote_reply_blocks.remove(id) else {
+            return;
+        };
+        self.remove_block_crease(block.crease_id, window, cx);
+        self.insert_quote_reply_block(id.to_string(), block.quote, comment, duration, window, cx);
+    }
+
+    /// Local: removes a Quote Reply Block whole, chip and all.
+    pub fn remove_quote_reply_block(
+        &mut self,
+        id: &str,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        if let Some(block) = self.quote_reply_blocks.remove(id) {
+            self.remove_block_crease(block.crease_id, window, cx);
+        }
+    }
+
+    /// The note after a quote, in the language the user dictates in.
+    fn quote_note(&self, cx: &App) -> &'static str {
+        quote_reply::quote_note(
+            agent_settings::AgentSettings::get_global(cx)
+                .dictation
+                .language
+                .code(),
+        )
+    }
+
+    /// Local: a block chip at the cursor: a folded crease whose mention
+    /// carries `content`, the text the agent receives for it.
+    fn insert_block_crease(
+        &mut self,
+        mention_uri: MentionUri,
+        tooltip: SharedString,
+        content: String,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) -> Option<CreaseId> {
         let link_text = mention_uri.as_link().to_string();
         let label: SharedString = mention_uri.name().into();
         let icon_path = mention_uri.icon_path(cx);
-        let tooltip: SharedString = crate::dictation_window::block_tooltip(&text).into();
         let workspace = self.workspace.clone();
 
         let crease_id = self.editor.update(cx, |editor, cx| {
@@ -788,17 +951,14 @@ impl MessageEditor {
             let ids = editor.insert_creases(vec![crease.clone()], cx);
             editor.fold_creases(vec![crease], false, window, cx);
             ids.first().copied()
-        });
-        let Some(crease_id) = crease_id else {
-            return false;
-        };
+        })?;
 
         self.mention_set.update(cx, |mention_set, cx| {
             mention_set.insert_mention(
                 crease_id,
                 mention_uri,
                 Task::ready(Ok(Mention::Text {
-                    content: text.clone(),
+                    content,
                     tracked_buffers: Vec::new(),
                 }))
                 .shared(),
@@ -806,59 +966,38 @@ impl MessageEditor {
                 cx,
             );
         });
-        self.dictation_blocks.insert(
-            id,
-            DictationBlock {
-                text,
-                duration,
-                crease_id,
-            },
-        );
         cx.notify();
-        true
+        Some(crease_id)
     }
 
-    /// Local: text and duration of a Dictation Block in this composer.
-    pub fn dictation_block(&self, id: &str) -> Option<(String, std::time::Duration)> {
-        self.dictation_blocks
-            .get(id)
-            .map(|block| (block.text.clone(), block.duration))
-    }
-
-    /// Local: replaces a Dictation Block in place. If its chip was deleted
-    /// meanwhile, the new block goes to the cursor instead.
-    pub fn replace_dictation_block(
+    /// Local: removes a block chip and its mention. The cursor lands where
+    /// the chip was, so a replacement goes to the same place.
+    fn remove_block_crease(
         &mut self,
-        id: &str,
-        text: String,
-        duration: std::time::Duration,
+        crease_id: CreaseId,
         window: &mut Window,
         cx: &mut Context<Self>,
     ) {
-        let Some(block) = self.dictation_blocks.remove(id) else {
-            self.insert_dictation_block(id.to_string(), text, duration, window, cx);
-            return;
-        };
         self.editor.update(cx, |editor, cx| {
             let crease_snapshot = editor.display_map.read(cx).crease_snapshot();
             let buffer_snapshot = editor.buffer().read(cx).snapshot(cx);
             let range = crease_snapshot
                 .creases()
-                .find(|(crease_id, _)| *crease_id == block.crease_id)
+                .find(|(id, _)| *id == crease_id)
                 .map(|(_, crease)| crease.range().to_offset(&buffer_snapshot));
             let Some(range) = range else {
                 return;
             };
-            editor.remove_creases([block.crease_id], cx);
+            editor.remove_creases([crease_id], cx);
             editor.edit([(range.clone(), "")], cx);
             editor.change_selections(Default::default(), window, cx, |selections| {
                 selections.select_ranges([range.start..range.start]);
             });
         });
         self.mention_set.update(cx, |mention_set, cx| {
-            mention_set.remove_mention(&block.crease_id, cx);
+            mention_set.remove_mention(&crease_id, cx);
         });
-        self.insert_dictation_block(id.to_string(), text, duration, window, cx);
+        cx.notify();
     }
 
     pub fn is_empty(&self, cx: &App) -> bool {
@@ -4180,6 +4319,219 @@ mod tests {
             supported_modes.contains(&PromptContextType::Thread),
             "Expected thread mode to be visible when enabled"
         );
+    }
+
+    /// Local: a composer for block chip tests, with nothing typed yet.
+    async fn message_editor_for_blocks(
+        cx: &mut TestAppContext,
+    ) -> (
+        Entity<MessageEditor>,
+        Entity<Editor>,
+        &mut VisualTestContext,
+    ) {
+        init_test(cx);
+        let fs = FakeFs::new(cx.executor());
+        let project = Project::test(fs, [], cx).await;
+        let (multi_workspace, cx) =
+            cx.add_window_view(|window, cx| MultiWorkspace::test_new(project.clone(), window, cx));
+        let workspace = multi_workspace.read_with(cx, |mw, _| mw.workspace().clone());
+        let message_editor = cx.update(|window, cx| {
+            cx.new(|cx| {
+                MessageEditor::new(
+                    workspace.downgrade(),
+                    project.downgrade(),
+                    None,
+                    Default::default(),
+                    "Test Agent".into(),
+                    "Test",
+                    EditorMode::AutoHeight {
+                        min_lines: 1,
+                        max_lines: None,
+                    },
+                    window,
+                    cx,
+                )
+            })
+        });
+        let editor =
+            message_editor.read_with(cx, |message_editor, _| message_editor.editor.clone());
+        cx.run_until_parked();
+        (message_editor, editor, cx)
+    }
+
+    /// Local: the mentions behind the chips, as (uri, text the agent gets).
+    async fn block_contents(
+        message_editor: &Entity<MessageEditor>,
+        cx: &mut VisualTestContext,
+    ) -> Vec<(MentionUri, String)> {
+        let contents = message_editor
+            .update(cx, |message_editor, cx| {
+                message_editor
+                    .mention_set()
+                    .update(cx, |mention_set, cx| mention_set.contents(false, cx))
+            })
+            .await
+            .unwrap();
+        let mut contents = contents
+            .into_values()
+            .map(|(uri, mention)| match mention {
+                Mention::Text { content, .. } => (uri, content),
+                other => panic!("unexpected mention {other:?}"),
+            })
+            .collect::<Vec<_>>();
+        contents.sort_by(|(_, a), (_, b)| a.cmp(b));
+        contents
+    }
+
+    #[gpui::test]
+    async fn test_quoted_fragment_reaches_the_agent_as_a_quote_with_a_note(
+        cx: &mut TestAppContext,
+    ) {
+        let (message_editor, editor, cx) = message_editor_for_blocks(cx).await;
+        editor.update_in(cx, |editor, window, cx| {
+            editor.set_text("See:", window, cx);
+            editor.move_to_end(&editor::actions::MoveToEnd, window, cx);
+        });
+        message_editor.update_in(cx, |message_editor, window, cx| {
+            assert!(message_editor.insert_quoted_fragment(
+                "line one\nline two".to_string(),
+                window,
+                cx
+            ));
+        });
+        editor.update_in(cx, |editor, window, cx| {
+            editor.insert("my reply", window, cx);
+        });
+
+        let contents = block_contents(&message_editor, cx).await;
+        let [(uri, content)] = contents.as_slice() else {
+            panic!("expected one Quoted Fragment, got {contents:?}");
+        };
+        assert!(
+            matches!(uri, MentionUri::Quote { line_count: 2, .. }),
+            "{uri:?}"
+        );
+        assert_eq!(
+            content,
+            "> line one\n> line two\n\n(quoting your reply above)"
+        );
+
+        let (blocks, _) = message_editor
+            .update(cx, |message_editor, cx| message_editor.contents(false, cx))
+            .await
+            .unwrap();
+        assert_eq!(blocks.len(), 3, "{blocks:?}");
+        assert!(matches!(&blocks[0], acp::ContentBlock::Text(text) if text.text == "See:"));
+        assert!(matches!(
+            &blocks[1],
+            acp::ContentBlock::Resource(_) | acp::ContentBlock::ResourceLink(_)
+        ));
+        assert!(
+            matches!(&blocks[2], acp::ContentBlock::Text(text) if text.text.trim() == "my reply")
+        );
+    }
+
+    #[gpui::test]
+    async fn test_quoted_fragment_is_deleted_whole(cx: &mut TestAppContext) {
+        let (message_editor, editor, cx) = message_editor_for_blocks(cx).await;
+        message_editor.update_in(cx, |message_editor, window, cx| {
+            message_editor.insert_quoted_fragment("quoted".to_string(), window, cx);
+        });
+        assert_eq!(block_contents(&message_editor, cx).await.len(), 1);
+
+        // Backspace over the trailing space and then over the chip.
+        editor.update_in(cx, |editor, window, cx| {
+            editor.backspace(&Default::default(), window, cx);
+            editor.backspace(&Default::default(), window, cx);
+        });
+
+        assert!(block_contents(&message_editor, cx).await.is_empty());
+        assert!(message_editor.read_with(cx, |message_editor, cx| message_editor.is_empty(cx)));
+    }
+
+    #[gpui::test]
+    async fn test_several_quoted_fragments_in_one_message(cx: &mut TestAppContext) {
+        let (message_editor, editor, cx) = message_editor_for_blocks(cx).await;
+        message_editor.update_in(cx, |message_editor, window, cx| {
+            message_editor.insert_quoted_fragment("first".to_string(), window, cx);
+        });
+        editor.update_in(cx, |editor, window, cx| {
+            editor.insert("agreed, and", window, cx);
+        });
+        message_editor.update_in(cx, |message_editor, window, cx| {
+            message_editor.insert_quoted_fragment("second".to_string(), window, cx);
+        });
+
+        let contents = block_contents(&message_editor, cx).await;
+        let texts: Vec<&str> = contents.iter().map(|(_, text)| text.as_str()).collect();
+        assert_eq!(
+            texts,
+            [
+                "> first\n\n(quoting your reply above)",
+                "> second\n\n(quoting your reply above)",
+            ]
+        );
+    }
+
+    #[gpui::test]
+    async fn test_quote_reply_block_keeps_its_quote_while_the_comment_changes(
+        cx: &mut TestAppContext,
+    ) {
+        let (message_editor, _editor, cx) = message_editor_for_blocks(cx).await;
+        message_editor.update_in(cx, |message_editor, window, cx| {
+            assert!(message_editor.insert_quote_reply_block(
+                "block-1".to_string(),
+                "quoted".to_string(),
+                String::new(),
+                std::time::Duration::ZERO,
+                window,
+                cx,
+            ));
+        });
+        let contents = block_contents(&message_editor, cx).await;
+        let [(uri, content)] = contents.as_slice() else {
+            panic!("expected one Quote Reply Block, got {contents:?}");
+        };
+        assert_eq!(uri.name(), "Quote Reply");
+        assert_eq!(content, "> quoted\n\n(quoting your reply above)");
+
+        message_editor.update_in(cx, |message_editor, window, cx| {
+            message_editor.replace_quote_reply_block(
+                "block-1",
+                "fix the loop please now".to_string(),
+                std::time::Duration::from_secs(5),
+                window,
+                cx,
+            );
+        });
+        let contents = block_contents(&message_editor, cx).await;
+        let [(uri, content)] = contents.as_slice() else {
+            panic!("expected one Quote Reply Block, got {contents:?}");
+        };
+        assert_eq!(uri.name(), "fix the loop please…");
+        assert_eq!(
+            content,
+            "> quoted\n\n(quoting your reply above)\n\nfix the loop please now"
+        );
+        assert_eq!(
+            message_editor.read_with(cx, |message_editor, _| {
+                message_editor.quote_reply_block("block-1")
+            }),
+            Some((
+                "quoted".to_string(),
+                "fix the loop please now".to_string(),
+                std::time::Duration::from_secs(5)
+            ))
+        );
+
+        message_editor.update_in(cx, |message_editor, window, cx| {
+            message_editor.remove_quote_reply_block("block-1", window, cx);
+        });
+        assert!(block_contents(&message_editor, cx).await.is_empty());
+        message_editor.read_with(cx, |message_editor, cx| {
+            assert!(message_editor.quote_reply_block("block-1").is_none());
+            assert!(message_editor.is_empty(cx));
+        });
     }
 
     #[gpui::test]

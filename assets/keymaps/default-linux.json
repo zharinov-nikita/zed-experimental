@@ -233,6 +233,8 @@
       "copy": "markdown::CopyAsMarkdown",
       "ctrl-insert": "markdown::CopyAsMarkdown",
       "ctrl-c": "markdown::CopyAsMarkdown",
+      // Local: dictate a reply to the selected fragment of an agent response.
+      "ctrl-alt-space": "agent::DictateReplyToSelection",
     },
   },
   {
