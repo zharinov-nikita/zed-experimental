@@ -110,8 +110,8 @@ cargo run --profile release-fast -- --user-data-dir "$env:LOCALAPPDATA\Zed-Local
   прокручивается); для этого в `ui` добавлен `Scrollbars::for_settings_along`, потому что `show_along` ось не убирает.
 - Запуск Ollama (`crates/agent_ui/src/dictation_model_server.rs`): если провайдер Post-processing это `ollama` с адресом
   по умолчанию (`http://localhost:11434`, пустой `language_models.ollama.api_url` считается им же) и `/api/version` не
-  отвечает, в начале Dictation Session Zed запускает `ollama app.exe` рядом с `ollama.exe` из PATH (сервер живёт в трее), а
-  без приложения — `ollama serve` скрытым процессом, и опрашивает сервер каждые 0,5 с до 20 с. Post-processing ждёт
+  отвечает, в начале Dictation Session Zed запускает `ollama serve` из PATH скрытым процессом (приложение Ollama с окном и
+  треем намеренно не трогается) и опрашивает сервер каждые 0,5 с до 20 с. Post-processing ждёт
   лаунчер прежде чем выбирать модель, в подвале тогда спиннер «Starting Ollama…». Если сервер не поднялся, просмотр
   показывает Callout «Ollama did not start» и сырой текст. Настроенная, но недоступная модель Post-processing теперь
   ошибка («Post-processing Unavailable»), а не тихая подмена моделью агента; подмена остаётся только когда модель вообще

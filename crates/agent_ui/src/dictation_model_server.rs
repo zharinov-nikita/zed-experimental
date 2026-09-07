@@ -9,7 +9,6 @@
 //! them, so the tests never touch a real server.
 
 use std::future::Future;
-use std::path::Path;
 use std::sync::Arc;
 use std::time::Duration;
 
@@ -25,10 +24,6 @@ pub const POLL: Duration = Duration::from_millis(500);
 const PROBE_TIMEOUT: Duration = Duration::from_secs(2);
 
 pub const OLLAMA_PROVIDER_ID: &str = "ollama";
-/// The desktop application next to the `ollama` executable on Windows. It
-/// puts the server in the tray the way a manual start does.
-#[cfg(target_os = "windows")]
-const DESKTOP_APP: &str = "ollama app.exe";
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum ServerOutcome {
@@ -122,43 +117,25 @@ pub async fn ollama_answers(
     }
 }
 
-/// Starts Ollama detached from Zed: the desktop application when it is
-/// installed next to the `ollama` executable found on `PATH`, otherwise
-/// `ollama serve` without a console window. The child handle is dropped
-/// without `kill_on_drop`, so the server outlives the session and is reaped
-/// by smol's background reaper.
+/// Starts `ollama serve` detached from Zed, without a console window. The
+/// desktop application is deliberately not used: it opens its own window,
+/// while the server alone is all Post-processing needs. The child handle is
+/// dropped without `kill_on_drop`, so the server outlives the session and is
+/// reaped by smol's background reaper.
 pub fn start_ollama() -> Result<()> {
     let executable = which::which("ollama")
         .context("`ollama` was not found on PATH; install Ollama or start it yourself")?;
-    let mut command = match desktop_app(&executable) {
-        Some(app) => util::command::new_command(app),
-        None => {
-            let mut command = util::command::new_command(&executable);
-            command.arg("serve");
-            command
-        }
-    };
+    let mut command = util::command::new_command(&executable);
     command
+        .arg("serve")
         .stdin(util::command::Stdio::null())
         .stdout(util::command::Stdio::null())
         .stderr(util::command::Stdio::null());
-    let program = command.get_program().to_string_lossy().into_owned();
-    log::info!("dictation: starting Ollama with {program}");
+    log::info!("dictation: starting `{} serve`", executable.display());
     command
         .spawn()
-        .with_context(|| format!("starting {program}"))?;
+        .with_context(|| format!("starting {} serve", executable.display()))?;
     Ok(())
-}
-
-#[cfg(target_os = "windows")]
-fn desktop_app(executable: &Path) -> Option<std::path::PathBuf> {
-    let app = executable.parent()?.join(DESKTOP_APP);
-    app.is_file().then_some(app)
-}
-
-#[cfg(not(target_os = "windows"))]
-fn desktop_app(_executable: &Path) -> Option<std::path::PathBuf> {
-    None
 }
 
 #[cfg(test)]
