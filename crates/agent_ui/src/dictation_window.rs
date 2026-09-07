@@ -464,7 +464,8 @@ impl DictationWindow {
 
     /// The host field is going away. Recording stops, and whatever the
     /// session recognized and processed is accepted the moment review is
-    /// reached; a session with no text yet is dismissed.
+    /// reached, without the review editor taking focus; a session with no
+    /// text yet is dismissed.
     pub fn accept_when_ready(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         self.stop_playback(cx);
         self.accept_when_ready = true;
@@ -481,8 +482,8 @@ impl DictationWindow {
             }
             Phase::Finishing => {}
             Phase::Review if self._post_processing_task.is_some() => {}
-            Phase::Review => self.emit_accept(cx),
-            Phase::Failed(_) => cx.emit(DictationWindowEvent::Dismiss),
+            // A failed session still holds the text of the block it resumed.
+            Phase::Review | Phase::Failed(_) => self.emit_accept(cx),
         }
     }
 
@@ -710,6 +711,9 @@ impl DictationWindow {
                 Ok(text) => this.recognized(text, elapsed, window, cx),
                 Err(error) => {
                     this.phase = Phase::Failed(format!("{error:#}").into());
+                    if this.accept_when_ready {
+                        this.emit_accept(cx);
+                    }
                     cx.notify();
                 }
             })
@@ -773,7 +777,9 @@ impl DictationWindow {
         let settings = settings.clone();
         self.processed_with_prompt = Some(settings.post_processing_prompt.clone());
         self.phase = Phase::Review;
-        self.focus_review_editor(window, cx);
+        if !self.accept_when_ready {
+            self.focus_review_editor(window, cx);
+        }
         self.play(SessionTransition::PostProcessingStarted, cx);
         cx.notify();
 
@@ -1451,6 +1457,24 @@ pub(crate) enum DictationButtonState {
     Recording,
     /// A Dictation Session runs over another field.
     Disabled,
+}
+
+impl DictationButtonState {
+    /// For a field that hosts the session (`hosts_session`) the button shows
+    /// whether it records; any other field is off while a session is open.
+    pub(crate) fn for_field(hosts_session: bool, recording: bool, session_open: bool) -> Self {
+        if hosts_session {
+            if recording {
+                Self::Recording
+            } else {
+                Self::Idle
+            }
+        } else if session_open {
+            Self::Disabled
+        } else {
+            Self::Idle
+        }
+    }
 }
 
 /// The microphone button shown next to the Composer and next to every

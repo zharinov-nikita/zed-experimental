@@ -64,7 +64,8 @@ impl ElicitationFormState {
                     if options.is_empty() {
                         // Local: an Answer Field grows with its text like the
                         // Composer, so a dictated paragraph keeps its lines.
-                        let max_lines = AgentSettings::get_global(cx).set_message_editor_max_lines();
+                        let max_lines =
+                            AgentSettings::get_global(cx).set_message_editor_max_lines();
                         let editor = cx.new(|cx| {
                             let mut editor = Editor::auto_height(1, max_lines, window, cx);
                             editor.set_soft_wrap();
@@ -1360,7 +1361,7 @@ pub(crate) struct AnswerFieldDictation {
     pub window: Option<(String, AnyView)>,
     pub recording: bool,
     /// A Dictation Session runs somewhere: the other fields' buttons are off.
-    pub blocked: bool,
+    pub session_open: bool,
 }
 
 impl ElicitationCardHandlers {
@@ -1390,7 +1391,7 @@ impl ElicitationCardHandlers {
 
     /// Local: routes the dictation hotkey, microphone button and Escape of
     /// the card's text fields to the Dictation Session host.
-    pub(crate) fn with_dictation(
+    pub(crate) fn with_dictation_handlers(
         mut self,
         on_toggle_dictation: impl Fn(ElicitationEntryId, String, &mut Window, &mut App) + 'static,
         on_cancel_dictation: impl Fn(ElicitationEntryId, String, &mut Window, &mut App) -> bool
@@ -1830,17 +1831,11 @@ impl<'a> ElicitationCard<'a> {
             .as_ref()
             .filter(|(name, _)| name == field_name)
             .map(|(_, window)| window.clone());
-        let button_state = if dictation_window.is_some() {
-            if dictation.recording {
-                DictationButtonState::Recording
-            } else {
-                DictationButtonState::Idle
-            }
-        } else if dictation.blocked {
-            DictationButtonState::Disabled
-        } else {
-            DictationButtonState::Idle
-        };
+        let button_state = DictationButtonState::for_field(
+            dictation_window.is_some(),
+            dictation.recording,
+            dictation.session_open,
+        );
         let on_toggle_dictation = self.handlers.on_toggle_dictation.clone();
         let on_cancel_dictation = self.handlers.on_cancel_dictation.clone();
         let toggle = {

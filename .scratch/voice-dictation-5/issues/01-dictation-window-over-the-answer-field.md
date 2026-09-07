@@ -6,8 +6,8 @@
 
 **Blocked by:** None — can start immediately.
 
-**Status:** ready-for-agent
+**Status:** implemented — ручная проверка в dev-сборке не проведена
 
-- [ ] Тесты: окно открывается для Answer Field, а не для Composer; пока оно открыто, старт из Composer и из других полей отклоняется.
+- [x] Тесты: окно открывается для Answer Field, а не для Composer; пока оно открыто, старт из Composer и из других полей отклоняется.
 - [ ] Ручная проверка: вопрос от Claude Code, диктовка по хоткею и по кнопке, окно раскрывается над полем, Live Transcript виден.
-- [ ] `./script/clippy` и тесты `agent_ui` зелёные.
+- [x] `./script/clippy` и тесты `agent_ui` зелёные.

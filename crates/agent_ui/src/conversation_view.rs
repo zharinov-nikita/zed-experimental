@@ -1634,6 +1634,7 @@ impl ConversationView {
                     list_state.splice(range.clone(), 0);
                     active.update(cx, |active, cx| {
                         active.sync_editor_mode(cx);
+                        active.sync_dictation_host(window, cx);
                     });
                 }
             }
@@ -4312,9 +4313,8 @@ pub(crate) mod tests {
         });
     }
 
-    // ----- Local: voice dictation over an Answer Field -----
-
-    /// A thread with one pending Agent Question whose only Answer Field is `name`.
+    /// Local: a thread with one pending Agent Question whose only Answer
+    /// Field is `name`.
     async fn setup_agent_question(
         cx: &mut TestAppContext,
     ) -> (
@@ -4413,15 +4413,25 @@ pub(crate) mod tests {
             "Answer: hello world"
         );
         thread.read_with(cx, |thread, cx| {
-            assert!(thread.dictation_host().is_none(), "Accept closes the window");
+            assert!(
+                thread.dictation_host().is_none(),
+                "Accept closes the window"
+            );
             assert!(
                 thread.has_elicitation_form_state(&question),
                 "Accept must not submit the answer"
             );
             let (_, elicitation) = thread.thread.read(cx).elicitation(&question).unwrap();
-            assert!(matches!(elicitation.status, ElicitationStatus::Pending { .. }));
+            assert!(matches!(
+                elicitation.status,
+                ElicitationStatus::Pending { .. }
+            ));
             assert!(
-                thread.message_editor.read(cx).dictation_block(&block_id).is_none(),
+                thread
+                    .message_editor
+                    .read(cx)
+                    .dictation_block(&block_id)
+                    .is_none(),
                 "no Dictation Block goes to the Composer"
             );
         });

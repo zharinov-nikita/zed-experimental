@@ -2632,7 +2632,7 @@ impl ThreadView {
                 .insert(id, ElicitationFormState::new(&schema, window, cx));
         } else if !is_pending {
             self.elicitation_form_states.remove(&id);
-            self.answer_fields_gone(&id, window, cx);
+            self.sync_dictation_host(window, cx);
         }
     }
 
@@ -4511,11 +4511,7 @@ impl ThreadView {
         window: &mut Window,
         cx: &mut Context<Self>,
     ) -> bool {
-        self.cancel_dictation_recording(
-            &DictationHost::AnswerField { question, field },
-            window,
-            cx,
-        )
+        self.cancel_dictation_recording(&DictationHost::AnswerField { question, field }, window, cx)
     }
 
     /// One session at a time: the field that hosts it toggles it, any other
@@ -4599,8 +4595,11 @@ impl ThreadView {
             return;
         };
         let dictation_window = cx.new(|cx| build(host_focus, window, cx));
-        let subscription =
-            cx.subscribe_in(&dictation_window, window, Self::handle_dictation_window_event);
+        let subscription = cx.subscribe_in(
+            &dictation_window,
+            window,
+            Self::handle_dictation_window_event,
+        );
         self.dictation = Some(DictationSession {
             window: dictation_window,
             host,
@@ -4631,7 +4630,9 @@ impl ThreadView {
         if !matches!(elicitation.status, ElicitationStatus::Pending { .. }) {
             return None;
         }
-        self.elicitation_form_states.get(question)?.text_field(field)
+        self.elicitation_form_states
+            .get(question)?
+            .text_field(field)
     }
 
     fn dictation_host_focus_handle(&self, host: &DictationHost, cx: &App) -> Option<FocusHandle> {
@@ -4643,24 +4644,20 @@ impl ThreadView {
         }
     }
 
-    /// The Agent Question `question` no longer takes answers. A session over
-    /// one of its fields moves above the Composer and wraps up there: the
+    /// Called whenever an Agent Question may have gone: answered another
+    /// way, withdrawn by the agent, or removed with its entry. A session over
+    /// one of its fields moves above the Composer and wraps up there, so the
     /// text becomes a Dictation Block instead of being lost with the card.
-    fn answer_fields_gone(
-        &mut self,
-        question: &ElicitationEntryId,
-        window: &mut Window,
-        cx: &mut Context<Self>,
-    ) {
+    pub(crate) fn sync_dictation_host(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        let Some(host) = self.dictation_host().cloned() else {
+            return;
+        };
+        if host == DictationHost::Composer || self.answer_field_editor(&host, cx).is_some() {
+            return;
+        }
         let Some(session) = &mut self.dictation else {
             return;
         };
-        let DictationHost::AnswerField { question: hosted, .. } = &session.host else {
-            return;
-        };
-        if hosted != question {
-            return;
-        }
         session.host = DictationHost::Composer;
         session.window.update(cx, |dictation_window, cx| {
             dictation_window.accept_when_ready(window, cx);
@@ -4686,15 +4683,15 @@ impl ThreadView {
                     return;
                 };
                 let answer_field = self.answer_field_editor(&host, cx);
-                let destination =
-                    dictation_host::accept_destination(&host, answer_field.is_some());
-                match (destination, answer_field) {
-                    (AcceptDestination::AnswerField, Some(editor)) => {
-                        editor.update(cx, |editor, cx| {
-                            dictation_host::insert_at_cursor(editor, text, window, cx);
-                        });
+                match dictation_host::accept_destination(&host, answer_field.is_some()) {
+                    AcceptDestination::AnswerField => {
+                        if let Some(editor) = answer_field {
+                            editor.update(cx, |editor, cx| {
+                                dictation_host::insert_at_cursor(editor, text, window, cx);
+                            });
+                        }
                     }
-                    (AcceptDestination::AnswerField, None) | (AcceptDestination::Composer, _) => {
+                    AcceptDestination::Composer => {
                         self.message_editor.update(cx, |message_editor, cx| {
                             if *replaces_existing {
                                 message_editor.replace_dictation_block(
@@ -4743,17 +4740,16 @@ impl ThreadView {
     /// The microphone button of the Composer. Off while a session runs over
     /// an Answer Field; red while the Composer's own session records.
     fn render_dictation_button(&self, cx: &mut Context<Self>) -> impl IntoElement {
-        let state = match &self.dictation {
-            None => DictationButtonState::Idle,
-            Some(session) if session.host == DictationHost::Composer => {
-                if session.window.read(cx).is_recording() {
-                    DictationButtonState::Recording
-                } else {
-                    DictationButtonState::Idle
-                }
-            }
-            Some(_) => DictationButtonState::Disabled,
-        };
+        let hosts_session = self.dictation_host() == Some(&DictationHost::Composer);
+        let state = DictationButtonState::for_field(
+            hosts_session,
+            hosts_session
+                && self
+                    .dictation
+                    .as_ref()
+                    .is_some_and(|session| session.window.read(cx).is_recording()),
+            self.dictation.is_some(),
+        );
         dictation_button(
             "dictation",
             state,
@@ -4776,21 +4772,24 @@ impl ThreadView {
             return AnswerFieldDictation::default();
         };
         let window = match &session.host {
-            DictationHost::AnswerField { question: hosted, field } if hosted == question => {
-                Some((field.clone(), session.window.clone().into()))
-            }
+            DictationHost::AnswerField {
+                question: hosted,
+                field,
+            } if hosted == question => Some((field.clone(), session.window.clone().into())),
             _ => None,
         };
         AnswerFieldDictation {
             recording: window.is_some() && session.window.read(cx).is_recording(),
             window,
-            blocked: true,
+            session_open: true,
         }
     }
 
     #[cfg(test)]
     pub(crate) fn dictation_window(&self) -> Option<Entity<DictationWindow>> {
-        self.dictation.as_ref().map(|session| session.window.clone())
+        self.dictation
+            .as_ref()
+            .map(|session| session.window.clone())
     }
 
     #[cfg(test)]
@@ -4824,7 +4823,9 @@ impl ThreadView {
             window,
             cx,
         );
-        self.dictation.as_ref().map(|session| session.window.clone())
+        self.dictation
+            .as_ref()
+            .map(|session| session.window.clone())
     }
 
     fn render_queue_steer_button(
@@ -6996,6 +6997,7 @@ impl ThreadView {
 
     fn elicitation_card_handlers(&self, cx: &Context<Self>) -> ElicitationCardHandlers {
         let view = cx.entity().downgrade();
+        let dictation_view = view.clone();
 
         ElicitationCardHandlers::new(
             {
@@ -7059,22 +7061,19 @@ impl ThreadView {
                     .log_err();
                 }
             },
-            {
-                let view = view.clone();
-                move |elicitation_id, field_name, value, selected, cx| {
-                    view.update(cx, |this, cx| {
-                        if let Some(form) = this.elicitation_form_states.get_mut(&elicitation_id) {
-                            form.set_multi_select(&field_name, value, selected);
-                            cx.notify();
-                        }
-                    })
-                    .log_err();
-                }
+            move |elicitation_id, field_name, value, selected, cx| {
+                view.update(cx, |this, cx| {
+                    if let Some(form) = this.elicitation_form_states.get_mut(&elicitation_id) {
+                        form.set_multi_select(&field_name, value, selected);
+                        cx.notify();
+                    }
+                })
+                .log_err();
             },
         )
-        .with_dictation(
+        .with_dictation_handlers(
             {
-                let view = view.clone();
+                let view = dictation_view.clone();
                 move |elicitation_id, field_name, window, cx| {
                     view.update(cx, |this, cx| {
                         this.toggle_answer_field_dictation(elicitation_id, field_name, window, cx);
@@ -7083,10 +7082,12 @@ impl ThreadView {
                 }
             },
             move |elicitation_id, field_name, window, cx| {
-                view.update(cx, |this, cx| {
-                    this.cancel_answer_field_dictation(elicitation_id, field_name, window, cx)
-                })
-                .unwrap_or(false)
+                dictation_view
+                    .update(cx, |this, cx| {
+                        this.cancel_answer_field_dictation(elicitation_id, field_name, window, cx)
+                    })
+                    .log_err()
+                    .unwrap_or(false)
             },
         )
     }

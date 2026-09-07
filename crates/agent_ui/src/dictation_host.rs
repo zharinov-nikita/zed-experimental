@@ -28,7 +28,10 @@ pub(crate) enum StartDecision {
     Refuse,
 }
 
-pub(crate) fn start_decision(current: Option<&DictationHost>, requested: &DictationHost) -> StartDecision {
+pub(crate) fn start_decision(
+    current: Option<&DictationHost>,
+    requested: &DictationHost,
+) -> StartDecision {
     match current {
         None => StartDecision::Open,
         Some(current) if current == requested => StartDecision::Toggle,
