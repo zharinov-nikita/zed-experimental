@@ -39,7 +39,7 @@ Appending new speech to an existing Dictation Block from inside the Dictation Wi
 _Avoid_: Continue, append, re-record
 
 **Session Audio**:
-The sound of one Dictation Session as the user spoke it, kept locally so it can be played back or used to reproduce a recognition problem. Belongs to the Dictation Block the session produced; a Resume adds its sound to the same block.
+The sound of one Dictation Session as the user spoke it, kept locally so it can be played back or used to reproduce a recognition problem. When the session produced a Dictation Block, a Resume of that block adds its sound to the same Session Audio.
 _Avoid_: Recording, WAV, last recording, audio file
 
 ### Transcript
@@ -104,12 +104,24 @@ _Avoid_: Vocabulary, dictionary, hints
 The text box in the agent panel where the user's prompt is authored before it is sent.
 _Avoid_: Message editor, input box, prompt field
 
+**Agent Question**:
+A question the agent asks the user in the middle of its work and waits to have answered before it continues. Shown as a card in the agent panel; the user answers there, not in the Composer.
+_Avoid_: Elicitation, prompt, permission request, form
+
+**Answer Field**:
+A text field inside an Agent Question where the user writes the answer. Dictation can go into it the same way it goes into the Composer, but the result is plain text, not a Dictation Block.
+_Avoid_: Input, text box, form field
+
 ### Quote Reply (adjacent feature, designed after Dictation)
 
 **Quote Reply**:
-Replying to a selected fragment of an agent response. The fragment is placed into the Composer as a quote, and the user continues by typing or by Dictation.
+Replying to a selected fragment of an agent response. The fragment is placed into the Composer as a Quoted Fragment, and the user continues by typing after it or by Dictation, which yields a Quote Reply Block.
 _Avoid_: Reply to selection, inline reply, thread reply
 
 **Quoted Fragment**:
-The piece of an agent response the user selected for a Quote Reply.
+The piece of an agent response the user selected for a Quote Reply, taken from the response text only, never from tool cards. Lives in the Composer as a single unit that is removed whole, never merged with typed text.
 _Avoid_: Selection, excerpt, citation
+
+**Quote Reply Block**:
+A Quoted Fragment and the dictated comment on it, kept together as one unit in the Composer and in the sent message, so it is always clear what the comment refers to. Only the comment can be resumed or edited; the fragment stays as selected.
+_Avoid_: Quote with audio, annotated quote, reply chip
