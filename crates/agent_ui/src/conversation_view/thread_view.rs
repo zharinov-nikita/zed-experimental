@@ -4593,7 +4593,7 @@ impl ThreadView {
         self.open_dictation_window(
             DictationHost::Composer,
             move |host_focus, window, cx| {
-                DictationWindow::start_block(host_focus, block_id, window, cx).with_quote(quote)
+                DictationWindow::start_block(host_focus, block_id, window, cx).with_quote(quote, cx)
             },
             window,
             cx,
@@ -4711,7 +4711,7 @@ impl ThreadView {
                 DictationHost::Composer,
                 move |host_focus, window, cx| {
                     DictationWindow::review(host_focus, id, comment, duration, window, cx)
-                        .with_quote(quote)
+                        .with_quote(quote, cx)
                 },
                 window,
                 cx,

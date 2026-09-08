@@ -32,6 +32,7 @@ use language_model::{
     LanguageModelRegistry, LanguageModelRequest, LanguageModelRequestMessage, Role, SelectedModel,
 };
 use language_models::AllLanguageModelSettings;
+use markdown::{Markdown, MarkdownElement, MarkdownFont, MarkdownStyle};
 use settings::Settings as _;
 use std::sync::Arc;
 use theme_settings::ThemeSettings;
@@ -348,9 +349,9 @@ pub struct DictationWindow {
     playback: Option<Playback>,
     /// Held while recording; dropping the window frees the session slot.
     engine_lease: Option<EngineLease<Transcriber>>,
-    /// The Quoted Fragment a Quote Reply Block comments on, shown read-only
-    /// above the transcript.
-    quote: Option<String>,
+    /// The Quoted Fragment a Quote Reply Block comments on, rendered
+    /// read-only above the transcript.
+    quote: Option<Entity<Markdown>>,
     review_editor: Entity<Editor>,
     scroll_handle: ScrollHandle,
     _events_task: Option<Task<()>>,
@@ -469,8 +470,8 @@ impl DictationWindow {
     }
 
     /// Shows `quote` above the transcript for the whole session.
-    pub fn with_quote(mut self, quote: String) -> Self {
-        self.quote = Some(quote);
+    pub fn with_quote(mut self, quote: String, cx: &mut Context<Self>) -> Self {
+        self.quote = Some(cx.new(|cx| Markdown::new(quote.into(), None, None, cx)));
         self
     }
 
@@ -1116,11 +1117,12 @@ impl DictationWindow {
     /// the same so recording and review share one line height.
     const BODY_TEXT_SIZE: Rems = rems(0.875);
 
-    /// The Quoted Fragment of a Quote Reply Block, read-only above the
-    /// transcript so the user sees what they are commenting on.
-    fn render_quote(&self, cx: &Context<Self>) -> Option<AnyElement> {
+    /// The Quoted Fragment of a Quote Reply Block, rendered read-only above
+    /// the transcript so the user sees what they are commenting on.
+    fn render_quote(&self, window: &mut Window, cx: &mut Context<Self>) -> Option<AnyElement> {
         let quote = self.quote.clone()?;
-        let colors = cx.theme().colors();
+        let style = MarkdownStyle::themed(MarkdownFont::Agent, window, cx).with_muted_text(cx);
+        let border = cx.theme().colors().border_variant;
         Some(
             div()
                 .px_2()
@@ -1130,12 +1132,10 @@ impl DictationWindow {
                         .id("dictation-quote")
                         .pl_2()
                         .border_l_2()
-                        .border_color(colors.border_variant)
-                        .max_h(px(96.))
+                        .border_color(border)
+                        .max_h(px(120.))
                         .overflow_y_scroll()
-                        .text_size(Self::BODY_TEXT_SIZE)
-                        .text_color(colors.text_muted)
-                        .child(StyledText::new(quote)),
+                        .child(MarkdownElement::new(quote, style)),
                 )
                 .into_any_element(),
         )
@@ -1482,7 +1482,7 @@ impl Render for DictationWindow {
             .border_color(colors.border)
             .bg(colors.surface_background)
             .py_1()
-            .children(self.render_quote(cx))
+            .children(self.render_quote(window, cx))
             .child(self.render_body(window, cx))
             .child(Divider::horizontal())
             .child(self.render_footer(cx))
