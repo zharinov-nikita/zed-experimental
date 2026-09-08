@@ -4612,7 +4612,7 @@ impl ThreadView {
                 AssistantMessageChunk::Message { block, .. }
                 | AssistantMessageChunk::Thought { block, .. } => block.markdown()?,
             };
-            markdown.read(cx).selected_source().map(str::to_string)
+            markdown.read(cx).selected_markdown()
         })
     }
 

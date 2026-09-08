@@ -1061,6 +1061,15 @@ impl Markdown {
         self.source.get(self.selection.start..self.selection.end)
     }
 
+    /// Local: the selection as well-formed markdown, the way Copy Selection
+    /// copies it, so a selection starting inside a styled span quotes cleanly.
+    pub fn selected_markdown(&self) -> Option<String> {
+        self.has_selection().then(|| {
+            self.parsed_markdown
+                .rebalanced_markdown_for_selection(self.selection.start..self.selection.end)
+        })
+    }
+
     pub fn set_search_highlights(
         &mut self,
         highlights: Vec<Range<usize>>,
