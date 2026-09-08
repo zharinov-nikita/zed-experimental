@@ -64,7 +64,8 @@ cargo run --profile release-fast -- --user-data-dir "$env:LOCALAPPDATA\Zed-Local
   заполняет комментарий, Discard пустого комментария удаляет блок; Resume и правка открытого из Composer
   блока касаются только комментария. Агенту уходит `> цитата`, пометка на языке `agent.dictation.language` («(из твоего ответа выше)»
   для `ru`, иначе «(quoting your reply above)») и комментарий. Оба пункта погашены без выделения и во время
-  Dictation Session. Чистые функции: `crates/agent_ui/src/quote_reply.rs`.
+  Dictation Session. Клик по другому блоку из ожидающего просмотра принимает просмотр и открывает тот блок;
+  в отправленном сообщении цитата и комментарий видны текстом. Чистые функции: `crates/agent_ui/src/quote_reply.rs`.
 - Настройки в окне Settings: AI → General → Dictation (поиск по «whisper», «microphone»). Подстраница правит
   `agent.dictation` и `audio.experimental.input_audio_device` в `settings.json`; провайдер и модель Post-processing
   пишутся парой в `agent.dictation.post_processing.model` (как `agent.default_model`), «Agent default model» удаляет
