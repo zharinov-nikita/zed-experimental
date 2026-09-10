@@ -288,6 +288,18 @@ struct ClientContext {
     request_elicitations: Entity<ElicitationStore>,
 }
 
+impl ClientContext {
+    /// Local: refuses `request` when it comes from a text-only session and
+    /// counts the refusal; see [`AcpSession::text_only`].
+    fn refuse_action(&self, session_id: &acp::SessionId, request: &str) -> Option<acp::Error> {
+        let mut sessions = self.sessions.borrow_mut();
+        let state = sessions.get_mut(session_id)?.text_only.as_mut()?;
+        let error = text_only_refusal(true, request)?;
+        state.refused_actions += 1;
+        Some(error)
+    }
+}
+
 fn dispatch_queue_closed_error() -> acp::Error {
     acp::Error::internal_error().data("ACP foreground dispatch queue closed")
 }
@@ -521,7 +533,41 @@ pub struct AcpSession {
     suppress_abort_err: bool,
     session_modes: Option<Rc<RefCell<acp::SessionModeState>>>,
     config_options: Option<ConfigOptions>,
+    /// Local: set for a session that may answer with text and nothing else
+    /// (a Post-processing Session of the dictation feature). Every request
+    /// it makes back to Zed for the file system, a terminal, a permission or
+    /// an answer from the user is refused where it arrives; the refusals are
+    /// counted and the text of its answers collected, so the side that
+    /// opened the session can tell an answer from an attempt to act.
+    text_only: Option<TextOnlyState>,
     _release_subscription: Subscription,
+}
+
+#[derive(Default)]
+struct TextOnlyState {
+    refused_actions: u32,
+    reply: String,
+}
+
+/// Local: what a text-only session did during its latest turn.
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub struct TextOnlyTurn {
+    /// The agent's answer, text blocks only.
+    pub reply: String,
+    /// How many requests to act on the machine were refused.
+    pub refused_actions: u32,
+}
+
+/// Local: the answer to a request from a text-only session. Refused where
+/// the request arrives, before anything could happen; `None` for an
+/// ordinary session, which handles the request as usual.
+fn text_only_refusal(text_only: bool, request: &str) -> Option<acp::Error> {
+    text_only.then(|| {
+        acp::Error::new(
+            i32::from(acp::ErrorCode::InternalError),
+            format!("{request} is refused: this session may answer with text only"),
+        )
+    })
 }
 
 pub struct AcpSessionList {
@@ -1168,6 +1214,7 @@ impl AcpConnection {
         thread: &Entity<AcpThread>,
         session_modes: Option<Rc<RefCell<acp::SessionModeState>>>,
         config_options: Option<ConfigOptions>,
+        text_only: bool,
         cx: &mut App,
     ) {
         let release_subscription = cx.observe_release(thread, {
@@ -1207,6 +1254,7 @@ impl AcpConnection {
                 suppress_abort_err: false,
                 session_modes,
                 config_options,
+                text_only: text_only.then(TextOnlyState::default),
                 _release_subscription: release_subscription,
             },
         );
@@ -1214,6 +1262,66 @@ impl AcpConnection {
 
     fn agent_supports_session_close(&self) -> bool {
         self.agent_capabilities.session_capabilities.close.is_some()
+    }
+
+    /// Local: creates a session that may answer with text and nothing else;
+    /// see [`AcpSession::text_only`]. `cwd` is the directory the agent is
+    /// told it works in and should be empty. Unlike [`Self::new_session`],
+    /// nothing stored for this agent in settings (default mode, default
+    /// config options) is applied and no MCP servers are passed: the caller
+    /// sets explicitly what the session should run with.
+    pub fn new_text_only_session(
+        self: Rc<Self>,
+        project: Entity<Project>,
+        cwd: PathBuf,
+        cx: &mut App,
+    ) -> Task<Result<Entity<AcpThread>>> {
+        cx.spawn(async move |cx| {
+            let response = self
+                .connection
+                .send_request(acp::NewSessionRequest::new(cwd))
+                .block_task()
+                .await
+                .map_err(map_acp_error)?;
+            let (modes, config_options) = config_state(response.modes, response.config_options);
+            let action_log = cx.new(|_| ActionLog::new(project.clone()));
+            let thread: Entity<AcpThread> = cx.new(|cx| {
+                AcpThread::new(
+                    None,
+                    None,
+                    None,
+                    self.clone(),
+                    project,
+                    action_log,
+                    response.session_id.clone(),
+                    watch::Receiver::constant(self.agent_capabilities.prompt_capabilities.clone()),
+                    cx,
+                )
+            });
+            cx.update(|cx| {
+                self.register_session(
+                    response.session_id,
+                    &thread,
+                    modes,
+                    config_options.map(ConfigOptions::new),
+                    true,
+                    cx,
+                )
+            });
+            Ok(thread)
+        })
+    }
+
+    /// Local: what a text-only session did since the last call, and a fresh
+    /// start for its next turn. `None` for sessions that are not text-only.
+    pub fn take_text_only_turn(&self, session_id: &acp::SessionId) -> Option<TextOnlyTurn> {
+        let mut sessions = self.sessions.borrow_mut();
+        let state = sessions.get_mut(session_id)?.text_only.as_mut()?;
+        let turn = TextOnlyTurn {
+            reply: std::mem::take(&mut state.reply),
+            refused_actions: std::mem::replace(&mut state.refused_actions, 0),
+        };
+        Some(turn)
     }
 
     fn open_or_create_session(
@@ -1285,7 +1393,7 @@ impl AcpConnection {
                     // (e.g. history replay during `session/load`) can find the thread.
                     // Modes/config are filled in once the response arrives.
                     cx.update(|cx| {
-                        this.register_session(session_id.clone(), &thread, None, None, cx)
+                        this.register_session(session_id.clone(), &thread, None, None, false, cx)
                     });
 
                     let response =
@@ -1735,6 +1843,7 @@ impl AgentConnection for AcpConnection {
                     &thread,
                     modes,
                     config_options.map(ConfigOptions::new),
+                    false,
                     cx,
                 )
             });
@@ -3718,6 +3827,253 @@ mod tests {
         );
     }
 
+    #[test]
+    fn only_a_text_only_session_is_refused() {
+        assert_eq!(text_only_refusal(false, "fs/read_text_file"), None);
+        let error = text_only_refusal(true, "fs/read_text_file")
+            .expect("a text-only session must be refused");
+        assert!(
+            error.message.contains("fs/read_text_file is refused"),
+            "{error}"
+        );
+    }
+
+    /// Local: a fake agent that answers every prompt with a text chunk and
+    /// then asks Zed to read a file, recording what the read came back with.
+    async fn connect_text_only_test_agent(
+        cx: &mut gpui::TestAppContext,
+    ) -> (
+        Rc<AcpConnection>,
+        Entity<project::Project>,
+        Arc<std::sync::Mutex<Vec<Result<String, String>>>>,
+        Task<anyhow::Result<()>>,
+    ) {
+        cx.update(|cx| {
+            let store = settings::SettingsStore::test(cx);
+            cx.set_global(store);
+        });
+
+        let fs = fs::FakeFs::new(cx.executor());
+        fs.insert_tree("/", serde_json::json!({ "a": { "file.txt": "hello" } }))
+            .await;
+        let project = project::Project::test(fs, [std::path::Path::new("/a")], cx).await;
+
+        let read_results: Arc<std::sync::Mutex<Vec<Result<String, String>>>> = Arc::default();
+        let next_session = Arc::new(AtomicUsize::new(0));
+
+        let (client_transport, agent_transport) = agent_client_protocol::Channel::duplex();
+
+        let sessions: Rc<RefCell<HashMap<acp::SessionId, AcpSession>>> =
+            Rc::new(RefCell::new(HashMap::default()));
+        let client_session_list: Rc<RefCell<Option<Rc<AcpSessionList>>>> =
+            Rc::new(RefCell::new(None));
+
+        let agent_future = Agent
+            .builder()
+            .name("text-only-test-agent")
+            .on_receive_request(
+                async move |req: acp::InitializeRequest, responder, _cx| {
+                    responder.respond(acp::InitializeResponse::new(req.protocol_version))
+                },
+                agent_client_protocol::on_receive_request!(),
+            )
+            .on_receive_request(
+                {
+                    let next_session = next_session.clone();
+                    async move |_req: acp::NewSessionRequest, responder, _cx| {
+                        let number = next_session.fetch_add(1, Ordering::SeqCst);
+                        responder.respond(acp::NewSessionResponse::new(acp::SessionId::new(
+                            format!("session-{number}"),
+                        )))
+                    }
+                },
+                agent_client_protocol::on_receive_request!(),
+            )
+            .on_receive_request(
+                {
+                    let read_results = read_results.clone();
+                    async move |req: acp::PromptRequest, responder, cx| {
+                        let session_id = req.session_id.clone();
+                        cx.send_notification(acp::SessionNotification::new(
+                            session_id.clone(),
+                            acp::SessionUpdate::AgentMessageChunk(acp::ContentChunk::new(
+                                "Clean text".into(),
+                            )),
+                        ))?;
+                        let read_results = read_results.clone();
+                        cx.send_request(acp::ReadTextFileRequest::new(
+                            session_id,
+                            PathBuf::from("/a/file.txt"),
+                        ))
+                        .on_receiving_result(async move |result| {
+                            read_results
+                                .lock()
+                                .expect("read results lock should not be poisoned")
+                                .push(
+                                    result
+                                        .map(|response| response.content)
+                                        .map_err(|error| error.to_string()),
+                                );
+                            responder.respond(acp::PromptResponse::new(acp::StopReason::EndTurn))
+                        })?;
+                        Ok(())
+                    }
+                },
+                agent_client_protocol::on_receive_request!(),
+            )
+            .on_receive_notification(
+                async move |_notif: acp::CancelNotification, _cx| Ok(()),
+                agent_client_protocol::on_receive_notification!(),
+            )
+            .connect_to(agent_transport);
+
+        let agent_io_task = cx.background_spawn(agent_future);
+
+        let (dispatch_tx, dispatch_rx) = mpsc::unbounded::<ForegroundWork>();
+        let (connection_tx, connection_rx) = futures::channel::oneshot::channel();
+        let client_future = connect_client_future(
+            "zed-test",
+            client_transport,
+            dispatch_tx.clone(),
+            connection_tx,
+        );
+        let client_io_task = cx.background_spawn(async move {
+            client_future.await.ok();
+        });
+
+        let client_conn: ConnectionTo<Agent> = connection_rx
+            .await
+            .expect("failed to receive ACP connection handle");
+
+        let response = client_conn
+            .send_request(acp::InitializeRequest::new(ProtocolVersion::V1))
+            .block_task()
+            .await
+            .expect("failed to initialize ACP connection");
+        let agent_capabilities = response.agent_capabilities;
+
+        let request_elicitations = cx.new(|_| ElicitationStore::default());
+        let dispatch_context = ClientContext {
+            sessions: sessions.clone(),
+            session_list: client_session_list.clone(),
+            request_elicitations: request_elicitations.clone(),
+        };
+        let dispatch_task = cx.spawn({
+            let mut dispatch_rx = dispatch_rx;
+            move |cx| async move {
+                let mut cx = cx;
+                while let Some(work) = dispatch_rx.next().await {
+                    work.run(&mut cx, &dispatch_context);
+                }
+            }
+        });
+
+        let agent_server_store =
+            project.read_with(cx, |project, _| project.agent_server_store().downgrade());
+
+        let connection = cx.update(|cx| {
+            AcpConnection::new_for_test(
+                client_conn,
+                sessions,
+                agent_capabilities,
+                request_elicitations,
+                agent_server_store,
+                client_io_task,
+                dispatch_task,
+                cx,
+            )
+        });
+
+        let keep_agent_alive = cx.background_spawn(async move {
+            agent_io_task.await.ok();
+            anyhow::Ok(())
+        });
+
+        (Rc::new(connection), project, read_results, keep_agent_alive)
+    }
+
+    #[gpui::test]
+    async fn a_text_only_session_is_refused_actions_while_an_ordinary_one_is_not(
+        cx: &mut gpui::TestAppContext,
+    ) {
+        let (connection, project, read_results, _keep_agent_alive) =
+            connect_text_only_test_agent(cx).await;
+
+        let ordinary = cx
+            .update(|cx| {
+                connection.clone().new_session(
+                    project.clone(),
+                    PathList::new(&[std::path::Path::new("/a")]),
+                    cx,
+                )
+            })
+            .await
+            .expect("new_session failed");
+        let ordinary_id = ordinary.read_with(cx, |thread, _| thread.session_id().clone());
+        cx.update(|cx| {
+            connection.prompt(
+                acp::PromptRequest::new(ordinary_id.clone(), vec!["hi".into()]),
+                cx,
+            )
+        })
+        .await
+        .expect("prompt failed");
+        cx.run_until_parked();
+        assert_eq!(
+            read_results
+                .lock()
+                .expect("read results lock should not be poisoned")
+                .as_slice(),
+            &[Ok("hello".to_string())],
+            "an ordinary session reads the file as before"
+        );
+        assert_eq!(connection.take_text_only_turn(&ordinary_id), None);
+
+        let text_only = cx
+            .update(|cx| {
+                connection
+                    .clone()
+                    .new_text_only_session(project.clone(), PathBuf::from("/a"), cx)
+            })
+            .await
+            .expect("new_text_only_session failed");
+        let text_only_id = text_only.read_with(cx, |thread, _| thread.session_id().clone());
+        let response = cx
+            .update(|cx| {
+                connection.prompt(
+                    acp::PromptRequest::new(text_only_id.clone(), vec!["hi".into()]),
+                    cx,
+                )
+            })
+            .await
+            .expect("prompt failed");
+        cx.run_until_parked();
+        assert_eq!(response.stop_reason, acp::StopReason::EndTurn);
+        let refused = read_results
+            .lock()
+            .expect("read results lock should not be poisoned")
+            .get(1)
+            .cloned()
+            .expect("the agent must have asked to read")
+            .expect_err("the read must be refused on a text-only session");
+        assert!(
+            refused.contains("fs/read_text_file is refused"),
+            "unexpected error: {refused}"
+        );
+        assert_eq!(
+            connection.take_text_only_turn(&text_only_id),
+            Some(TextOnlyTurn {
+                reply: "Clean text".into(),
+                refused_actions: 1,
+            })
+        );
+        assert_eq!(
+            connection.take_text_only_turn(&text_only_id),
+            Some(TextOnlyTurn::default()),
+            "taking the turn starts the next one afresh"
+        );
+    }
+
     #[cfg(not(windows))]
     #[gpui::test]
     async fn startup_returns_error_when_agent_exits_before_initialization(
@@ -4520,6 +4876,9 @@ fn handle_request_permission(
         Ok(t) => t,
         Err(e) => return respond_err(responder, e),
     };
+    if let Some(error) = ctx.refuse_action(&args.session_id, "session/request_permission") {
+        return respond_err(responder, error);
+    }
 
     let cancellation = responder.cancellation();
     let tool_call_id = args.tool_call.tool_call_id.clone();
@@ -4574,6 +4933,9 @@ fn handle_create_elicitation(
                 Ok(t) => t,
                 Err(e) => return respond_err(responder, e),
             };
+            if let Some(error) = ctx.refuse_action(&scope.session_id, "elicitation/create") {
+                return respond_err(responder, error);
+            }
 
             let (elicitation_id, task) = match thread
                 .update(cx, |thread, cx| {
@@ -4690,6 +5052,9 @@ fn handle_write_text_file(
         Ok(t) => t,
         Err(e) => return respond_err(responder, e),
     };
+    if let Some(error) = ctx.refuse_action(&args.session_id, "fs/write_text_file") {
+        return respond_err(responder, error);
+    }
 
     cx.spawn(async move |cx| {
         let result: Result<_, acp::Error> = async {
@@ -4725,6 +5090,9 @@ fn handle_read_text_file(
         Ok(t) => t,
         Err(e) => return respond_err(responder, e),
     };
+    if let Some(error) = ctx.refuse_action(&args.session_id, "fs/read_text_file") {
+        return respond_err(responder, error);
+    }
 
     cx.spawn(async move |cx| {
         let cancellation = responder.cancellation();
@@ -4749,6 +5117,21 @@ fn handle_session_notification(
     cx: &mut AsyncApp,
     ctx: &ClientContext,
 ) {
+    // Local: a text-only session keeps the text of its answer itself, so the
+    // side that opened it does not have to read it back out of the thread.
+    if let acp::SessionUpdate::AgentMessageChunk(acp::ContentChunk {
+        content: acp::ContentBlock::Text(text),
+        ..
+    }) = &notification.update
+        && let Some(state) = ctx
+            .sessions
+            .borrow_mut()
+            .get_mut(&notification.session_id)
+            .and_then(|session| session.text_only.as_mut())
+    {
+        state.reply.push_str(&text.text);
+    }
+
     // Extract everything we need from the session while briefly borrowing.
     let (thread, session_modes, config_opts_data) = {
         let sessions = ctx.sessions.borrow();
@@ -4910,6 +5293,9 @@ fn handle_create_terminal(
         Ok(t) => t,
         Err(e) => return respond_err(responder, e),
     };
+    if let Some(error) = ctx.refuse_action(&args.session_id, "terminal/create") {
+        return respond_err(responder, error);
+    }
     let project = match thread
         .read_with(cx, |thread, _cx| thread.project().clone())
         .map_err(acp::Error::from)
@@ -4970,6 +5356,9 @@ fn handle_kill_terminal(
         Ok(t) => t,
         Err(e) => return respond_err(responder, e),
     };
+    if let Some(error) = ctx.refuse_action(&args.session_id, "terminal/kill") {
+        return respond_err(responder, error);
+    }
 
     match thread
         .update(cx, |thread, cx| thread.kill_terminal(args.terminal_id, cx))
@@ -4994,6 +5383,9 @@ fn handle_release_terminal(
         Ok(t) => t,
         Err(e) => return respond_err(responder, e),
     };
+    if let Some(error) = ctx.refuse_action(&args.session_id, "terminal/release") {
+        return respond_err(responder, error);
+    }
 
     match thread
         .update(cx, |thread, cx| {
@@ -5020,6 +5412,9 @@ fn handle_terminal_output(
         Ok(t) => t,
         Err(e) => return respond_err(responder, e),
     };
+    if let Some(error) = ctx.refuse_action(&args.session_id, "terminal/output") {
+        return respond_err(responder, error);
+    }
 
     match thread
         .read_with(cx, |thread, cx| -> anyhow::Result<_> {
@@ -5048,6 +5443,9 @@ fn handle_wait_for_terminal_exit(
         Ok(t) => t,
         Err(e) => return respond_err(responder, e),
     };
+    if let Some(error) = ctx.refuse_action(&args.session_id, "terminal/wait_for_exit") {
+        return respond_err(responder, error);
+    }
 
     cx.spawn(async move |cx| {
         let cancellation = responder.cancellation();
