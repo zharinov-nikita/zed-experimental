@@ -67,9 +67,15 @@ cargo run --profile release-fast -- --user-data-dir "$env:LOCALAPPDATA\Zed-Local
   Dictation Session. Клик по другому блоку из ожидающего просмотра принимает просмотр и открывает тот блок;
   в отправленном сообщении цитата и комментарий видны текстом. Чистые функции: `crates/agent_ui/src/quote_reply.rs`.
 - Настройки в окне Settings: AI → General → Dictation (поиск по «whisper», «microphone»). Подстраница правит
-  `agent.dictation` и `audio.experimental.input_audio_device` в `settings.json`; провайдер и модель Post-processing
+  `agent.dictation` и `audio.experimental.input_audio_device` в `settings.json`. Выбор переписывателя в разделе
+  Post-processing двухуровневый: «Rewriter» — «Zed language model» или «External Agent». В первой ветке провайдер и модель
   пишутся парой в `agent.dictation.post_processing.model` (как `agent.default_model`), «Agent default model» удаляет
-  ключ; «Reset to default» у промпта удаляет `prompt`, и действует умолчание из `assets/settings/default.json`.
+  ключ. Во второй — «Agent» (идентификаторы из `agent_servers`), «Model» и прочие объявленные агентом опции пишутся в
+  `agent.dictation.post_processing.agent` (`{ "id": "...", "options": { "model": "haiku" } }`); модели показаны именами
+  из кэша `agent_options_cache`, который заполняет первое переписывание, до него дропдаун говорит «Not known yet».
+  Выбор одной ветки удаляет ключ другой; если в `settings.json` заданы оба, страница показывает Banner, а диктовка —
+  Callout «Post-processing Misconfigured». «Reset to default» у промпта удаляет `prompt`, и действует умолчание из
+  `assets/settings/default.json`.
 - Нужны настройки `agent.dictation.model_path` и `backends_dir` (см. `prototypes/voice-dictation/PLAN.md`,
   там же готовый фрагмент для этой машины). Vulkan-бэкенд не собирается из исходников: `ggml-vulkan.dll`
   берётся из официального артефакта transcribe.cpp в `%LOCALAPPDATA%\zed-dictation\transcribe-native`.
@@ -133,6 +139,20 @@ cargo run --profile release-fast -- --user-data-dir "$env:LOCALAPPDATA\Zed-Local
   показывает Callout «Ollama did not start» и сырой текст. Настроенная, но недоступная модель Post-processing теперь
   ошибка («Post-processing Unavailable»), а не тихая подмена моделью агента; подмена остаётся только когда модель вообще
   не задана. Удалённый адрес и другие провайдеры ничего не запускают; неудача не мешает следующей сессии попробовать снова.
+- Post-processing через External Agent (ADR 0004, `crates/agent_ui/src/dictation_post_processing.rs`): при
+  `agent.dictation.post_processing.agent` переписывание идёт в Post-processing Session — отдельной сессии того агента
+  на соединении из хранилища панели агента (второй процесс не запускается, Ollama не нужна). Сессия помечена «только
+  текст» (`AcpConnection::new_text_only_session` в `agent_servers`): запросы агента к файлам, терминалу, за разрешением
+  и с вопросом отклоняются на месте и считаются, ответ собирается в самой сессии. Рабочий каталог — пустой
+  `<data dir>\dictation\post-processing`; из настроек агента для рабочих тредов ничего не применяется, выставляются
+  только опции из `options`, которые агент объявил (`session_policy`), режим — самый строгий из объявленных (`plan`,
+  если есть). Одна сессия на Dictation Session: Resume переписывается в ней же, при закрытии окна она удаляется у агента
+  (`session/delete`) или, если агент удаление не поддерживает, помечается скрытой и не предлагается к импорту тредов.
+  Предел ответа 60 с (`RESPONSE_LIMIT`); подвал во время ожидания — «Post-processing with <агент>…», подпись —
+  «Processed · <агент> · <модель>» («default model», если `options.model` не задан). Провалы различаются Callout:
+  «Agent Unavailable» (не настроен, не запустился, возможно не авторизован), «Agent Tried to Act» (по отказам сессии,
+  не по тексту ответа), «Agent Refused», «Post-processing Timed Out»; сырой текст остаётся всегда, следующая сессия
+  пробует снова без перезапуска. Тесты модуля работают с фальшивым `RewriteAgent`, ни один не поднимает агента.
 - Звуки (`agent.dictation.sounds`, по умолчанию `false`): старт записи и Resume играют `unmute`, остановка записи (`esc`,
   хоткей, подсказка Review) — `mute`, всё через `audio::Audio::play_sound` на `audio.experimental.output_audio_device`.
   Accept, Cancel, Post-processing и ошибки беззвучны; какой переход чем звучит, решает `sound_for` в `dictation_window.rs`.

@@ -16,15 +16,17 @@ use gpui::{
 };
 use language::language_settings::SoftWrap;
 use language_model::{LanguageModelProvider, LanguageModelProviderId, LanguageModelRegistry};
+use project::agent_server_store::AllAgentServersSettings;
 use settings::{
-    AgentSettingsContent, AudioInputDeviceName, DictationPostProcessingSettingsContent,
-    DictationSettingsContent, LanguageModelProviderSetting, LanguageModelSelection, Settings as _,
-    SettingsContent, SettingsStore,
+    AgentConfigOptionValue, AgentSettingsContent, AudioInputDeviceName,
+    DictationAgentOptionContent, DictationAgentOptionKindContent,
+    DictationPostProcessingSettingsContent, DictationSettingsContent, LanguageModelProviderSetting,
+    LanguageModelSelection, Settings as _, SettingsContent, SettingsStore,
 };
 use theme_settings::ThemeSettings;
 use ui::{
     Banner, ContextMenu, Disableable as _, Divider, DropdownMenu, DropdownStyle, IconButtonShape,
-    IconPosition, PopoverMenu, Tooltip, prelude::*,
+    IconPosition, PopoverMenu, SwitchField, ToggleState, Tooltip, prelude::*,
 };
 use util::ResultExt as _;
 
@@ -42,6 +44,13 @@ const DEFAULT_AUDIO_INPUT: AudioInputDeviceName = AudioInputDeviceName(None);
 const DEFAULT_EMPTY_AUDIO_INPUT: Option<&AudioInputDeviceName> = Some(&DEFAULT_AUDIO_INPUT);
 
 const AGENT_DEFAULT_MODEL_LABEL: &str = "Agent default model";
+const REWRITER_LANGUAGE_MODEL_LABEL: &str = "Zed language model";
+const REWRITER_EXTERNAL_AGENT_LABEL: &str = "External Agent";
+const AGENT_OPTION_DEFAULT_LABEL: &str = "Agent default";
+const MODELS_UNKNOWN_LABEL: &str = "Not known yet";
+const MODELS_UNKNOWN_DESCRIPTION: &str =
+    "The agent has not been contacted yet. Its models are listed here after the first rewrite.";
+const REWRITER_CONFLICT: &str = "Both a language model and an External Agent are set in settings.json. Post-processing is off until you choose one of them here.";
 const PROMPT_SAVE_DEBOUNCE: Duration = Duration::from_millis(500);
 
 const GLOSSARY_DESCRIPTION: &str = "Terms the recognizer and post-processing should spell exactly as written. Paste a comma-separated list to add several at once.";
@@ -125,6 +134,163 @@ fn set_post_processing_model(
 /// `None` removes the override so the default prompt applies again.
 fn set_post_processing_prompt(agent: &mut AgentSettingsContent, prompt: Option<String>) {
     post_processing_content(agent).prompt = prompt;
+}
+
+/// What rewrites the transcript: the first level of the choice.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum Rewriter {
+    LanguageModel,
+    ExternalAgent,
+}
+
+/// Both keys set at once in settings.json.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+struct RewriterConflict;
+
+/// The branch the page shows. An `agent` block, even one without an id
+/// yet, is the agent branch; `model` alone or nothing is the language
+/// model branch, where nothing means the agent's default model.
+fn rewriter_choice(
+    post_processing: Option<&DictationPostProcessingSettingsContent>,
+) -> Result<Rewriter, RewriterConflict> {
+    let Some(post_processing) = post_processing else {
+        return Ok(Rewriter::LanguageModel);
+    };
+    match (&post_processing.model, &post_processing.agent) {
+        (Some(_), Some(_)) => Err(RewriterConflict),
+        (None, Some(_)) => Ok(Rewriter::ExternalAgent),
+        (_, None) => Ok(Rewriter::LanguageModel),
+    }
+}
+
+/// Choosing a rewriter drops the other one's key, so the two never
+/// coexist. Choosing the agent branch picks `first_agent` when no agent
+/// was chosen before, so the settings are valid at once.
+fn set_rewriter(agent: &mut AgentSettingsContent, rewriter: Rewriter, first_agent: Option<&str>) {
+    let post_processing = post_processing_content(agent);
+    match rewriter {
+        Rewriter::LanguageModel => post_processing.agent = None,
+        Rewriter::ExternalAgent => {
+            post_processing.model = None;
+            let chosen = post_processing.agent.get_or_insert_default();
+            if chosen.id.is_none() {
+                chosen.id = first_agent.map(str::to_string);
+            }
+        }
+    }
+}
+
+fn set_post_processing_agent_id(agent: &mut AgentSettingsContent, id: String) {
+    let post_processing = post_processing_content(agent);
+    post_processing.model = None;
+    post_processing.agent.get_or_insert_default().id = Some(id);
+}
+
+/// `None` removes the option so the agent's own default applies again.
+fn set_agent_option(
+    agent: &mut AgentSettingsContent,
+    option_id: &str,
+    value: Option<AgentConfigOptionValue>,
+) {
+    let options = post_processing_content(agent)
+        .agent
+        .get_or_insert_default()
+        .options
+        .get_or_insert_default();
+    match value {
+        Some(value) => {
+            options.insert(option_id.to_string(), value);
+        }
+        None => {
+            options.remove(option_id);
+        }
+    }
+}
+
+/// The agents the user has configured, by the ids they have under
+/// `agent_servers`; the same list the agent panel offers.
+fn configured_agents(settings: &AllAgentServersSettings) -> Vec<String> {
+    let mut agents: Vec<String> = settings.keys().cloned().collect();
+    agents.sort();
+    agents
+}
+
+fn is_model_option(option: &DictationAgentOptionContent) -> bool {
+    option.category.as_deref() == Some("model") || option.id == "model"
+}
+
+fn is_mode_option(option: &DictationAgentOptionContent) -> bool {
+    option.category.as_deref() == Some("mode")
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+struct ModelChoice {
+    id: String,
+    name: String,
+    /// The value the agent had selected when it announced the option.
+    agent_default: bool,
+}
+
+/// The models an agent offers, as far as Zed knows them.
+#[derive(Clone, Debug, PartialEq, Eq)]
+enum ModelChoices {
+    /// The agent has not been contacted yet, or announced no model option.
+    Unknown,
+    Known {
+        option_id: String,
+        choices: Vec<ModelChoice>,
+    },
+}
+
+/// Built from the cache the first rewrite filled; Zed cannot ask the
+/// agent for its models without talking to it.
+fn model_choices(cached: Option<&[DictationAgentOptionContent]>) -> ModelChoices {
+    let Some(option) =
+        cached.and_then(|cached| cached.iter().find(|option| is_model_option(option)))
+    else {
+        return ModelChoices::Unknown;
+    };
+    match &option.kind {
+        DictationAgentOptionKindContent::Select { current, values } => ModelChoices::Known {
+            option_id: option.id.clone(),
+            choices: values
+                .iter()
+                .map(|value| ModelChoice {
+                    id: value.id.clone(),
+                    name: value.name.clone(),
+                    agent_default: &value.id == current,
+                })
+                .collect(),
+        },
+        DictationAgentOptionKindContent::Boolean { .. } => ModelChoices::Unknown,
+    }
+}
+
+/// What the Model dropdown says: the chosen model by its human name, or
+/// that the agent decides.
+fn model_label(choices: &ModelChoices, chosen: Option<&AgentConfigOptionValue>) -> String {
+    let ModelChoices::Known { choices, .. } = choices else {
+        return MODELS_UNKNOWN_LABEL.to_string();
+    };
+    let Some(chosen) = chosen.and_then(AgentConfigOptionValue::as_value_id) else {
+        return AGENT_DEFAULT_MODEL_LABEL.to_string();
+    };
+    choices
+        .iter()
+        .find(|choice| choice.id == chosen)
+        .map(|choice| choice.name.clone())
+        .unwrap_or_else(|| chosen.to_string())
+}
+
+/// The announced options other than the model and the mode: the mode is
+/// always the strictest one and cannot be chosen here.
+fn other_agent_options(
+    cached: &[DictationAgentOptionContent],
+) -> Vec<&DictationAgentOptionContent> {
+    cached
+        .iter()
+        .filter(|option| !is_model_option(option) && !is_mode_option(option))
+        .collect()
 }
 
 fn selection_for_model(provider: &str, model: &str) -> LanguageModelSelection {
@@ -528,7 +694,7 @@ pub(crate) fn render_dictation_page(
     let post_processing_enabled = render_items(&post_processing_items, window, cx);
 
     let glossary = render_glossary_section(cx);
-    let model_rows = render_post_processing_model_rows(settings_window, window, cx);
+    let model_rows = render_post_processing_rewriter_rows(settings_window, window, cx);
     let prompt = render_prompt_section(window, cx);
 
     v_flex()
@@ -729,6 +895,376 @@ fn set_pending_provider(
     settings_window.update(cx, |_, cx| cx.notify()).log_err();
 }
 
+/// The two-level choice of the rewriter: first whether a Zed language
+/// model or an External Agent rewrites, then the specifics of that branch.
+fn render_post_processing_rewriter_rows(
+    settings_window: &SettingsWindow,
+    window: &mut Window,
+    cx: &mut Context<SettingsWindow>,
+) -> AnyElement {
+    let (_, post_processing) = SettingsStore::global(cx)
+        .get_value_from_file(SettingsUiFile::User.to_settings(), post_processing_settings);
+    let post_processing = post_processing.cloned();
+    let choice = rewriter_choice(post_processing.as_ref());
+    let agents = configured_agents(AllAgentServersSettings::get_global(cx));
+
+    let rewriter_dropdown = render_rewriter_dropdown(choice.ok(), agents.clone(), window, cx);
+    let rewriter_row = render_settings_item_layout(
+        settings_window,
+        "Rewriter",
+        "What rewrites the transcript: a language model from Zed's providers, or an External Agent through a session of its own.",
+        rewriter_dropdown,
+        None,
+        None,
+        Some("agent.dictation.post_processing"),
+        false,
+        cx,
+    )
+    .pt_4()
+    .pb_4();
+
+    let mut rows = v_flex().px_8();
+    if choice.is_err() {
+        rows = rows.child(
+            div().pt_4().child(
+                Banner::new()
+                    .severity(Severity::Warning)
+                    .wrap_content(true)
+                    .child(Label::new(REWRITER_CONFLICT).size(LabelSize::Small)),
+            ),
+        );
+    }
+    rows = rows.child(rewriter_row).child(Divider::horizontal());
+    let branch = match choice {
+        Ok(Rewriter::LanguageModel) => {
+            render_post_processing_model_rows(settings_window, window, cx)
+        }
+        Ok(Rewriter::ExternalAgent) => render_post_processing_agent_rows(
+            settings_window,
+            post_processing.and_then(|post_processing| post_processing.agent),
+            agents,
+            window,
+            cx,
+        ),
+        Err(RewriterConflict) => div().into_any_element(),
+    };
+    rows.child(branch).into_any_element()
+}
+
+fn render_rewriter_dropdown(
+    current: Option<Rewriter>,
+    agents: Vec<String>,
+    window: &mut Window,
+    cx: &mut App,
+) -> AnyElement {
+    let label: SharedString = match current {
+        Some(Rewriter::LanguageModel) => REWRITER_LANGUAGE_MODEL_LABEL.into(),
+        Some(Rewriter::ExternalAgent) => REWRITER_EXTERNAL_AGENT_LABEL.into(),
+        None => "Choose…".into(),
+    };
+    let menu = ContextMenu::build(window, cx, move |mut menu, _, _| {
+        for (rewriter, label) in [
+            (Rewriter::LanguageModel, REWRITER_LANGUAGE_MODEL_LABEL),
+            (Rewriter::ExternalAgent, REWRITER_EXTERNAL_AGENT_LABEL),
+        ] {
+            let first_agent = agents.first().cloned();
+            menu = menu.toggleable_entry(
+                label,
+                current == Some(rewriter),
+                IconPosition::Start,
+                None,
+                move |_, cx| {
+                    let first_agent = first_agent.clone();
+                    update_agent_settings(cx, move |agent| {
+                        set_rewriter(agent, rewriter, first_agent.as_deref())
+                    });
+                },
+            );
+        }
+        menu
+    });
+    DropdownMenu::new("dictation-post-processing-rewriter", label, menu)
+        .style(DropdownStyle::Outlined)
+        .into_any_element()
+}
+
+/// The agent branch: which agent, which of its models, and its other
+/// announced options. Models and options come from the cache the first
+/// rewrite filled; the page never contacts the agent.
+fn render_post_processing_agent_rows(
+    settings_window: &SettingsWindow,
+    chosen: Option<settings::DictationPostProcessingAgentSettingsContent>,
+    agents: Vec<String>,
+    window: &mut Window,
+    cx: &mut Context<SettingsWindow>,
+) -> AnyElement {
+    let chosen_id = chosen
+        .as_ref()
+        .and_then(|chosen| chosen.id.clone())
+        .filter(|id| !id.trim().is_empty());
+    let options = chosen.and_then(|chosen| chosen.options).unwrap_or_default();
+    let cached = chosen_id.as_ref().and_then(|id| {
+        AgentSettings::get_global(cx)
+            .dictation
+            .post_processing_agent_options_cache
+            .get(id)
+            .cloned()
+    });
+    let choices = model_choices(cached.as_deref());
+
+    let agent_dropdown = render_agent_dropdown(chosen_id.clone(), agents, window, cx);
+    let agent_row = render_settings_item_layout(
+        settings_window,
+        "Agent",
+        "One of the agents configured under `agent_servers`. The rewrite runs in a session of its own on the connection Zed already holds for it.",
+        agent_dropdown,
+        None,
+        None,
+        Some("agent.dictation.post_processing.agent"),
+        false,
+        cx,
+    )
+    .pt_4()
+    .pb_4();
+
+    let model_dropdown = render_agent_model_dropdown(&choices, options.get("model"), window, cx);
+    let model_row = render_settings_item_layout(
+        settings_window,
+        "Model",
+        "The agent's model for post-processing, independent of the model your own threads use. Pick the agent's default explicitly to say so on purpose.",
+        model_dropdown,
+        None,
+        None,
+        Some("agent.dictation.post_processing.agent"),
+        false,
+        cx,
+    )
+    .pt_4()
+    .pb_4();
+
+    let mut rows = v_flex()
+        .child(agent_row)
+        .child(Divider::horizontal())
+        .child(model_row);
+    if matches!(choices, ModelChoices::Unknown) {
+        rows = rows.child(
+            div().pb_4().child(
+                Label::new(MODELS_UNKNOWN_DESCRIPTION)
+                    .size(LabelSize::Small)
+                    .color(Color::Muted),
+            ),
+        );
+    }
+    rows = rows.child(Divider::horizontal());
+    for option in other_agent_options(cached.as_deref().unwrap_or_default()) {
+        rows = rows
+            .child(render_agent_option_row(
+                option,
+                options.get(&option.id),
+                window,
+                cx,
+            ))
+            .child(Divider::horizontal());
+    }
+    rows.into_any_element()
+}
+
+fn render_agent_dropdown(
+    chosen_id: Option<String>,
+    agents: Vec<String>,
+    window: &mut Window,
+    cx: &mut App,
+) -> AnyElement {
+    let label: SharedString = match &chosen_id {
+        Some(id) => id.clone().into(),
+        None if agents.is_empty() => "No agents configured".into(),
+        None => "Select an agent…".into(),
+    };
+    let disabled = agents.is_empty();
+    let menu = ContextMenu::build(window, cx, move |mut menu, _, _| {
+        for id in &agents {
+            let is_current = chosen_id.as_deref() == Some(id.as_str());
+            let id_for_write = id.clone();
+            menu = menu.toggleable_entry(
+                id.clone(),
+                is_current,
+                IconPosition::Start,
+                None,
+                move |_, cx| {
+                    let id = id_for_write.clone();
+                    update_agent_settings(cx, move |agent| set_post_processing_agent_id(agent, id));
+                },
+            );
+        }
+        menu
+    });
+    DropdownMenu::new("dictation-post-processing-agent", label, menu)
+        .style(DropdownStyle::Outlined)
+        .disabled(disabled)
+        .into_any_element()
+}
+
+fn render_agent_model_dropdown(
+    choices: &ModelChoices,
+    chosen: Option<&AgentConfigOptionValue>,
+    window: &mut Window,
+    cx: &mut App,
+) -> AnyElement {
+    let label: SharedString = model_label(choices, chosen).into();
+    let chosen_id = chosen
+        .and_then(AgentConfigOptionValue::as_value_id)
+        .map(str::to_string);
+    let known = match choices {
+        ModelChoices::Known { option_id, choices } => Some((option_id.clone(), choices.clone())),
+        ModelChoices::Unknown => None,
+    };
+    let disabled = known.is_none();
+    let menu = ContextMenu::build(window, cx, move |mut menu, _, _| {
+        let Some((option_id, choices)) = known.clone() else {
+            return menu;
+        };
+        for choice in choices {
+            let name = if choice.agent_default {
+                format!("{} (agent default)", choice.name)
+            } else {
+                choice.name.clone()
+            };
+            let is_current = chosen_id.as_deref() == Some(choice.id.as_str());
+            let option_id = option_id.clone();
+            let value_id = choice.id.clone();
+            menu =
+                menu.toggleable_entry(name, is_current, IconPosition::Start, None, move |_, cx| {
+                    let option_id = option_id.clone();
+                    let value = AgentConfigOptionValue::ValueId(value_id.clone());
+                    update_agent_settings(cx, move |agent| {
+                        set_agent_option(agent, &option_id, Some(value))
+                    });
+                });
+        }
+        menu
+    });
+    DropdownMenu::new("dictation-post-processing-agent-model", label, menu)
+        .style(DropdownStyle::Outlined)
+        .disabled(disabled)
+        .into_any_element()
+}
+
+/// One announced option, edited as the agent declared it: a select as a
+/// list of its values with «Agent default» to unset it, a boolean as a
+/// switch. Rendered by hand because the title is the agent's, not a
+/// static string.
+fn render_agent_option_row(
+    option: &DictationAgentOptionContent,
+    chosen: Option<&AgentConfigOptionValue>,
+    window: &mut Window,
+    cx: &mut App,
+) -> AnyElement {
+    let option_id = option.id.clone();
+    let control: AnyElement = match &option.kind {
+        DictationAgentOptionKindContent::Select { values, .. } => {
+            let chosen_id = chosen
+                .and_then(AgentConfigOptionValue::as_value_id)
+                .map(str::to_string);
+            let label: SharedString = chosen_id
+                .as_ref()
+                .and_then(|id| values.iter().find(|value| &value.id == id))
+                .map(|value| value.name.clone())
+                .or_else(|| chosen_id.clone())
+                .unwrap_or_else(|| AGENT_OPTION_DEFAULT_LABEL.to_string())
+                .into();
+            let values = values.clone();
+            let menu = ContextMenu::build(window, cx, move |mut menu, _, _| {
+                menu = menu.toggleable_entry(
+                    AGENT_OPTION_DEFAULT_LABEL,
+                    chosen_id.is_none(),
+                    IconPosition::Start,
+                    None,
+                    {
+                        let option_id = option_id.clone();
+                        move |_, cx| {
+                            let option_id = option_id.clone();
+                            update_agent_settings(cx, move |agent| {
+                                set_agent_option(agent, &option_id, None)
+                            });
+                        }
+                    },
+                );
+                for value in &values {
+                    let is_current = chosen_id.as_deref() == Some(value.id.as_str());
+                    let option_id = option_id.clone();
+                    let value_id = value.id.clone();
+                    menu = menu.toggleable_entry(
+                        value.name.clone(),
+                        is_current,
+                        IconPosition::Start,
+                        None,
+                        move |_, cx| {
+                            let option_id = option_id.clone();
+                            let value = AgentConfigOptionValue::ValueId(value_id.clone());
+                            update_agent_settings(cx, move |agent| {
+                                set_agent_option(agent, &option_id, Some(value))
+                            });
+                        },
+                    );
+                }
+                menu
+            });
+            DropdownMenu::new(
+                gpui::ElementId::Name(format!("dictation-agent-option-{}", option.id).into()),
+                label,
+                menu,
+            )
+            .style(DropdownStyle::Outlined)
+            .into_any_element()
+        }
+        DictationAgentOptionKindContent::Boolean { current } => {
+            let state = chosen
+                .and_then(AgentConfigOptionValue::as_bool)
+                .unwrap_or(*current);
+            SwitchField::new(
+                gpui::ElementId::Name(format!("dictation-agent-option-{}", option.id).into()),
+                None::<SharedString>,
+                None,
+                if state {
+                    ToggleState::Selected
+                } else {
+                    ToggleState::Unselected
+                },
+                move |state, _, cx| {
+                    let option_id = option_id.clone();
+                    let value = AgentConfigOptionValue::Boolean(*state == ToggleState::Selected);
+                    update_agent_settings(cx, move |agent| {
+                        set_agent_option(agent, &option_id, Some(value))
+                    });
+                },
+            )
+            .into_any_element()
+        }
+    };
+    h_flex()
+        .w_full()
+        .pt_4()
+        .pb_4()
+        .gap_4()
+        .justify_between()
+        .child(
+            v_flex()
+                .gap_0p5()
+                .child(Label::new(option.name.clone()))
+                .child(
+                    Label::new(format!(
+                        "Session option `{}` as the agent announced it.",
+                        option.id
+                    ))
+                    .size(LabelSize::Small)
+                    .color(Color::Muted)
+                    .render_code_spans(),
+                ),
+        )
+        .child(control)
+        .into_any_element()
+}
+
 fn render_post_processing_model_rows(
     settings_window: &SettingsWindow,
     window: &mut Window,
@@ -797,7 +1333,6 @@ fn render_post_processing_model_rows(
     .pb_4();
 
     v_flex()
-        .px_8()
         .child(provider_row)
         .child(Divider::horizontal())
         .child(model_row)
@@ -1222,6 +1757,255 @@ mod tests {
 
         let no_models = selection_for_provider("anthropic", &[], Some("claude"), None);
         assert_eq!(no_models, None);
+    }
+
+    fn cached(options: &[DictationAgentOptionContent]) -> Option<&[DictationAgentOptionContent]> {
+        Some(options)
+    }
+
+    fn model_option() -> DictationAgentOptionContent {
+        DictationAgentOptionContent {
+            id: "model".into(),
+            name: "Model".into(),
+            category: Some("model".into()),
+            kind: DictationAgentOptionKindContent::Select {
+                current: "default".into(),
+                values: vec![
+                    settings::DictationAgentOptionValueContent {
+                        id: "default".into(),
+                        name: "Default (recommended)".into(),
+                    },
+                    settings::DictationAgentOptionValueContent {
+                        id: "haiku".into(),
+                        name: "Haiku".into(),
+                    },
+                ],
+            },
+        }
+    }
+
+    fn fast_option() -> DictationAgentOptionContent {
+        DictationAgentOptionContent {
+            id: "fast".into(),
+            name: "Fast mode".into(),
+            category: None,
+            kind: DictationAgentOptionKindContent::Boolean { current: false },
+        }
+    }
+
+    fn mode_option() -> DictationAgentOptionContent {
+        DictationAgentOptionContent {
+            id: "permission-mode".into(),
+            name: "Permissions".into(),
+            category: Some("mode".into()),
+            kind: DictationAgentOptionKindContent::Select {
+                current: "default".into(),
+                values: vec![],
+            },
+        }
+    }
+
+    fn post_processing_of(agent: &AgentSettingsContent) -> &DictationPostProcessingSettingsContent {
+        agent
+            .dictation
+            .as_ref()
+            .and_then(|dictation| dictation.post_processing.as_ref())
+            .expect("post_processing should be written")
+    }
+
+    #[test]
+    fn the_branch_follows_the_keys_and_both_at_once_is_a_conflict() {
+        assert_eq!(rewriter_choice(None), Ok(Rewriter::LanguageModel));
+        let mut content = DictationPostProcessingSettingsContent::default();
+        assert_eq!(rewriter_choice(Some(&content)), Ok(Rewriter::LanguageModel));
+
+        content.model = Some(selection_for_model("ollama", "qwen3:14b"));
+        assert_eq!(rewriter_choice(Some(&content)), Ok(Rewriter::LanguageModel));
+
+        content.agent = Some(settings::DictationPostProcessingAgentSettingsContent::default());
+        assert_eq!(rewriter_choice(Some(&content)), Err(RewriterConflict));
+
+        content.model = None;
+        assert_eq!(
+            rewriter_choice(Some(&content)),
+            Ok(Rewriter::ExternalAgent),
+            "an agent block without an id is still the agent branch"
+        );
+    }
+
+    #[test]
+    fn choosing_a_rewriter_drops_the_other_ones_key() {
+        let mut agent = AgentSettingsContent::default();
+        set_post_processing_model(&mut agent, Some(selection_for_model("ollama", "qwen3:14b")));
+
+        set_rewriter(&mut agent, Rewriter::ExternalAgent, Some("claude-acp"));
+        let post_processing = post_processing_of(&agent);
+        assert_eq!(post_processing.model, None);
+        assert_eq!(
+            post_processing
+                .agent
+                .as_ref()
+                .and_then(|agent| agent.id.as_deref()),
+            Some("claude-acp"),
+            "the first configured agent is chosen so the settings are valid at once"
+        );
+
+        set_agent_option(
+            &mut agent,
+            "model",
+            Some(AgentConfigOptionValue::ValueId("haiku".into())),
+        );
+        set_rewriter(&mut agent, Rewriter::ExternalAgent, Some("gemini"));
+        assert_eq!(
+            post_processing_of(&agent)
+                .agent
+                .as_ref()
+                .and_then(|agent| agent.id.as_deref()),
+            Some("claude-acp"),
+            "choosing the agent branch again keeps the chosen agent"
+        );
+
+        set_post_processing_model(&mut agent, Some(selection_for_model("ollama", "qwen3:14b")));
+        set_rewriter(&mut agent, Rewriter::LanguageModel, None);
+        let post_processing = post_processing_of(&agent);
+        assert_eq!(post_processing.agent, None);
+        assert!(post_processing.model.is_some());
+
+        let mut none_configured = AgentSettingsContent::default();
+        set_rewriter(&mut none_configured, Rewriter::ExternalAgent, None);
+        let chosen = post_processing_of(&none_configured)
+            .agent
+            .as_ref()
+            .expect("the agent block is written even with no agents to choose from");
+        assert_eq!(chosen.id, None);
+    }
+
+    #[test]
+    fn picking_an_agent_writes_its_id_and_drops_the_model_key() {
+        let mut agent = AgentSettingsContent::default();
+        set_post_processing_model(&mut agent, Some(selection_for_model("ollama", "qwen3:14b")));
+        set_post_processing_agent_id(&mut agent, "claude-acp".into());
+        let json = serde_json::to_value(&agent).unwrap();
+        assert_eq!(
+            json["dictation"]["post_processing"]["agent"]["id"],
+            serde_json::json!("claude-acp")
+        );
+        assert!(json["dictation"]["post_processing"].get("model").is_none());
+    }
+
+    #[test]
+    fn agent_options_are_written_by_id_and_removed_by_none() {
+        let mut agent = AgentSettingsContent::default();
+        set_agent_option(
+            &mut agent,
+            "model",
+            Some(AgentConfigOptionValue::ValueId("haiku".into())),
+        );
+        set_agent_option(
+            &mut agent,
+            "fast",
+            Some(AgentConfigOptionValue::Boolean(true)),
+        );
+        let json = serde_json::to_value(&agent).unwrap();
+        let options = &json["dictation"]["post_processing"]["agent"]["options"];
+        assert_eq!(options["model"], serde_json::json!("haiku"));
+        assert_eq!(options["fast"], serde_json::json!(true));
+
+        set_agent_option(&mut agent, "fast", None);
+        let json = serde_json::to_value(&agent).unwrap();
+        let options = &json["dictation"]["post_processing"]["agent"]["options"];
+        assert!(options.get("fast").is_none());
+        assert_eq!(options["model"], serde_json::json!("haiku"));
+    }
+
+    #[test]
+    fn the_model_list_comes_from_the_cache_with_the_agents_default_marked() {
+        let options = [model_option(), fast_option()];
+        assert_eq!(
+            model_choices(cached(&options)),
+            ModelChoices::Known {
+                option_id: "model".into(),
+                choices: vec![
+                    ModelChoice {
+                        id: "default".into(),
+                        name: "Default (recommended)".into(),
+                        agent_default: true,
+                    },
+                    ModelChoice {
+                        id: "haiku".into(),
+                        name: "Haiku".into(),
+                        agent_default: false,
+                    },
+                ],
+            }
+        );
+    }
+
+    #[test]
+    fn without_a_cache_the_models_are_not_known_rather_than_empty() {
+        assert_eq!(model_choices(None), ModelChoices::Unknown);
+        let without_model = [fast_option()];
+        assert_eq!(model_choices(cached(&without_model)), ModelChoices::Unknown);
+        assert_eq!(
+            model_label(&ModelChoices::Unknown, None),
+            MODELS_UNKNOWN_LABEL
+        );
+    }
+
+    #[test]
+    fn the_model_label_is_the_human_name_or_the_agents_default() {
+        let options = [model_option()];
+        let choices = model_choices(cached(&options));
+        assert_eq!(model_label(&choices, None), AGENT_DEFAULT_MODEL_LABEL);
+        assert_eq!(
+            model_label(
+                &choices,
+                Some(&AgentConfigOptionValue::ValueId("haiku".into()))
+            ),
+            "Haiku"
+        );
+        assert_eq!(
+            model_label(
+                &choices,
+                Some(&AgentConfigOptionValue::ValueId("opus[1m]".into()))
+            ),
+            "opus[1m]",
+            "a value the cache does not know is shown as written"
+        );
+    }
+
+    #[test]
+    fn the_other_options_leave_out_the_model_and_the_mode() {
+        let options = [model_option(), mode_option(), fast_option()];
+        let other: Vec<&str> = other_agent_options(&options)
+            .into_iter()
+            .map(|option| option.id.as_str())
+            .collect();
+        assert_eq!(other, vec!["fast"]);
+    }
+
+    #[test]
+    fn configured_agents_are_listed_in_a_stable_order() {
+        let mut settings = AllAgentServersSettings::default();
+        settings.insert(
+            "gemini".into(),
+            project::agent_server_store::CustomAgentServerSettings::Registry {
+                env: Default::default(),
+                default_mode: None,
+                default_config_options: Default::default(),
+                favorite_config_option_values: Default::default(),
+            },
+        );
+        settings.insert(
+            "claude-acp".into(),
+            project::agent_server_store::CustomAgentServerSettings::Registry {
+                env: Default::default(),
+                default_mode: None,
+                default_config_options: Default::default(),
+                favorite_config_option_values: Default::default(),
+            },
+        );
+        assert_eq!(configured_agents(&settings), vec!["claude-acp", "gemini"]);
     }
 
     #[test]
