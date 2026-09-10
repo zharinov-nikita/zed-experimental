@@ -409,11 +409,66 @@ pub struct DictationPostProcessingSettingsContent {
     /// Default: true
     pub enabled: Option<bool>,
     /// Model used for post-processing. Falls back to the agent's default
-    /// model when not set.
+    /// model when not set. Mutually exclusive with `agent`.
     pub model: Option<LanguageModelSelection>,
+    /// External Agent used for post-processing instead of a language model,
+    /// reached through a session of its own. Mutually exclusive with `model`.
+    pub agent: Option<DictationPostProcessingAgentSettingsContent>,
+    /// Written by Zed, not by hand: the options each agent announced when a
+    /// Post-processing Session was last created for it, keyed by agent id,
+    /// so the settings page can list the agent's models before it is
+    /// contacted again.
+    pub agent_options_cache: Option<HashMap<String, Vec<DictationAgentOptionContent>>>,
     /// Prompt for post-processing. `${output}` is replaced with the raw
     /// transcript and `${glossary}` with the comma-separated glossary.
     pub prompt: Option<String>,
+}
+
+/// Local: an External Agent as the rewriter for post-processing.
+#[with_fallible_options]
+#[derive(Clone, PartialEq, Serialize, Deserialize, JsonSchema, MergeFrom, Debug, Default)]
+pub struct DictationPostProcessingAgentSettingsContent {
+    /// The agent, by the id it has under `agent_servers`.
+    pub id: Option<String>,
+    /// Session config options to set on the Post-processing Session, by
+    /// option id (for example `"model": "haiku"`). Only options the agent
+    /// announces for that session are set; nothing stored for the agent
+    /// under `agent_servers` is applied.
+    pub options: Option<HashMap<String, AgentConfigOptionValue>>,
+}
+
+/// Local: one session config option as an agent announced it.
+#[derive(Clone, PartialEq, Serialize, Deserialize, JsonSchema, MergeFrom, Debug)]
+pub struct DictationAgentOptionContent {
+    pub id: String,
+    pub name: String,
+    /// The category the agent gave the option (`model`, `mode`, ...), if any.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub category: Option<String>,
+    #[serde(flatten)]
+    pub kind: DictationAgentOptionKindContent,
+}
+
+/// Local: the shape of an announced option, as the agent declared it.
+#[derive(Clone, PartialEq, Serialize, Deserialize, JsonSchema, MergeFrom, Debug)]
+#[serde(tag = "type", rename_all = "snake_case")]
+pub enum DictationAgentOptionKindContent {
+    Select {
+        /// The value the agent had selected when it announced the option:
+        /// its own default.
+        current: String,
+        values: Vec<DictationAgentOptionValueContent>,
+    },
+    Boolean {
+        current: bool,
+    },
+}
+
+/// Local: one value of an announced select option.
+#[derive(Clone, PartialEq, Serialize, Deserialize, JsonSchema, MergeFrom, Debug)]
+pub struct DictationAgentOptionValueContent {
+    pub id: String,
+    pub name: String,
 }
 
 #[with_fallible_options]

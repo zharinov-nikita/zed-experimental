@@ -7,7 +7,7 @@ use std::path::{Component, Path};
 use std::sync::{Arc, LazyLock};
 
 use anyhow::Context as _;
-use collections::{HashSet, IndexMap};
+use collections::{HashMap, HashSet, IndexMap};
 use fs::Fs;
 use futures::channel::oneshot;
 use gpui::{App, Pixels, SharedString};
@@ -16,11 +16,11 @@ use project::DisableAiSettings;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use settings::{
-    DictationLanguage, DockPosition, DockSide, IntoGpui, LanguageModelParameters,
-    LanguageModelSelection, NotifyWhenAgentWaiting, PlaySoundWhenAgentDone, RegisterSetting,
-    Settings, SettingsContent, SettingsStore, SidebarDockPosition, SidebarSide,
-    ThinkingBlockDisplay, ToolPermissionMode, update_settings_file,
-    update_settings_file_with_completion,
+    AgentConfigOptionValue, DictationAgentOptionContent, DictationLanguage, DockPosition, DockSide,
+    IntoGpui, LanguageModelParameters, LanguageModelSelection, NotifyWhenAgentWaiting,
+    PlaySoundWhenAgentDone, RegisterSetting, Settings, SettingsContent, SettingsStore,
+    SidebarDockPosition, SidebarSide, ThinkingBlockDisplay, ToolPermissionMode,
+    update_settings_file, update_settings_file_with_completion,
 };
 use util::ResultExt as _;
 
@@ -215,7 +215,21 @@ pub struct DictationSettings {
     pub session_audio_keep: u32,
     pub post_processing_enabled: bool,
     pub post_processing_model: Option<LanguageModelSelection>,
+    /// The External Agent that rewrites instead of a language model; both
+    /// set at once is a configuration error the window reports.
+    pub post_processing_agent: Option<DictationPostProcessingAgent>,
+    /// What each agent announced when a Post-processing Session was last
+    /// created for it, keyed by agent id; written by Zed.
+    pub post_processing_agent_options_cache: HashMap<String, Vec<DictationAgentOptionContent>>,
     pub post_processing_prompt: String,
+}
+
+/// Local: an External Agent chosen as the rewriter, with the session
+/// config options to set for it.
+#[derive(Clone, Debug, PartialEq)]
+pub struct DictationPostProcessingAgent {
+    pub id: String,
+    pub options: HashMap<String, AgentConfigOptionValue>,
 }
 
 #[derive(Clone, Debug, RegisterSetting)]
@@ -794,6 +808,17 @@ impl Settings for AgentSettings {
                 session_audio_keep: session_audio.keep.unwrap_or(20),
                 post_processing_enabled: post_processing.enabled.unwrap_or(true),
                 post_processing_model: post_processing.model,
+                post_processing_agent: post_processing.agent.and_then(|agent| {
+                    let id = agent.id?;
+                    let id = id.trim();
+                    (!id.is_empty()).then(|| DictationPostProcessingAgent {
+                        id: id.to_string(),
+                        options: agent.options.unwrap_or_default(),
+                    })
+                }),
+                post_processing_agent_options_cache: post_processing
+                    .agent_options_cache
+                    .unwrap_or_default(),
                 post_processing_prompt: post_processing.prompt.unwrap_or_default(),
             },
             button: agent.button.unwrap(),
@@ -1261,6 +1286,83 @@ mod tests {
         let dictation = AgentSettings::get_global(cx).dictation.clone();
         assert_eq!(dictation.language, DictationLanguage::Russian);
         assert_eq!(dictation.session_audio_keep, 20);
+    }
+
+    #[gpui::test]
+    fn test_dictation_post_processing_agent_and_announced_options_cache_are_resolved(
+        cx: &mut gpui::App,
+    ) {
+        let store = SettingsStore::test(cx);
+        cx.set_global(store);
+        project::DisableAiSettings::register(cx);
+        AgentSettings::register(cx);
+
+        let dictation = AgentSettings::get_global(cx).dictation.clone();
+        assert_eq!(dictation.post_processing_agent, None);
+        assert!(dictation.post_processing_agent_options_cache.is_empty());
+
+        SettingsStore::update_global(cx, |store, cx| {
+            store
+                .set_user_settings(
+                    r#"{ "agent": { "dictation": { "post_processing": {
+                        "agent": { "id": "claude-acp", "options": { "model": "haiku", "fast": true } },
+                        "agent_options_cache": { "claude-acp": [
+                            { "id": "model", "name": "Model", "category": "model", "type": "select",
+                              "current": "default",
+                              "values": [ { "id": "default", "name": "Default" }, { "id": "haiku", "name": "Haiku" } ] },
+                            { "id": "fast", "name": "Fast mode", "type": "boolean", "current": false }
+                        ] }
+                    } } } }"#,
+                    cx,
+                )
+                .unwrap();
+        });
+        let dictation = AgentSettings::get_global(cx).dictation.clone();
+        let agent = dictation
+            .post_processing_agent
+            .expect("the agent should be resolved");
+        assert_eq!(agent.id, "claude-acp");
+        assert_eq!(
+            agent.options.get("model"),
+            Some(&AgentConfigOptionValue::ValueId("haiku".into()))
+        );
+        assert_eq!(
+            agent.options.get("fast"),
+            Some(&AgentConfigOptionValue::Boolean(true))
+        );
+        assert_eq!(
+            dictation.post_processing_model, None,
+            "the model key is left as it was"
+        );
+        let cached = &dictation.post_processing_agent_options_cache["claude-acp"];
+        assert_eq!(cached.len(), 2);
+        assert_eq!(cached[0].id, "model");
+        assert_eq!(cached[0].category.as_deref(), Some("model"));
+        assert!(matches!(
+            &cached[0].kind,
+            settings::DictationAgentOptionKindContent::Select { current, values }
+                if current == "default" && values.len() == 2 && values[1].name == "Haiku"
+        ));
+        assert!(matches!(
+            &cached[1].kind,
+            settings::DictationAgentOptionKindContent::Boolean { current: false }
+        ));
+
+        SettingsStore::update_global(cx, |store, cx| {
+            store
+                .set_user_settings(
+                    r#"{ "agent": { "dictation": { "post_processing": { "agent": { "id": "  " } } } } }"#,
+                    cx,
+                )
+                .unwrap();
+        });
+        assert_eq!(
+            AgentSettings::get_global(cx)
+                .dictation
+                .post_processing_agent,
+            None,
+            "a blank id selects no agent"
+        );
     }
 
     #[gpui::test]

@@ -4590,8 +4590,9 @@ impl ThreadView {
         }
         self.open_dictation_window(
             DictationHost::Composer,
-            move |host_focus, window, cx| {
-                DictationWindow::start_block(host_focus, block_id, window, cx).with_quote(quote, cx)
+            move |host_focus, workspace, window, cx| {
+                DictationWindow::start_block(host_focus, workspace, block_id, window, cx)
+                    .with_quote(quote, cx)
             },
             window,
             cx,
@@ -4650,7 +4651,9 @@ impl ThreadView {
             StartDecision::Refuse => {}
             StartDecision::Open => self.open_dictation_window(
                 host,
-                |host_focus, window, cx| DictationWindow::start(host_focus, window, cx),
+                |host_focus, workspace, window, cx| {
+                    DictationWindow::start(host_focus, workspace, window, cx)
+                },
                 window,
                 cx,
             ),
@@ -4707,9 +4710,11 @@ impl ThreadView {
         {
             self.open_dictation_window(
                 DictationHost::Composer,
-                move |host_focus, window, cx| {
-                    DictationWindow::review(host_focus, id, comment, duration, window, cx)
-                        .with_quote(quote, cx)
+                move |host_focus, workspace, window, cx| {
+                    DictationWindow::review(
+                        host_focus, workspace, id, comment, duration, window, cx,
+                    )
+                    .with_quote(quote, cx)
                 },
                 window,
                 cx,
@@ -4721,8 +4726,8 @@ impl ThreadView {
         };
         self.open_dictation_window(
             DictationHost::Composer,
-            move |host_focus, window, cx| {
-                DictationWindow::review(host_focus, id, text, duration, window, cx)
+            move |host_focus, workspace, window, cx| {
+                DictationWindow::review(host_focus, workspace, id, text, duration, window, cx)
             },
             window,
             cx,
@@ -4732,14 +4737,20 @@ impl ThreadView {
     fn open_dictation_window(
         &mut self,
         host: DictationHost,
-        build: impl FnOnce(FocusHandle, &mut Window, &mut Context<DictationWindow>) -> DictationWindow,
+        build: impl FnOnce(
+            FocusHandle,
+            WeakEntity<Workspace>,
+            &mut Window,
+            &mut Context<DictationWindow>,
+        ) -> DictationWindow,
         window: &mut Window,
         cx: &mut Context<Self>,
     ) {
         let Some(host_focus) = self.dictation_host_focus_handle(&host, cx) else {
             return;
         };
-        let dictation_window = cx.new(|cx| build(host_focus, window, cx));
+        let workspace = self.workspace.clone();
+        let dictation_window = cx.new(|cx| build(host_focus, workspace, window, cx));
         let subscription = cx.subscribe_in(
             &dictation_window,
             window,
@@ -4969,9 +4980,10 @@ impl ThreadView {
         let block_id = uuid::Uuid::new_v4().to_string();
         self.open_dictation_window(
             host,
-            move |host_focus, window, cx| {
+            move |host_focus, workspace, window, cx| {
                 DictationWindow::review(
                     host_focus,
+                    workspace,
                     block_id,
                     text,
                     std::time::Duration::from_secs(3),

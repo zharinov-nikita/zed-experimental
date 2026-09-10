@@ -806,7 +806,18 @@ async fn collect_all_sessions(
         };
         let task = cx.update(|cx| list.list_sessions(request, cx));
         let response = task.await?;
-        sessions.extend(response.sessions);
+        // Local: Post-processing Sessions of agents that cannot delete them
+        // are hidden rather than offered for import.
+        let listed = response.sessions;
+        let visible = cx.update(|cx| {
+            listed
+                .into_iter()
+                .filter(|session| {
+                    !crate::dictation_post_processing::is_hidden_session(&session.session_id, cx)
+                })
+                .collect::<Vec<_>>()
+        });
+        sessions.extend(visible);
         match response.next_cursor {
             Some(next) if Some(&next) != cursor.as_ref() => cursor = Some(next),
             _ => break,

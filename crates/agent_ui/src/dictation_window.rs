@@ -10,6 +10,7 @@
 //! business (`dictation_host`). See `CONTEXT.md` for the vocabulary.
 
 use std::path::PathBuf;
+use std::rc::Rc;
 use std::sync::Mutex;
 use std::time::Duration;
 
@@ -25,7 +26,8 @@ use futures::future::Shared;
 use futures::{FutureExt as _, StreamExt as _};
 use gpui::{
     Action as _, Animation, AnimationExt as _, App, Context, Entity, EventEmitter, FocusHandle,
-    Focusable, HighlightStyle, Rems, ScrollHandle, StyledText, Task, Window, pulsating_between,
+    Focusable, HighlightStyle, Rems, ScrollHandle, StyledText, Task, WeakEntity, Window,
+    pulsating_between,
 };
 use language_models::AllLanguageModelSettings;
 use markdown::{Markdown, MarkdownElement, MarkdownFont, MarkdownStyle};
@@ -42,7 +44,9 @@ use crate::dictation_footer::{
     FooterAction, FooterInput, FooterLabel, FooterPhase, FooterState, ProcessedBy, footer_state,
 };
 use crate::dictation_model_server::{self, ServerOutcome};
-use crate::dictation_post_processing::{self as post_processing, Failure};
+use crate::dictation_post_processing::{
+    self as post_processing, AgentRewriter, Backend, Failure, ZedAgents,
+};
 use crate::{
     AcceptDictation, AgentPanel, CancelDictation, ToggleDictation, ToggleDictationPlayback,
     ToggleDictationRawText,
@@ -161,31 +165,6 @@ fn play_sound(sound: DictationSound, cx: &mut App) {
 #[cfg(not(feature = "audio"))]
 fn play_sound(_sound: DictationSound, _cx: &mut App) {}
 
-/// A Callout shown in review: what went wrong and why the text is raw.
-#[derive(Clone, Debug, PartialEq, Eq)]
-struct Notice {
-    title: SharedString,
-    description: SharedString,
-}
-
-/// The Callout for a run that left the text raw.
-fn notice_for(failure: &Failure) -> Notice {
-    let unavailable = |description: String| Notice {
-        title: "Post-processing Unavailable".into(),
-        description: description.into(),
-    };
-    match failure {
-        Failure::NoText => unavailable("Post-processing returned no text.".into()),
-        Failure::ServerDidNotStart(reason) => Notice {
-            title: "Ollama did not start".into(),
-            description: format!("{reason} The text is shown as recognized.").into(),
-        },
-        Failure::ModelUnavailable(reason) | Failure::RequestFailed(reason) => {
-            unavailable(reason.clone())
-        }
-    }
-}
-
 fn join_text(prefix: &str, text: &str) -> String {
     let prefix = prefix.trim_end();
     let text = text.trim_start();
@@ -246,6 +225,8 @@ pub struct DictationWindow {
     focus_handle: FocusHandle,
     /// The field the window is open over; focused while recording.
     host_focus_handle: FocusHandle,
+    /// Where the agent panel, and with it the agent connections, are found.
+    workspace: WeakEntity<Workspace>,
     phase: Phase,
     /// The Dictation Block this session belongs to. Chosen when the window
     /// opens so that Session Audio is filed under it from the first second,
@@ -261,7 +242,13 @@ pub struct DictationWindow {
     processed_by: Option<ProcessedBy>,
     /// The prompt template Post-processing ran with, for the label tooltip.
     processed_with_prompt: Option<String>,
-    post_processing_error: Option<Notice>,
+    post_processing_failure: Option<Failure>,
+    /// The Post-processing Session of this Dictation Session, once an
+    /// External Agent has been asked; dropped with the window, which
+    /// forgets the session at the agent.
+    agent_rewriter: Option<Rc<AgentRewriter<ZedAgents>>>,
+    /// The agent named in the footer while its answer is awaited.
+    rewriting_with_agent: Option<String>,
     /// Brings up the local Ollama server while the user dictates, when
     /// Post-processing needs it; Post-processing awaits it before choosing
     /// its model. `None` when nothing has to be started.
@@ -306,6 +293,7 @@ impl Focusable for DictationWindow {
 impl DictationWindow {
     fn build(
         host_focus_handle: FocusHandle,
+        workspace: WeakEntity<Workspace>,
         block_id: Option<String>,
         window: &mut Window,
         cx: &mut Context<Self>,
@@ -325,6 +313,7 @@ impl DictationWindow {
         Self {
             focus_handle: cx.focus_handle(),
             host_focus_handle,
+            workspace,
             phase: Phase::Starting,
             block_id,
             replaces_existing,
@@ -334,7 +323,9 @@ impl DictationWindow {
             processed: None,
             processed_by: None,
             processed_with_prompt: None,
-            post_processing_error: None,
+            post_processing_failure: None,
+            agent_rewriter: None,
+            rewriting_with_agent: None,
             model_server: None,
             model_server_starting: false,
             resume_error: None,
@@ -360,10 +351,11 @@ impl DictationWindow {
     /// Opens the window and starts recording a new Dictation Session.
     pub fn start(
         host_focus_handle: FocusHandle,
+        workspace: WeakEntity<Workspace>,
         window: &mut Window,
         cx: &mut Context<Self>,
     ) -> Self {
-        let mut this = Self::build(host_focus_handle, None, window, cx);
+        let mut this = Self::build(host_focus_handle, workspace, None, window, cx);
         this.start_recording(window, cx);
         this
     }
@@ -371,13 +363,14 @@ impl DictationWindow {
     /// Opens an existing Dictation Block for review, resume or edit.
     pub fn review(
         host_focus_handle: FocusHandle,
+        workspace: WeakEntity<Workspace>,
         block_id: String,
         text: String,
         duration: Duration,
         window: &mut Window,
         cx: &mut Context<Self>,
     ) -> Self {
-        let mut this = Self::build(host_focus_handle, Some(block_id), window, cx);
+        let mut this = Self::build(host_focus_handle, workspace, Some(block_id), window, cx);
         this.raw = text.clone();
         this.duration = duration;
         this.base_duration = duration;
@@ -395,11 +388,12 @@ impl DictationWindow {
     /// in the Composer, such as a Quote Reply Block awaiting its comment.
     pub fn start_block(
         host_focus_handle: FocusHandle,
+        workspace: WeakEntity<Workspace>,
         block_id: String,
         window: &mut Window,
         cx: &mut Context<Self>,
     ) -> Self {
-        let mut this = Self::build(host_focus_handle, Some(block_id), window, cx);
+        let mut this = Self::build(host_focus_handle, workspace, Some(block_id), window, cx);
         this.start_recording(window, cx);
         this
     }
@@ -478,7 +472,7 @@ impl DictationWindow {
         self.phase = Phase::Starting;
         self.processed = None;
         self.processed_by = None;
-        self.post_processing_error = None;
+        self.post_processing_failure = None;
         self.resume_error = None;
         self.input_device = None;
         cx.notify();
@@ -714,7 +708,7 @@ impl DictationWindow {
         }
         self.processed = None;
         self.processed_by = None;
-        self.post_processing_error = None;
+        self.post_processing_failure = None;
         self.show_raw = true;
         let raw = self.raw.clone();
         self.review_editor.update(cx, |editor, cx| {
@@ -747,9 +741,9 @@ impl DictationWindow {
             &new_part,
             &settings.glossary,
         );
-        let backend = post_processing::select_backend(settings);
         let model_server = self.model_server.clone();
         self.processed_with_prompt = Some(settings.post_processing_prompt.clone());
+        self.rewriting_with_agent = None;
         self.phase = Phase::Review;
         if !self.accept_when_ready {
             self.focus_review_editor(window, cx);
@@ -757,27 +751,86 @@ impl DictationWindow {
         self.play(SessionTransition::PostProcessingStarted, cx);
         cx.notify();
 
-        self._post_processing_task = Some(cx.spawn_in(window, async move |this, cx| {
-            // Ollama started by Zed may still be coming up; the model can
-            // only be resolved once the server lists it, which is why the
-            // launcher is awaited inside the run.
-            let resolve_cx = gpui::AsyncApp::clone(cx);
-            let complete_cx = gpui::AsyncApp::clone(cx);
-            let (processed_by, result) = post_processing::rewrite_with_language_model(
-                model_server,
-                move || async move {
-                    resolve_cx
-                        .update(|cx| post_processing::resolve_language_model(backend, cx))
-                        .await
-                },
-                move |model| post_processing::complete_with_language_model(model, prompt, complete_cx),
-            )
-            .await;
-            this.update_in(cx, |this, window, cx| {
-                this.post_processing_done(processed_by, result, window, cx);
-            })
-            .ok();
-        }));
+        let backend = match post_processing::select_backend(settings) {
+            Ok(backend) => backend,
+            Err(failure) => {
+                self.post_processing_done(None, Err(failure), window, cx);
+                return;
+            }
+        };
+        self._post_processing_task = Some(match backend {
+            Backend::LanguageModel(_) | Backend::DefaultLanguageModel => {
+                cx.spawn_in(window, async move |this, cx| {
+                    // Ollama started by Zed may still be coming up; the model
+                    // can only be resolved once the server lists it, which is
+                    // why the launcher is awaited inside the run.
+                    let resolve_cx = gpui::AsyncApp::clone(cx);
+                    let complete_cx = gpui::AsyncApp::clone(cx);
+                    let (processed_by, result) = post_processing::rewrite_with_language_model(
+                        model_server,
+                        move || async move {
+                            resolve_cx
+                                .update(|cx| post_processing::resolve_language_model(backend, cx))
+                                .await
+                        },
+                        move |model| {
+                            post_processing::complete_with_language_model(
+                                model,
+                                prompt,
+                                complete_cx,
+                            )
+                        },
+                    )
+                    .await;
+                    this.update_in(cx, |this, window, cx| {
+                        this.post_processing_done(processed_by, result, window, cx);
+                    })
+                    .ok();
+                })
+            }
+            Backend::ExternalAgent(config) => {
+                let Some(rewriter) = self.agent_rewriter(config, cx) else {
+                    let failure = Failure::AgentUnavailable {
+                        agent: settings
+                            .post_processing_agent
+                            .as_ref()
+                            .map(|agent| agent.id.clone())
+                            .unwrap_or_default(),
+                        reason: "The agent panel is not open.".into(),
+                    };
+                    self.post_processing_done(None, Err(failure), window, cx);
+                    return;
+                };
+                cx.spawn_in(window, async move |this, cx| {
+                    let (processed_by, result) = rewriter.rewrite(prompt).await;
+                    this.update_in(cx, |this, window, cx| {
+                        this.post_processing_done(processed_by, result, window, cx);
+                    })
+                    .ok();
+                })
+            }
+        });
+    }
+
+    /// The Post-processing Session of this Dictation Session, created on the
+    /// first rewrite and kept for every Resume. `None` without an agent
+    /// panel to take the connection from.
+    fn agent_rewriter(
+        &mut self,
+        config: agent_settings::DictationPostProcessingAgent,
+        cx: &mut Context<Self>,
+    ) -> Option<Rc<AgentRewriter<ZedAgents>>> {
+        if let Some(rewriter) = &self.agent_rewriter
+            && rewriter.agent_id() == config.id
+        {
+            self.rewriting_with_agent = Some(rewriter.agent().display_name(&config.id, cx));
+            return Some(rewriter.clone());
+        }
+        let agents = ZedAgents::new(&self.workspace, cx)?;
+        self.rewriting_with_agent = Some(agents.display_name(&config.id, cx));
+        let rewriter = Rc::new(AgentRewriter::new(agents, config));
+        self.agent_rewriter = Some(rewriter.clone());
+        Some(rewriter)
     }
 
     fn post_processing_done(
@@ -788,6 +841,7 @@ impl DictationWindow {
         cx: &mut Context<Self>,
     ) {
         self._post_processing_task = None;
+        self.rewriting_with_agent = None;
         match result {
             Ok(text) => {
                 let full = join_text(&self.prefix, &text);
@@ -800,7 +854,7 @@ impl DictationWindow {
             }
             Err(failure) => {
                 self.processed_by = None;
-                self.post_processing_error = Some(notice_for(&failure));
+                self.post_processing_failure = Some(failure);
             }
         }
         self.finish_review(window, cx);
@@ -861,6 +915,8 @@ impl DictationWindow {
             playing: self.playback.is_some(),
             microphone: self.input_device.clone(),
             model_server_starting: self.model_server_starting,
+            rewriting_with_agent: self.rewriting_with_agent.clone(),
+            post_processing_failure: self.post_processing_failure.clone(),
         }
     }
 
@@ -1106,7 +1162,7 @@ impl DictationWindow {
                             .description(error),
                     )
                 })
-                .when_some(self.post_processing_error.clone(), |this, notice| {
+                .when_some(self.footer().notice, |this, notice| {
                     this.child(
                         Callout::new()
                             .severity(Severity::Warning)
@@ -1175,14 +1231,14 @@ impl DictationWindow {
                     )
                     .into(),
                 ),
-                FooterLabel::Processed(ProcessedBy { provider, model }) => {
+                FooterLabel::Processed(processed_by) => {
                     let prompt = self
                         .processed_with_prompt
                         .as_deref()
                         .unwrap_or(current_prompt);
                     (
-                        format!("Processed · {model}").into(),
-                        format!("Rewritten by {provider} · {model}").into(),
+                        format!("Processed · {}", processed_by.label()).into(),
+                        processed_by.description().into(),
                         format!("Prompt:\n{}", prompt_preview(prompt)).into(),
                     )
                 }

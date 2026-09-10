@@ -1296,8 +1296,17 @@
         // Rewrite the raw transcript with a language model before accepting it.
         "enabled": true,
         // Model for post-processing, e.g. { "provider": "ollama", "model": "qwen3:14b" }.
-        // Falls back to the agent's default model when null.
+        // Falls back to the agent's default model when null. Mutually exclusive with "agent".
         "model": null,
+        // External Agent for post-processing instead of a language model, e.g.
+        // { "id": "claude-acp", "options": { "model": "haiku" } }: the agent by its id under
+        // "agent_servers" and the session config options to set, by option id. Only options the
+        // agent announces are set; nothing stored under "agent_servers" is applied. Mutually
+        // exclusive with "model".
+        "agent": null,
+        // Written by Zed: the options each agent announced when it last rewrote a transcript,
+        // keyed by agent id, so the settings page can list its models without contacting it.
+        "agent_options_cache": {},
         // `${output}` is replaced with the raw transcript, `${glossary}` with the glossary.
         "prompt": "Clean up this dictated text. Fix punctuation and casing, remove filler words and repeated words, remove Whisper artifacts like \"Продолжение следует\", \"Subtitles by\" or \"Thank you\". Keep the language and the meaning. Spell these terms exactly as given: ${glossary}. Output only the cleaned text.\n\n${output}",
       },
