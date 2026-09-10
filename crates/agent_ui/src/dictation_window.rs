@@ -27,14 +27,9 @@ use gpui::{
     Action as _, Animation, AnimationExt as _, App, Context, Entity, EventEmitter, FocusHandle,
     Focusable, HighlightStyle, Rems, ScrollHandle, StyledText, Task, Window, pulsating_between,
 };
-use language_model::{
-    CompletionIntent, LanguageModel, LanguageModelId, LanguageModelProviderId,
-    LanguageModelRegistry, LanguageModelRequest, LanguageModelRequestMessage, Role, SelectedModel,
-};
 use language_models::AllLanguageModelSettings;
 use markdown::{Markdown, MarkdownElement, MarkdownFont, MarkdownStyle};
 use settings::Settings as _;
-use std::sync::Arc;
 use theme_settings::ThemeSettings;
 use ui::{
     Callout, Divider, Indicator, KeyBinding, ScrollAxes, Scrollbars, Severity, SpinnerLabel,
@@ -47,6 +42,7 @@ use crate::dictation_footer::{
     FooterAction, FooterInput, FooterLabel, FooterPhase, FooterState, ProcessedBy, footer_state,
 };
 use crate::dictation_model_server::{self, ServerOutcome};
+use crate::dictation_post_processing::{self as post_processing, Failure};
 use crate::{
     AcceptDictation, AgentPanel, CancelDictation, ToggleDictation, ToggleDictationPlayback,
     ToggleDictationRawText,
@@ -117,67 +113,6 @@ fn refresh_audio_devices(cx: &mut App) {
 #[cfg(not(feature = "audio"))]
 fn refresh_audio_devices(_cx: &mut App) {}
 
-fn select_post_processing_model(
-    settings: &DictationSettings,
-    cx: &mut App,
-) -> Option<Arc<dyn LanguageModel>> {
-    if let Some(selection) = &settings.post_processing_model {
-        let selected = SelectedModel {
-            provider: LanguageModelProviderId(selection.provider.0.clone().into()),
-            model: LanguageModelId(selection.model.clone().into()),
-        };
-        let configured = LanguageModelRegistry::global(cx)
-            .update(cx, |registry, cx| registry.select_model(&selected, cx));
-        if let Some(configured) = configured {
-            return Some(configured.model);
-        }
-    }
-    None
-}
-
-/// Resolves the post-processing model. Providers such as Ollama list their
-/// models only after they have been asked to authenticate, which nothing does
-/// in a fresh session, so the provider is authenticated first and the lookup
-/// is retried. A configured model that is still missing is an error, never a
-/// silent switch to another model; the agent's default model is used only
-/// when no Post-processing model is configured at all.
-fn post_processing_model(
-    settings: &DictationSettings,
-    cx: &mut App,
-) -> Task<Result<Arc<dyn LanguageModel>>> {
-    if let Some(model) = select_post_processing_model(settings, cx) {
-        return Task::ready(Ok(model));
-    }
-    let Some(selection) = settings.post_processing_model.clone() else {
-        return Task::ready(
-            LanguageModelRegistry::read_global(cx)
-                .default_model()
-                .map(|configured| configured.model)
-                .ok_or_else(|| anyhow!("No language model is configured for post-processing.")),
-        );
-    };
-    let provider = LanguageModelRegistry::read_global(cx).provider(&LanguageModelProviderId(
-        selection.provider.0.clone().into(),
-    ));
-    let authenticate = provider.map(|provider| provider.authenticate(cx));
-    let settings = settings.clone();
-    cx.spawn(async move |cx| {
-        if let Some(authenticate) = authenticate
-            && let Err(error) = authenticate.await
-        {
-            log::warn!("dictation: post-processing provider is unavailable: {error}");
-        }
-        cx.update(|cx| select_post_processing_model(&settings, cx))
-            .ok_or_else(|| {
-                anyhow!(
-                    "The post-processing model {} ({}) is not available.",
-                    selection.model,
-                    selection.provider.0
-                )
-            })
-    })
-}
-
 /// What a Dictation Session just did, as far as sounds are concerned.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) enum SessionTransition {
@@ -233,22 +168,22 @@ struct Notice {
     description: SharedString,
 }
 
-enum PostProcessingError {
-    /// Zed started Ollama for Post-processing and it did not come up.
-    ServerDidNotStart(String),
-    Other(anyhow::Error),
-}
-
-/// Qwen-style models may wrap reasoning in `<think>` tags; only the answer is wanted.
-fn strip_thinking(text: &str) -> String {
-    let mut result = text.to_string();
-    while let Some(start) = result.find("<think>") {
-        match result[start..].find("</think>") {
-            Some(end) => result.replace_range(start..start + end + "</think>".len(), ""),
-            None => result.truncate(start),
+/// The Callout for a run that left the text raw.
+fn notice_for(failure: &Failure) -> Notice {
+    let unavailable = |description: String| Notice {
+        title: "Post-processing Unavailable".into(),
+        description: description.into(),
+    };
+    match failure {
+        Failure::NoText => unavailable("Post-processing returned no text.".into()),
+        Failure::ServerDidNotStart(reason) => Notice {
+            title: "Ollama did not start".into(),
+            description: format!("{reason} The text is shown as recognized.").into(),
+        },
+        Failure::ModelUnavailable(reason) | Failure::RequestFailed(reason) => {
+            unavailable(reason.clone())
         }
     }
-    result.trim().to_string()
 }
 
 fn join_text(prefix: &str, text: &str) -> String {
@@ -807,12 +742,13 @@ impl DictationWindow {
         window: &mut Window,
         cx: &mut Context<Self>,
     ) {
-        let prompt = settings
-            .post_processing_prompt
-            .replace("${output}", &new_part)
-            .replace("${glossary}", &settings.glossary.join(", "));
+        let prompt = post_processing::prompt_text(
+            &settings.post_processing_prompt,
+            &new_part,
+            &settings.glossary,
+        );
+        let backend = post_processing::select_backend(settings);
         let model_server = self.model_server.clone();
-        let settings = settings.clone();
         self.processed_with_prompt = Some(settings.post_processing_prompt.clone());
         self.phase = Phase::Review;
         if !self.accept_when_ready {
@@ -823,60 +759,22 @@ impl DictationWindow {
 
         self._post_processing_task = Some(cx.spawn_in(window, async move |this, cx| {
             // Ollama started by Zed may still be coming up; the model can
-            // only be resolved once the server lists it. When the server
-            // never came up, Post-processing does not run at all.
-            let server_failure = match model_server {
-                Some(model_server) => match model_server.await {
-                    ServerOutcome::Ready => None,
-                    ServerOutcome::Failed(reason) => Some(reason),
+            // only be resolved once the server lists it, which is why the
+            // launcher is awaited inside the run.
+            let resolve_cx = gpui::AsyncApp::clone(cx);
+            let complete_cx = gpui::AsyncApp::clone(cx);
+            let (processed_by, result) = post_processing::rewrite_with_language_model(
+                model_server,
+                move || async move {
+                    resolve_cx
+                        .update(|cx| post_processing::resolve_language_model(backend, cx))
+                        .await
                 },
-                None => None,
-            };
-            let result = match server_failure {
-                Some(reason) => Err(PostProcessingError::ServerDidNotStart(reason)),
-                None => async {
-                    let model = cx
-                        .update(|_, cx| post_processing_model(&settings, cx))?
-                        .await?;
-                    // The label names the model actually used, including the
-                    // fallback to the agent's default model.
-                    let processed_by = ProcessedBy {
-                        provider: model.provider_name().0.to_string(),
-                        model: model.name().0.to_string(),
-                    };
-                    this.update(cx, |this, cx| {
-                        this.processed_by = Some(processed_by);
-                        cx.notify();
-                    })?;
-                    let temperature = cx
-                        .update(|_, cx| AgentSettings::temperature_for_model(&model, cx))
-                        .ok()
-                        .flatten();
-                    let request = LanguageModelRequest {
-                        intent: Some(CompletionIntent::UserPrompt),
-                        messages: vec![LanguageModelRequestMessage {
-                            role: Role::User,
-                            content: vec![prompt.into()],
-                            cache: false,
-                            reasoning_details: None,
-                        }],
-                        temperature,
-                        thinking_allowed: false,
-                        ..Default::default()
-                    };
-                    let stream = model.stream_completion_text(request, cx);
-                    let mut messages = stream.await?;
-                    let mut text = String::new();
-                    while let Some(chunk) = messages.stream.next().await {
-                        text.push_str(&chunk?);
-                    }
-                    anyhow::Ok(strip_thinking(&text))
-                }
-                .await
-                .map_err(PostProcessingError::Other),
-            };
+                move |model| post_processing::complete_with_language_model(model, prompt, complete_cx),
+            )
+            .await;
             this.update_in(cx, |this, window, cx| {
-                this.post_processing_done(result, window, cx);
+                this.post_processing_done(processed_by, result, window, cx);
             })
             .ok();
         }));
@@ -884,39 +782,25 @@ impl DictationWindow {
 
     fn post_processing_done(
         &mut self,
-        result: Result<String, PostProcessingError>,
+        processed_by: Option<ProcessedBy>,
+        result: Result<String, Failure>,
         window: &mut Window,
         cx: &mut Context<Self>,
     ) {
         self._post_processing_task = None;
-        let unavailable = |description: String| Notice {
-            title: "Post-processing Unavailable".into(),
-            description: description.into(),
-        };
         match result {
-            Ok(text) if !text.trim().is_empty() => {
+            Ok(text) => {
                 let full = join_text(&self.prefix, &text);
                 self.processed = Some(full.clone());
+                self.processed_by = processed_by;
                 self.show_raw = false;
                 self.review_editor.update(cx, |editor, cx| {
                     editor.set_text(full, window, cx);
                 });
             }
-            Ok(_) => {
+            Err(failure) => {
                 self.processed_by = None;
-                self.post_processing_error =
-                    Some(unavailable("Post-processing returned no text.".into()));
-            }
-            Err(PostProcessingError::ServerDidNotStart(reason)) => {
-                self.processed_by = None;
-                self.post_processing_error = Some(Notice {
-                    title: "Ollama did not start".into(),
-                    description: format!("{reason} The text is shown as recognized.").into(),
-                });
-            }
-            Err(PostProcessingError::Other(error)) => {
-                self.processed_by = None;
-                self.post_processing_error = Some(unavailable(format!("{error:#}")));
+                self.post_processing_error = Some(notice_for(&failure));
             }
         }
         self.finish_review(window, cx);

@@ -1,6 +1,6 @@
 # Zed Experimental — Voice Dictation
 
-Fork-local feature: the user speaks instead of typing, and the speech becomes the text of a prompt in the AI agent panel composer. Everything runs on the user's machine.
+Fork-local feature: the user speaks instead of typing, and the speech becomes the text of a prompt in the AI agent panel composer. The user's voice never leaves the machine; the transcript does only if the user points Post-processing at something remote.
 
 ## Language
 
@@ -71,8 +71,12 @@ The component that turns audio into text. Always local: no network, no API keys,
 _Avoid_: STT provider, recognizer, cloud engine
 
 **Post-processing**:
-Optional rewrite of a transcript by a local language model driven by a user-editable prompt. May fix punctuation, fillers, term spelling and recognizer artifacts; must not change meaning. It is the only place where recognizer artifacts are removed.
+Optional rewrite of a transcript driven by a user-editable prompt. May fix punctuation, fillers, term spelling and recognizer artifacts; must not change meaning. It is the only place where recognizer artifacts are removed. The rewriter is the user's choice and need not be local: either a language model the user has configured, or an External Agent, reached through a Post-processing Session.
 _Avoid_: Cleanup, polishing, correction
+
+**Post-processing Session**:
+The conversation with an External Agent that exists only to rewrite transcripts, held apart from the user's own conversation with the same agent so that neither can see what the other said. It lasts one Dictation Session, so a Resume is rewritten against the text the same session produced a moment earlier, and a later dictation starts from nothing. It is allowed to answer with text and nothing else: if it asks to touch the machine or to ask the user something, the rewrite has failed and the user keeps the raw text.
+_Avoid_: Hidden thread, background chat, sub-agent, side session
 
 **Recognizer Artifact**:
 A phrase the Transcription Engine invents on silence or noise ("Продолжение следует", "Subtitles by"). The engine never judges it by its words: the Speech Gate keeps silence from being decoded at all, and whatever still slips through is left to Post-processing.
@@ -99,6 +103,10 @@ A user-maintained list of terms (mostly English technical words) that guides bot
 _Avoid_: Vocabulary, dictionary, hints
 
 ### Surroundings
+
+**External Agent**:
+An AI agent that is not Zed's own: it runs as a separate program with its own account, its own models and its own tools, and Zed only relays what it announces about itself. Zed cannot know its models before talking to it, and does not know what its settings mean.
+_Avoid_: ACP agent, CLI agent, external provider, backend
 
 **Composer**:
 The text box in the agent panel where the user's prompt is authored before it is sent.

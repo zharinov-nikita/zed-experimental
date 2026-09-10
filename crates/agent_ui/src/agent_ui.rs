@@ -15,6 +15,7 @@ mod dictation_engine;
 mod dictation_footer;
 mod dictation_host;
 mod dictation_model_server;
+mod dictation_post_processing;
 mod dictation_window;
 pub mod draft_prompt_store;
 mod entry_view_state;
