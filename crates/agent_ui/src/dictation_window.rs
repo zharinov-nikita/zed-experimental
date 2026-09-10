@@ -760,6 +760,10 @@ impl DictationWindow {
         };
         self._post_processing_task = Some(match backend {
             Backend::LanguageModel(_) | Backend::DefaultLanguageModel => {
+                let selection = match backend {
+                    Backend::LanguageModel(selection) => Some(selection),
+                    Backend::DefaultLanguageModel | Backend::ExternalAgent(_) => None,
+                };
                 cx.spawn_in(window, async move |this, cx| {
                     // Ollama started by Zed may still be coming up; the model
                     // can only be resolved once the server lists it, which is
@@ -770,7 +774,7 @@ impl DictationWindow {
                         model_server,
                         move || async move {
                             resolve_cx
-                                .update(|cx| post_processing::resolve_language_model(backend, cx))
+                                .update(|cx| post_processing::resolve_language_model(selection, cx))
                                 .await
                         },
                         move |model| {
@@ -789,13 +793,10 @@ impl DictationWindow {
                 })
             }
             Backend::ExternalAgent(config) => {
+                let agent_id = config.id.clone();
                 let Some(rewriter) = self.agent_rewriter(config, cx) else {
                     let failure = Failure::AgentUnavailable {
-                        agent: settings
-                            .post_processing_agent
-                            .as_ref()
-                            .map(|agent| agent.id.clone())
-                            .unwrap_or_default(),
+                        agent: agent_id,
                         reason: "The agent panel is not open.".into(),
                     };
                     self.post_processing_done(None, Err(failure), window, cx);

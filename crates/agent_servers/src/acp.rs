@@ -3893,7 +3893,7 @@ mod tests {
                 {
                     let read_results = read_results.clone();
                     async move |req: acp::PromptRequest, responder, cx| {
-                        let session_id = req.session_id.clone();
+                        let session_id = req.session_id;
                         cx.send_notification(acp::SessionNotification::new(
                             session_id.clone(),
                             acp::SessionUpdate::AgentMessageChunk(acp::ContentChunk::new(
@@ -4846,6 +4846,21 @@ fn session_thread(
         .ok_or_else(|| acp::Error::internal_error().data(format!("unknown session: {session_id}")))
 }
 
+/// Local: the thread of `session_id` for `request`, a request to act on the
+/// machine or the user, which a text-only session is refused before
+/// anything happens; see [`AcpSession::text_only`].
+fn session_thread_for_action(
+    ctx: &ClientContext,
+    session_id: &acp::SessionId,
+    request: &str,
+) -> Result<WeakEntity<AcpThread>, acp::Error> {
+    let thread = session_thread(ctx, session_id)?;
+    match ctx.refuse_action(session_id, request) {
+        Some(error) => Err(error),
+        None => Ok(thread),
+    }
+}
+
 fn respond_err<T: JsonRpcResponse>(responder: Responder<T>, err: acp::Error) {
     // Log the actual error we're returning — otherwise agents that hit an
     // error path (e.g. unknown session) would see only the generic internal
@@ -4872,13 +4887,11 @@ fn handle_request_permission(
     cx: &mut AsyncApp,
     ctx: &ClientContext,
 ) {
-    let thread = match session_thread(ctx, &args.session_id) {
-        Ok(t) => t,
-        Err(e) => return respond_err(responder, e),
-    };
-    if let Some(error) = ctx.refuse_action(&args.session_id, "session/request_permission") {
-        return respond_err(responder, error);
-    }
+    let thread =
+        match session_thread_for_action(ctx, &args.session_id, "session/request_permission") {
+            Ok(t) => t,
+            Err(e) => return respond_err(responder, e),
+        };
 
     let cancellation = responder.cancellation();
     let tool_call_id = args.tool_call.tool_call_id.clone();
@@ -4929,13 +4942,11 @@ fn handle_create_elicitation(
 ) {
     match args.scope() {
         acp::ElicitationScope::Session(scope) => {
-            let thread = match session_thread(ctx, &scope.session_id) {
-                Ok(t) => t,
-                Err(e) => return respond_err(responder, e),
-            };
-            if let Some(error) = ctx.refuse_action(&scope.session_id, "elicitation/create") {
-                return respond_err(responder, error);
-            }
+            let thread =
+                match session_thread_for_action(ctx, &scope.session_id, "elicitation/create") {
+                    Ok(t) => t,
+                    Err(e) => return respond_err(responder, e),
+                };
 
             let (elicitation_id, task) = match thread
                 .update(cx, |thread, cx| {
@@ -5048,13 +5059,10 @@ fn handle_write_text_file(
     cx: &mut AsyncApp,
     ctx: &ClientContext,
 ) {
-    let thread = match session_thread(ctx, &args.session_id) {
+    let thread = match session_thread_for_action(ctx, &args.session_id, "fs/write_text_file") {
         Ok(t) => t,
         Err(e) => return respond_err(responder, e),
     };
-    if let Some(error) = ctx.refuse_action(&args.session_id, "fs/write_text_file") {
-        return respond_err(responder, error);
-    }
 
     cx.spawn(async move |cx| {
         let result: Result<_, acp::Error> = async {
@@ -5086,13 +5094,10 @@ fn handle_read_text_file(
     cx: &mut AsyncApp,
     ctx: &ClientContext,
 ) {
-    let thread = match session_thread(ctx, &args.session_id) {
+    let thread = match session_thread_for_action(ctx, &args.session_id, "fs/read_text_file") {
         Ok(t) => t,
         Err(e) => return respond_err(responder, e),
     };
-    if let Some(error) = ctx.refuse_action(&args.session_id, "fs/read_text_file") {
-        return respond_err(responder, error);
-    }
 
     cx.spawn(async move |cx| {
         let cancellation = responder.cancellation();
@@ -5289,13 +5294,10 @@ fn handle_create_terminal(
     cx: &mut AsyncApp,
     ctx: &ClientContext,
 ) {
-    let thread = match session_thread(ctx, &args.session_id) {
+    let thread = match session_thread_for_action(ctx, &args.session_id, "terminal/create") {
         Ok(t) => t,
         Err(e) => return respond_err(responder, e),
     };
-    if let Some(error) = ctx.refuse_action(&args.session_id, "terminal/create") {
-        return respond_err(responder, error);
-    }
     let project = match thread
         .read_with(cx, |thread, _cx| thread.project().clone())
         .map_err(acp::Error::from)
@@ -5352,13 +5354,10 @@ fn handle_kill_terminal(
     cx: &mut AsyncApp,
     ctx: &ClientContext,
 ) {
-    let thread = match session_thread(ctx, &args.session_id) {
+    let thread = match session_thread_for_action(ctx, &args.session_id, "terminal/kill") {
         Ok(t) => t,
         Err(e) => return respond_err(responder, e),
     };
-    if let Some(error) = ctx.refuse_action(&args.session_id, "terminal/kill") {
-        return respond_err(responder, error);
-    }
 
     match thread
         .update(cx, |thread, cx| thread.kill_terminal(args.terminal_id, cx))
@@ -5379,13 +5378,10 @@ fn handle_release_terminal(
     cx: &mut AsyncApp,
     ctx: &ClientContext,
 ) {
-    let thread = match session_thread(ctx, &args.session_id) {
+    let thread = match session_thread_for_action(ctx, &args.session_id, "terminal/release") {
         Ok(t) => t,
         Err(e) => return respond_err(responder, e),
     };
-    if let Some(error) = ctx.refuse_action(&args.session_id, "terminal/release") {
-        return respond_err(responder, error);
-    }
 
     match thread
         .update(cx, |thread, cx| {
@@ -5408,13 +5404,10 @@ fn handle_terminal_output(
     cx: &mut AsyncApp,
     ctx: &ClientContext,
 ) {
-    let thread = match session_thread(ctx, &args.session_id) {
+    let thread = match session_thread_for_action(ctx, &args.session_id, "terminal/output") {
         Ok(t) => t,
         Err(e) => return respond_err(responder, e),
     };
-    if let Some(error) = ctx.refuse_action(&args.session_id, "terminal/output") {
-        return respond_err(responder, error);
-    }
 
     match thread
         .read_with(cx, |thread, cx| -> anyhow::Result<_> {
@@ -5439,13 +5432,10 @@ fn handle_wait_for_terminal_exit(
     cx: &mut AsyncApp,
     ctx: &ClientContext,
 ) {
-    let thread = match session_thread(ctx, &args.session_id) {
+    let thread = match session_thread_for_action(ctx, &args.session_id, "terminal/wait_for_exit") {
         Ok(t) => t,
         Err(e) => return respond_err(responder, e),
     };
-    if let Some(error) = ctx.refuse_action(&args.session_id, "terminal/wait_for_exit") {
-        return respond_err(responder, error);
-    }
 
     cx.spawn(async move |cx| {
         let cancellation = responder.cancellation();

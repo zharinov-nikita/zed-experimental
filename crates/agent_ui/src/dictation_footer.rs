@@ -7,7 +7,8 @@
 use dictation::OpenedInputDevice;
 use ui::SharedString;
 
-use crate::dictation_post_processing::{Failure, RESPONSE_LIMIT};
+use crate::dictation_model_server::RESPONSE_LIMIT;
+use crate::dictation_post_processing::Failure;
 
 /// Where the Dictation Session is, as far as the footer is concerned.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]

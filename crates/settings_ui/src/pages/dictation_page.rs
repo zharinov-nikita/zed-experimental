@@ -1012,7 +1012,7 @@ fn render_post_processing_agent_rows(
     });
     let choices = model_choices(cached.as_deref());
 
-    let agent_dropdown = render_agent_dropdown(chosen_id.clone(), agents, window, cx);
+    let agent_dropdown = render_agent_dropdown(chosen_id, agents, window, cx);
     let agent_row = render_settings_item_layout(
         settings_window,
         "Agent",

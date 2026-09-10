@@ -18,6 +18,9 @@ use http_client::{AsyncBody, HttpClient};
 
 /// How long Post-processing waits for a server Zed has started.
 pub const START_LIMIT: Duration = Duration::from_secs(20);
+/// How long Post-processing waits for an External Agent's answer in a
+/// Post-processing Session; after that the text stays raw.
+pub const RESPONSE_LIMIT: Duration = Duration::from_secs(60);
 /// How often the server is asked whether it answers yet.
 pub const POLL: Duration = Duration::from_millis(500);
 /// A reachability probe that takes longer than this counts as no answer.

@@ -36,17 +36,13 @@ use settings::{
     DictationAgentOptionValueContent, LanguageModelSelection, SettingsStore,
 };
 use util::ResultExt as _;
-use util::path_list::PathList;
+
 use workspace::Workspace;
 
 use crate::agent_connection_store::AgentConnectionStore;
 use crate::dictation_footer::{ProcessedBy, RewriterKind};
-use crate::dictation_model_server::ServerOutcome;
+use crate::dictation_model_server::{RESPONSE_LIMIT, ServerOutcome};
 use crate::{Agent, AgentPanel};
-
-/// How long a Post-processing Session may take to answer; after that the
-/// text stays raw. Lives next to the Ollama start-up limit.
-pub const RESPONSE_LIMIT: Duration = Duration::from_secs(60);
 
 /// Which rewriter the resolved settings select.
 #[derive(Clone, Debug, PartialEq)]
@@ -194,25 +190,16 @@ fn processed_by_model(model: &Arc<dyn LanguageModel>) -> ProcessedBy {
 /// authenticated first and the lookup retried. A configured model that is
 /// still missing is an error, never a silent switch to another model.
 pub fn resolve_language_model(
-    backend: Backend,
+    selection: Option<LanguageModelSelection>,
     cx: &mut App,
 ) -> Task<Result<(ProcessedBy, Arc<dyn LanguageModel>)>> {
-    let selection = match backend {
-        Backend::DefaultLanguageModel => {
-            return Task::ready(
-                LanguageModelRegistry::read_global(cx)
-                    .default_model()
-                    .map(|configured| (processed_by_model(&configured.model), configured.model))
-                    .ok_or_else(|| anyhow!("No language model is configured for post-processing.")),
-            );
-        }
-        Backend::LanguageModel(selection) => selection,
-        Backend::ExternalAgent(agent) => {
-            return Task::ready(Err(anyhow!(
-                "{} is an External Agent, not a language model.",
-                agent.id
-            )));
-        }
+    let Some(selection) = selection else {
+        return Task::ready(
+            LanguageModelRegistry::read_global(cx)
+                .default_model()
+                .map(|configured| (processed_by_model(&configured.model), configured.model))
+                .ok_or_else(|| anyhow!("No language model is configured for post-processing.")),
+        );
     };
     if let Some(model) = select_configured_model(&selection, cx) {
         return Task::ready(Ok((processed_by_model(&model), model)));
@@ -267,11 +254,6 @@ pub async fn complete_with_language_model(
     Ok(text)
 }
 
-// ---------------------------------------------------------------------------
-// The External Agent path: a Post-processing Session on a connection Zed
-// already holds.
-// ---------------------------------------------------------------------------
-
 /// What the agent announced when the Post-processing Session was created:
 /// the modes it can run in and the session config options it accepts.
 #[derive(Clone, Debug, Default, PartialEq)]
@@ -280,8 +262,9 @@ pub struct Announcement {
     pub config_options: Vec<acp::SessionConfigOption>,
 }
 
-/// How the Post-processing Session is set up: which options to set, which
-/// mode to choose and which working directories to give it (none).
+/// How the Post-processing Session is set up: which options to set and
+/// which mode to choose. It gets no working directory of the user's: the
+/// live path gives it [`post_processing_cwd`], an empty directory.
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct SessionPolicy {
     /// Only options the agent announced, with values it announced; nothing
@@ -289,7 +272,6 @@ pub struct SessionPolicy {
     pub options: Vec<(acp::SessionConfigId, acp::SessionConfigOptionValue)>,
     /// The strictest of the announced modes, when the agent has modes.
     pub mode: Option<acp::SessionModeId>,
-    pub work_dirs: PathList,
 }
 
 fn is_mode_option(option: &acp::SessionConfigOption) -> bool {
@@ -319,8 +301,11 @@ fn select_values(select: &acp::SessionConfigSelect) -> Vec<&acp::SessionConfigSe
 }
 
 /// How permissive a mode is, by what it calls itself; lower is stricter.
-/// No announced mode means «no tools at all», so the ranking only decides
-/// which one asks the most; the real guard is the refusal by session.
+/// No announced mode means «no tools at all», and the real guard is the
+/// refusal by session, so the strictest mode is the one that asks Zed
+/// before every tool: each request is then refused and counted. A
+/// read-only mode ranks after it, because in it the agent reads on its
+/// own without asking.
 fn permissiveness(id: &str, name: &str) -> u8 {
     let text = format!("{id} {name}").to_lowercase();
     if text.contains("bypass") || text.contains("yolo") || text.contains("dangerous") {
@@ -329,13 +314,13 @@ fn permissiveness(id: &str, name: &str) -> u8 {
         3
     } else if text.contains("accept") || text.contains("edit") {
         2
-    } else if text.contains("plan") || text.contains("read") {
-        0
     } else if text.contains("default")
         || text.contains("manual")
         || text.contains("ask")
         || text.contains("normal")
     {
+        0
+    } else if text.contains("plan") || text.contains("read") {
         1
     } else {
         2
@@ -402,11 +387,7 @@ pub fn session_policy(
             .map(|mode| (mode.id.0.as_ref(), mode.name.as_str())),
     )
     .map(|id| acp::SessionModeId::new(id.to_string()));
-    SessionPolicy {
-        options,
-        mode,
-        work_dirs: PathList::default(),
-    }
+    SessionPolicy { options, mode }
 }
 
 /// The model the label names: the human name of the model value the policy
@@ -721,8 +702,9 @@ impl<A: RewriteAgent> Drop for AgentRewriter<A> {
     }
 }
 
-/// Post-processing Sessions of agents that cannot delete sessions; Zed's
-/// lists of agent sessions leave them out.
+/// Post-processing Sessions of agents that cannot delete sessions, hidden
+/// from the moment they are created; Zed's lists of agent sessions leave
+/// them out. Kept in memory for this run of Zed.
 #[derive(Default)]
 pub struct HiddenSessions(HashSet<acp::SessionId>);
 
@@ -756,7 +738,7 @@ pub struct LiveSession {
     connection: Rc<AcpConnection>,
     /// Keeps the session registered with the connection; dropping it closes
     /// the session for agents that support closing.
-    _thread: Entity<AcpThread>,
+    thread: Entity<AcpThread>,
     session_id: acp::SessionId,
 }
 
@@ -781,14 +763,19 @@ impl ZedAgents {
     /// The name the user knows `agent_id` by, for the footer while the
     /// answer is awaited.
     pub fn display_name(&self, agent_id: &str, cx: &App) -> String {
-        self.project
-            .read(cx)
-            .agent_server_store()
-            .read(cx)
-            .agent_display_name(&AgentId::new(agent_id.to_string()))
-            .map(|name| name.to_string())
-            .unwrap_or_else(|| agent_id.to_string())
+        agent_display_name(&self.project, agent_id, cx)
     }
+}
+
+/// The agent's display name from the agent store, its id when it has none.
+fn agent_display_name(project: &Entity<Project>, agent_id: &str, cx: &App) -> String {
+    project
+        .read(cx)
+        .agent_server_store()
+        .read(cx)
+        .agent_display_name(&AgentId::new(agent_id.to_string()))
+        .map(|name| name.to_string())
+        .unwrap_or_else(|| agent_id.to_string())
 }
 
 impl RewriteAgent for ZedAgents {
@@ -806,11 +793,13 @@ impl RewriteAgent for ZedAgents {
         async move {
             let id = AgentId::new(agent_id.clone());
             let (configured, display_name) = cx.update(|cx| {
-                let agents = project.read(cx).agent_server_store().read(cx);
-                (
-                    agents.external_agents().any(|known| known == &id),
-                    agents.agent_display_name(&id),
-                )
+                let configured = project
+                    .read(cx)
+                    .agent_server_store()
+                    .read(cx)
+                    .external_agents()
+                    .any(|known| known == &id);
+                (configured, agent_display_name(&project, &agent_id, cx))
             });
             if !configured {
                 anyhow::bail!("{agent_id} is not configured under `agent_servers`.");
@@ -834,9 +823,7 @@ impl RewriteAgent for ZedAgents {
                 .ok_or_else(|| anyhow!("{agent_id} is not an ACP agent."))?;
             Ok(Connected {
                 connection,
-                display_name: display_name
-                    .map(|name| name.to_string())
-                    .unwrap_or(agent_id),
+                display_name,
             })
         }
         .boxed_local()
@@ -861,6 +848,16 @@ impl RewriteAgent for ZedAgents {
                 .update(|cx| connection.clone().new_text_only_session(project, cwd, cx))
                 .await?;
             let session_id = cx.update(|cx| thread.read(cx).session_id().clone());
+            // An agent that cannot delete the session would list it among the
+            // user's threads from now on, so it is hidden right away.
+            cx.update(|cx| {
+                let can_delete = connection
+                    .session_list(cx)
+                    .is_some_and(|list| list.supports_delete());
+                if forget_plan(can_delete) == ForgetPlan::Hide {
+                    hide_session(session_id.clone(), cx);
+                }
+            });
             let announcement = cx.update(|cx| Announcement {
                 modes: connection
                     .session_modes(&session_id, cx)
@@ -874,7 +871,7 @@ impl RewriteAgent for ZedAgents {
             Ok((
                 LiveSession {
                     connection,
-                    _thread: thread,
+                    thread,
                     session_id,
                 },
                 announcement,
@@ -971,21 +968,21 @@ impl RewriteAgent for ZedAgents {
     }
 
     /// Runs in a task of its own: the rewriter may be dropped in the middle
-    /// of an update, when the app must not be borrowed again.
+    /// of an update, when the app must not be borrowed again. The thread is
+    /// kept until the deletion is answered, so the session is not closed
+    /// from under it; a session the agent cannot delete was hidden when it
+    /// was created.
     fn forget(&self, session: &Self::Session) {
         let connection = session.connection.clone();
+        let thread = session.thread.clone();
         let session_id = session.session_id.clone();
         self.cx
             .spawn(async move |cx| {
                 let delete = cx.update(|cx| {
-                    let list = connection.session_list(cx);
-                    match forget_plan(list.as_ref().is_some_and(|list| list.supports_delete())) {
-                        ForgetPlan::Delete => list.map(|list| list.delete_session(&session_id, cx)),
-                        ForgetPlan::Hide => {
-                            hide_session(session_id.clone(), cx);
-                            None
-                        }
-                    }
+                    connection
+                        .session_list(cx)
+                        .filter(|list| forget_plan(list.supports_delete()) == ForgetPlan::Delete)
+                        .map(|list| list.delete_session(&session_id, cx))
                 });
                 if let Some(delete) = delete {
                     delete
@@ -993,6 +990,7 @@ impl RewriteAgent for ZedAgents {
                         .with_context(|| format!("deleting Post-processing Session {session_id}"))
                         .log_err();
                 }
+                drop(thread);
             })
             .detach();
     }
@@ -1265,8 +1263,6 @@ mod tests {
         assert_eq!(result, Err(Failure::NoText));
     }
 
-    // -- Session policy --------------------------------------------------
-
     fn set_option(policy: &SessionPolicy, id: &str) -> Option<acp::SessionConfigOptionValue> {
         policy
             .options
@@ -1296,7 +1292,6 @@ mod tests {
         assert_eq!(set_option(&policy, "effort"), None, "not announced");
         assert_eq!(set_option(&policy, "model_unknown"), None, "not announced");
         assert_eq!(policy.options.len(), 2);
-        assert!(policy.work_dirs.is_empty());
     }
 
     #[test]
@@ -1317,20 +1312,24 @@ mod tests {
     }
 
     #[test]
-    fn the_strictest_announced_mode_is_chosen() {
+    fn the_strictest_announced_mode_is_the_one_that_always_asks() {
         let policy = session_policy(&HashMap::default(), &recorded_announcement());
-        assert_eq!(policy.mode, Some(acp::SessionModeId::new("plan")));
+        assert_eq!(policy.mode, Some(acp::SessionModeId::new("default")));
 
-        let without_plan = Announcement {
+        let without_default = Announcement {
             modes: vec![
                 acp::SessionMode::new("bypassPermissions", "Bypass Permissions"),
-                acp::SessionMode::new("default", "Manual (always ask)"),
+                acp::SessionMode::new("plan", "Plan (read-only)"),
                 acp::SessionMode::new("auto", "Auto"),
             ],
             config_options: Vec::new(),
         };
-        let policy = session_policy(&HashMap::default(), &without_plan);
-        assert_eq!(policy.mode, Some(acp::SessionModeId::new("default")));
+        let policy = session_policy(&HashMap::default(), &without_default);
+        assert_eq!(
+            policy.mode,
+            Some(acp::SessionModeId::new("plan")),
+            "a read-only mode is the next best"
+        );
 
         let none = Announcement::default();
         assert_eq!(session_policy(&HashMap::default(), &none).mode, None);
@@ -1356,7 +1355,7 @@ mod tests {
         let policy = session_policy(&requested, &announced);
         assert_eq!(
             set_option(&policy, "permission-mode"),
-            Some(acp::SessionConfigOptionValue::value_id("plan"))
+            Some(acp::SessionConfigOptionValue::value_id("default"))
         );
         assert_eq!(policy.mode, None);
     }
@@ -1409,8 +1408,6 @@ mod tests {
         );
         assert_eq!(entry[1].category, None);
     }
-
-    // -- Outcome ---------------------------------------------------------
 
     fn observed(reply: &str, refused_actions: u32, stop_reason: acp::StopReason) -> Observation {
         Observation {
@@ -1490,8 +1487,6 @@ mod tests {
         assert_eq!(forget_plan(true), ForgetPlan::Delete);
         assert_eq!(forget_plan(false), ForgetPlan::Hide);
     }
-
-    // -- Lifecycle with a fake agent --------------------------------------
 
     #[derive(Clone, Copy, Debug, PartialEq, Eq)]
     enum Reply {
@@ -1648,7 +1643,10 @@ mod tests {
                 set_option(&log.policies[0], "model"),
                 Some(acp::SessionConfigOptionValue::value_id("haiku"))
             );
-            assert_eq!(log.policies[0].mode, Some(acp::SessionModeId::new("plan")));
+            assert_eq!(
+                log.policies[0].mode,
+                Some(acp::SessionModeId::new("default"))
+            );
             assert!(log.forgotten.is_empty(), "the session lives until the end");
         }
         drop(rewriter);

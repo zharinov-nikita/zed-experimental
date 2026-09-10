@@ -1363,6 +1363,23 @@ mod tests {
             None,
             "a blank id selects no agent"
         );
+
+        SettingsStore::update_global(cx, |store, cx| {
+            store
+                .set_user_settings(
+                    r#"{ "agent": { "dictation": { "post_processing": {
+                        "model": { "provider": "ollama", "model": "qwen3:14b" },
+                        "agent": { "id": "claude-acp" }
+                    } } } }"#,
+                    cx,
+                )
+                .unwrap();
+        });
+        let dictation = AgentSettings::get_global(cx).dictation.clone();
+        assert!(
+            dictation.post_processing_model.is_some() && dictation.post_processing_agent.is_some(),
+            "both keys resolve as written: neither wins silently, the conflict is reported to the user"
+        );
     }
 
     #[gpui::test]
