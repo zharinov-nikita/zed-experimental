@@ -1267,7 +1267,7 @@ impl DictationWindow {
             .color(Color::Muted)
             .disabled(!enabled)
             .key_binding(
-                KeyBinding::for_action_in(action, focus_handle, cx).size(rems_from_px(10.)),
+                KeyBinding::for_action_in(action, focus_handle, cx).size(rems_from_px(10_f32)),
             )
             .on_click(on_click)
     }

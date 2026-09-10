@@ -61,6 +61,6 @@ crates/docs_preprocessor/actions.json
 
 .local*
 
-
 # APM dependencies
 apm_modules/
+.cache
