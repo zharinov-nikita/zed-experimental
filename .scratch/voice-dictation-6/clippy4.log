@@ -1,0 +1,37 @@
++ cargo clippy -p agent_ui --release --all-targets --all-features -- --deny warnings
+    Checking markdown v0.1.0 (C:\Users\NikitaDev\Desktop\projects\zed-experimental\crates\markdown)
+   Compiling remote_server v0.1.0 (C:\Users\NikitaDev\Desktop\projects\zed-experimental\crates\remote_server)
+    Checking project v0.1.0 (C:\Users\NikitaDev\Desktop\projects\zed-experimental\crates\project)
+    Checking agent_settings v0.1.0 (C:\Users\NikitaDev\Desktop\projects\zed-experimental\crates\agent_settings)
+    Checking action_log v0.1.0 (C:\Users\NikitaDev\Desktop\projects\zed-experimental\crates\action_log)
+    Checking extension_host v0.1.0 (C:\Users\NikitaDev\Desktop\projects\zed-experimental\crates\extension_host)
+    Checking json_schema_store v0.1.0 (C:\Users\NikitaDev\Desktop\projects\zed-experimental\crates\json_schema_store)
+    Checking language_extension v0.1.0 (C:\Users\NikitaDev\Desktop\projects\zed-experimental\crates\language_extension)
+    Checking languages v0.1.0 (C:\Users\NikitaDev\Desktop\projects\zed-experimental\crates\languages)
+    Checking acp_thread v0.1.0 (C:\Users\NikitaDev\Desktop\projects\zed-experimental\crates\acp_thread)
+    Checking workspace v0.1.0 (C:\Users\NikitaDev\Desktop\projects\zed-experimental\crates\workspace)
+    Checking agent_servers v0.1.0 (C:\Users\NikitaDev\Desktop\projects\zed-experimental\crates\agent_servers)
+    Checking command_palette_hooks v0.1.0 (C:\Users\NikitaDev\Desktop\projects\zed-experimental\crates\command_palette_hooks)
+    Checking breadcrumbs v0.1.0 (C:\Users\NikitaDev\Desktop\projects\zed-experimental\crates\breadcrumbs)
+    Checking picker v0.1.0 (C:\Users\NikitaDev\Desktop\projects\zed-experimental\crates\picker)
+    Checking auto_update v0.1.0 (C:\Users\NikitaDev\Desktop\projects\zed-experimental\crates\auto_update)
+    Checking notifications v0.1.0 (C:\Users\NikitaDev\Desktop\projects\zed-experimental\crates\notifications)
+    Checking platform_title_bar v0.1.0 (C:\Users\NikitaDev\Desktop\projects\zed-experimental\crates\platform_title_bar)
+    Checking editor v0.1.0 (C:\Users\NikitaDev\Desktop\projects\zed-experimental\crates\editor)
+    Checking copilot v0.1.0 (C:\Users\NikitaDev\Desktop\projects\zed-experimental\crates\copilot)
+    Checking remote_connection v0.1.0 (C:\Users\NikitaDev\Desktop\projects\zed-experimental\crates\remote_connection)
+    Checking command_palette v0.1.0 (C:\Users\NikitaDev\Desktop\projects\zed-experimental\crates\command_palette)
+    Checking copilot_ui v0.1.0 (C:\Users\NikitaDev\Desktop\projects\zed-experimental\crates\copilot_ui)
+    Checking language_models v0.1.0 (C:\Users\NikitaDev\Desktop\projects\zed-experimental\crates\language_models)
+    Checking agent v0.1.0 (C:\Users\NikitaDev\Desktop\projects\zed-experimental\crates\agent)
+    Checking picker_preview v0.1.0 (C:\Users\NikitaDev\Desktop\projects\zed-experimental\crates\picker_preview)
+    Checking terminal_view v0.1.0 (C:\Users\NikitaDev\Desktop\projects\zed-experimental\crates\terminal_view)
+    Checking git_ui_core v0.1.0 (C:\Users\NikitaDev\Desktop\projects\zed-experimental\crates\git_ui_core)
+    Checking search v0.1.0 (C:\Users\NikitaDev\Desktop\projects\zed-experimental\crates\search)
+    Checking vim v0.1.0 (C:\Users\NikitaDev\Desktop\projects\zed-experimental\crates\vim)
+    Checking agent_ui v0.1.0 (C:\Users\NikitaDev\Desktop\projects\zed-experimental\crates\agent_ui)
+    Finished `release` profile [optimized + debuginfo] target(s) in 1m 15s
++ [[ -z '' ]]
++ which cargo-machete
++ exit 0
+EXIT 0

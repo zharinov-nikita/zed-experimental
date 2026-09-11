@@ -1,0 +1,129 @@
+Diff in \\?\C:\Users\NikitaDev\Desktop\projects\zed-experimental\crates\agent_ui\src\conversation_view\elicitation.rs:64:
+                     if options.is_empty() {
+                         // Local: an Answer Field grows with its text like the
+                         // Composer, so a dictated paragraph keeps its lines.
+[31m-                        let max_lines = AgentSettings::get_global(cx).set_message_editor_max_lines();
+[0m[32m+                        let max_lines =
+[0m[32m+                            AgentSettings::get_global(cx).set_message_editor_max_lines();
+[0m                         let editor = cx.new(|cx| {
+                             let mut editor = Editor::auto_height(1, max_lines, window, cx);
+                             editor.set_soft_wrap();
+Diff in \\?\C:\Users\NikitaDev\Desktop\projects\zed-experimental\crates\agent_ui\src\conversation_view\thread_view.rs:4511:
+         window: &mut Window,
+         cx: &mut Context<Self>,
+     ) -> bool {
+[31m-        self.cancel_dictation_recording(
+[0m[31m-            &DictationHost::AnswerField { question, field },
+[0m[31m-            window,
+[0m[31m-            cx,
+[0m[31m-        )
+[0m[32m+        self.cancel_dictation_recording(&DictationHost::AnswerField { question, field }, window, cx)
+[0m     }
+ 
+     /// One session at a time: the field that hosts it toggles it, any other
+Diff in \\?\C:\Users\NikitaDev\Desktop\projects\zed-experimental\crates\agent_ui\src\conversation_view\thread_view.rs:4599:
+             return;
+         };
+         let dictation_window = cx.new(|cx| build(host_focus, window, cx));
+[31m-        let subscription =
+[0m[31m-            cx.subscribe_in(&dictation_window, window, Self::handle_dictation_window_event);
+[0m[32m+        let subscription = cx.subscribe_in(
+[0m[32m+            &dictation_window,
+[0m[32m+            window,
+[0m[32m+            Self::handle_dictation_window_event,
+[0m[32m+        );
+[0m         self.dictation = Some(DictationSession {
+             window: dictation_window,
+             host,
+Diff in \\?\C:\Users\NikitaDev\Desktop\projects\zed-experimental\crates\agent_ui\src\conversation_view\thread_view.rs:4631:
+         if !matches!(elicitation.status, ElicitationStatus::Pending { .. }) {
+             return None;
+         }
+[31m-        self.elicitation_form_states.get(question)?.text_field(field)
+[0m[32m+        self.elicitation_form_states
+[0m[32m+            .get(question)?
+[0m[32m+            .text_field(field)
+[0m     }
+ 
+     fn dictation_host_focus_handle(&self, host: &DictationHost, cx: &App) -> Option<FocusHandle> {
+Diff in \\?\C:\Users\NikitaDev\Desktop\projects\zed-experimental\crates\agent_ui\src\conversation_view\thread_view.rs:4742:
+         let hosts_session = self.dictation_host() == Some(&DictationHost::Composer);
+         let state = DictationButtonState::for_field(
+             hosts_session,
+[31m-            hosts_session && self.dictation.as_ref().is_some_and(|session| {
+[0m[31m-                session.window.read(cx).is_recording()
+[0m[31m-            }),
+[0m[32m+            hosts_session
+[0m[32m+                && self
+[0m[32m+                    .dictation
+[0m[32m+                    .as_ref()
+[0m[32m+                    .is_some_and(|session| session.window.read(cx).is_recording()),
+[0m             self.dictation.is_some(),
+         );
+         dictation_button(
+Diff in \\?\C:\Users\NikitaDev\Desktop\projects\zed-experimental\crates\agent_ui\src\conversation_view\thread_view.rs:4769:
+             return AnswerFieldDictation::default();
+         };
+         let window = match &session.host {
+[31m-            DictationHost::AnswerField { question: hosted, field } if hosted == question => {
+[0m[31m-                Some((field.clone(), session.window.clone().into()))
+[0m[31m-            }
+[0m[32m+            DictationHost::AnswerField {
+[0m[32m+                question: hosted,
+[0m[32m+                field,
+[0m[32m+            } if hosted == question => Some((field.clone(), session.window.clone().into())),
+[0m             _ => None,
+         };
+         AnswerFieldDictation {
+Diff in \\?\C:\Users\NikitaDev\Desktop\projects\zed-experimental\crates\agent_ui\src\conversation_view\thread_view.rs:4783:
+ 
+     #[cfg(test)]
+     pub(crate) fn dictation_window(&self) -> Option<Entity<DictationWindow>> {
+[31m-        self.dictation.as_ref().map(|session| session.window.clone())
+[0m[32m+        self.dictation
+[0m[32m+            .as_ref()
+[0m[32m+            .map(|session| session.window.clone())
+[0m     }
+ 
+     #[cfg(test)]
+Diff in \\?\C:\Users\NikitaDev\Desktop\projects\zed-experimental\crates\agent_ui\src\conversation_view\thread_view.rs:4817:
+             window,
+             cx,
+         );
+[31m-        self.dictation.as_ref().map(|session| session.window.clone())
+[0m[32m+        self.dictation
+[0m[32m+            .as_ref()
+[0m[32m+            .map(|session| session.window.clone())
+[0m     }
+ 
+     fn render_queue_steer_button(
+Diff in \\?\C:\Users\NikitaDev\Desktop\projects\zed-experimental\crates\agent_ui\src\conversation_view.rs:4413:
+             "Answer: hello world"
+         );
+         thread.read_with(cx, |thread, cx| {
+[31m-            assert!(thread.dictation_host().is_none(), "Accept closes the window");
+[0m             assert!(
+[32m+                thread.dictation_host().is_none(),
+[0m[32m+                "Accept closes the window"
+[0m[32m+            );
+[0m[32m+            assert!(
+[0m                 thread.has_elicitation_form_state(&question),
+                 "Accept must not submit the answer"
+             );
+Diff in \\?\C:\Users\NikitaDev\Desktop\projects\zed-experimental\crates\agent_ui\src\conversation_view.rs:4421:
+             let (_, elicitation) = thread.thread.read(cx).elicitation(&question).unwrap();
+[31m-            assert!(matches!(elicitation.status, ElicitationStatus::Pending { .. }));
+[0m[32m+            assert!(matches!(
+[0m[32m+                elicitation.status,
+[0m[32m+                ElicitationStatus::Pending { .. }
+[0m[32m+            ));
+[0m             assert!(
+[31m-                thread.message_editor.read(cx).dictation_block(&block_id).is_none(),
+[0m[32m+                thread
+[0m[32m+                    .message_editor
+[0m[32m+                    .read(cx)
+[0m[32m+                    .dictation_block(&block_id)
+[0m[32m+                    .is_none(),
+[0m                 "no Dictation Block goes to the Composer"
+             );
+         });

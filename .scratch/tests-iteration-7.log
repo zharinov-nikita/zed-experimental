@@ -1,0 +1,872 @@
+   Compiling settings_content v0.1.0 (C:\Users\NikitaDev\Desktop\projects\zed-experimental\crates\settings_content)
+   Compiling copilot_chat v0.1.0 (C:\Users\NikitaDev\Desktop\projects\zed-experimental\crates\copilot_chat)
+   Compiling openai_subscribed v0.1.0 (C:\Users\NikitaDev\Desktop\projects\zed-experimental\crates\openai_subscribed)
+   Compiling migrator v0.1.0 (C:\Users\NikitaDev\Desktop\projects\zed-experimental\crates\migrator)
+   Compiling file_icons v0.1.0 (C:\Users\NikitaDev\Desktop\projects\zed-experimental\crates\file_icons)
+   Compiling settings v0.1.0 (C:\Users\NikitaDev\Desktop\projects\zed-experimental\crates\settings)
+warning: linker stdout: LINK : warning LNK4217: symbol 'wasm_byte_vec_delete' defined in 'libwasmtime_c_api-ec42d0f06e7a4cc5.rlib(wasmtime_c_api-ec42d0f06e7a4cc5.wasmtime_c_api.57f172cf0a713fbe-cgu.12.rcgu.o)' is imported by 'libtree_sitter-11c54d58852e37eb.rlib(9d101ca0d5afdee2-lib.o)' in function 'ts_wasm_store__instantiate'␍
+         LINK : warning LNK4217: symbol 'wasm_engine_delete' defined in 'libwasmtime_c_api-ec42d0f06e7a4cc5.rlib(wasmtime_c_api-ec42d0f06e7a4cc5.wasmtime_c_api.57f172cf0a713fbe-cgu.04.rcgu.o)' is imported by 'libtree_sitter-11c54d58852e37eb.rlib(9d101ca0d5afdee2-lib.o)' in function 'ts_wasm_store_delete'␍
+         LINK : warning LNK4217: symbol 'wasm_valtype_vec_new_empty' defined in 'libwasmtime_c_api-ec42d0f06e7a4cc5.rlib(wasmtime_c_api-ec42d0f06e7a4cc5.wasmtime_c_api.57f172cf0a713fbe-cgu.12.rcgu.o)' is imported by 'libtree_sitter-11c54d58852e37eb.rlib(9d101ca0d5afdee2-lib.o)' in function 'ts_wasm_store_new'␍
+         LINK : warning LNK4217: symbol 'wasm_valtype_vec_new' defined in 'libwasmtime_c_api-ec42d0f06e7a4cc5.rlib(wasmtime_c_api-ec42d0f06e7a4cc5.wasmtime_c_api.57f172cf0a713fbe-cgu.12.rcgu.o)' is imported by 'libtree_sitter-11c54d58852e37eb.rlib(9d101ca0d5afdee2-lib.o)' in function 'ts_wasm_store_new'␍
+         LINK : warning LNK4217: symbol 'wasm_valtype_new' defined in 'libwasmtime_c_api-ec42d0f06e7a4cc5.rlib(wasmtime_c_api-ec42d0f06e7a4cc5.wasmtime_c_api.57f172cf0a713fbe-cgu.11.rcgu.o)' is imported by 'libtree_sitter-11c54d58852e37eb.rlib(9d101ca0d5afdee2-lib.o)' in function 'ts_wasm_store_new'␍
+         LINK : warning LNK4217: symbol 'wasm_functype_delete' defined in 'libwasmtime_c_api-ec42d0f06e7a4cc5.rlib(wasmtime_c_api-ec42d0f06e7a4cc5.wasmtime_c_api.57f172cf0a713fbe-cgu.08.rcgu.o)' is imported by 'libtree_sitter-11c54d58852e37eb.rlib(9d101ca0d5afdee2-lib.o)' in function 'ts_wasm_store_new'␍
+         LINK : warning LNK4217: symbol 'wasm_functype_new' defined in 'libwasmtime_c_api-ec42d0f06e7a4cc5.rlib(wasmtime_c_api-ec42d0f06e7a4cc5.wasmtime_c_api.57f172cf0a713fbe-cgu.08.rcgu.o)' is imported by 'libtree_sitter-11c54d58852e37eb.rlib(9d101ca0d5afdee2-lib.o)' in function 'ts_wasm_store_new'␍
+         LINK : warning LNK4217: symbol 'wasm_globaltype_delete' defined in 'libwasmtime_c_api-ec42d0f06e7a4cc5.rlib(wasmtime_c_api-ec42d0f06e7a4cc5.wasmtime_c_api.57f172cf0a713fbe-cgu.12.rcgu.o)' is imported by 'libtree_sitter-11c54d58852e37eb.rlib(9d101ca0d5afdee2-lib.o)' in function 'ts_wasm_store_delete'␍
+         LINK : warning LNK4217: symbol 'wasm_globaltype_new' defined in 'libwasmtime_c_api-ec42d0f06e7a4cc5.rlib(wasmtime_c_api-ec42d0f06e7a4cc5.wasmtime_c_api.57f172cf0a713fbe-cgu.12.rcgu.o)' is imported by 'libtree_sitter-11c54d58852e37eb.rlib(9d101ca0d5afdee2-lib.o)' in function 'ts_wasm_store_new'␍
+         LINK : warning LNK4217: symbol 'wasm_tabletype_delete' defined in 'libwasmtime_c_api-ec42d0f06e7a4cc5.rlib(wasmtime_c_api-ec42d0f06e7a4cc5.wasmtime_c_api.57f172cf0a713fbe-cgu.05.rcgu.o)' is imported by 'libtree_sitter-11c54d58852e37eb.rlib(9d101ca0d5afdee2-lib.o)' in function 'ts_wasm_store_new'␍
+         LINK : warning LNK4217: symbol 'wasm_tabletype_new' defined in 'libwasmtime_c_api-ec42d0f06e7a4cc5.rlib(wasmtime_c_api-ec42d0f06e7a4cc5.wasmtime_c_api.57f172cf0a713fbe-cgu.05.rcgu.o)' is imported by 'libtree_sitter-11c54d58852e37eb.rlib(9d101ca0d5afdee2-lib.o)' in function 'ts_wasm_store_new'␍
+         LINK : warning LNK4217: symbol 'wasm_memorytype_delete' defined in 'libwasmtime_c_api-ec42d0f06e7a4cc5.rlib(wasmtime_c_api-ec42d0f06e7a4cc5.wasmtime_c_api.57f172cf0a713fbe-cgu.03.rcgu.o)' is imported by 'libtree_sitter-11c54d58852e37eb.rlib(9d101ca0d5afdee2-lib.o)' in function 'ts_wasm_store_new'␍
+         LINK : warning LNK4217: symbol 'wasm_memorytype_new' defined in 'libwasmtime_c_api-ec42d0f06e7a4cc5.rlib(wasmtime_c_api-ec42d0f06e7a4cc5.wasmtime_c_api.57f172cf0a713fbe-cgu.03.rcgu.o)' is imported by 'libtree_sitter-11c54d58852e37eb.rlib(9d101ca0d5afdee2-lib.o)' in function 'ts_wasm_store_new'␍
+         LINK : warning LNK4217: symbol 'wasm_externtype_as_memorytype_const' defined in 'libwasmtime_c_api-ec42d0f06e7a4cc5.rlib(wasmtime_c_api-ec42d0f06e7a4cc5.wasmtime_c_api.57f172cf0a713fbe-cgu.05.rcgu.o)' is imported by 'libtree_sitter-11c54d58852e37eb.rlib(9d101ca0d5afdee2-lib.o)' in function 'ts_wasm_store_new'␍
+         LINK : warning LNK4217: symbol 'wasm_importtype_vec_delete' defined in 'libwasmtime_c_api-ec42d0f06e7a4cc5.rlib(wasmtime_c_api-ec42d0f06e7a4cc5.wasmtime_c_api.57f172cf0a713fbe-cgu.12.rcgu.o)' is imported by 'libtree_sitter-11c54d58852e37eb.rlib(9d101ca0d5afdee2-lib.o)' in function 'ts_wasm_store__instantiate'␍
+         LINK : warning LNK4217: symbol 'wasm_importtype_name' defined in 'libwasmtime_c_api-ec42d0f06e7a4cc5.rlib(wasmtime_c_api-ec42d0f06e7a4cc5.wasmtime_c_api.57f172cf0a713fbe-cgu.12.rcgu.o)' is imported by 'libtree_sitter-11c54d58852e37eb.rlib(9d101ca0d5afdee2-lib.o)' in function 'ts_wasm_store__instantiate'␍
+         LINK : warning LNK4217: symbol 'wasm_importtype_type' defined in 'libwasmtime_c_api-ec42d0f06e7a4cc5.rlib(wasmtime_c_api-ec42d0f06e7a4cc5.wasmtime_c_api.57f172cf0a713fbe-cgu.12.rcgu.o)' is imported by 'libtree_sitter-11c54d58852e37eb.rlib(9d101ca0d5afdee2-lib.o)' in function 'ts_wasm_store_new'␍
+         LINK : warning LNK4217: symbol 'wasm_exporttype_vec_delete' defined in 'libwasmtime_c_api-ec42d0f06e7a4cc5.rlib(wasmtime_c_api-ec42d0f06e7a4cc5.wasmtime_c_api.57f172cf0a713fbe-cgu.12.rcgu.o)' is imported by 'libtree_sitter-11c54d58852e37eb.rlib(9d101ca0d5afdee2-lib.o)' in function 'ts_wasm_store__instantiate'␍
+         LINK : warning LNK4217: symbol 'wasm_exporttype_name' defined in 'libwasmtime_c_api-ec42d0f06e7a4cc5.rlib(wasmtime_c_api-ec42d0f06e7a4cc5.wasmtime_c_api.57f172cf0a713fbe-cgu.12.rcgu.o)' is imported by 'libtree_sitter-11c54d58852e37eb.rlib(9d101ca0d5afdee2-lib.o)' in function 'ts_wasm_store__instantiate'␍
+         LINK : warning LNK4217: symbol 'wasm_trap_delete' defined in 'libwasmtime_c_api-ec42d0f06e7a4cc5.rlib(wasmtime_c_api-ec42d0f06e7a4cc5.wasmtime_c_api.57f172cf0a713fbe-cgu.12.rcgu.o)' is imported by 'libtree_sitter-11c54d58852e37eb.rlib(9d101ca0d5afdee2-lib.o)' in function 'ts_parser__external_scanner_create'␍
+         LINK : warning LNK4217: symbol 'wasm_trap_message' defined in 'libwasmtime_c_api-ec42d0f06e7a4cc5.rlib(wasmtime_c_api-ec42d0f06e7a4cc5.wasmtime_c_api.57f172cf0a713fbe-cgu.12.rcgu.o)' is imported by 'libtree_sitter-11c54d58852e37eb.rlib(9d101ca0d5afdee2-lib.o)' in function 'ts_wasm_store__instantiate'␍
+         LINK : warning LNK4217: symbol 'wasmtime_error_delete' defined in 'libwasmtime_c_api-ec42d0f06e7a4cc5.rlib(wasmtime_c_api-ec42d0f06e7a4cc5.wasmtime_c_api.57f172cf0a713fbe-cgu.10.rcgu.o)' is imported by 'libtree_sitter-11c54d58852e37eb.rlib(9d101ca0d5afdee2-lib.o)' in function 'ts_parser__external_scanner_create'␍
+         LINK : warning LNK4217: symbol 'wasmtime_error_message' defined in 'libwasmtime_c_api-ec42d0f06e7a4cc5.rlib(wasmtime_c_api-ec42d0f06e7a4cc5.wasmtime_c_api.57f172cf0a713fbe-cgu.10.rcgu.o)' is imported by 'libtree_sitter-11c54d58852e37eb.rlib(9d101ca0d5afdee2-lib.o)' in function 'ts_wasm_store__instantiate'␍
+         LINK : warning LNK4217: symbol 'wasmtime_module_new' defined in 'libwasmtime_c_api-ec42d0f06e7a4cc5.rlib(wasmtime_c_api-ec42d0f06e7a4cc5.wasmtime_c_api.57f172cf0a713fbe-cgu.12.rcgu.o)' is imported by 'libtree_sitter-11c54d58852e37eb.rlib(9d101ca0d5afdee2-lib.o)' in function 'ts_wasm_store_load_language'␍
+         LINK : warning LNK4217: symbol 'wasmtime_module_delete' defined in 'libwasmtime_c_api-ec42d0f06e7a4cc5.rlib(wasmtime_c_api-ec42d0f06e7a4cc5.wasmtime_c_api.57f172cf0a713fbe-cgu.12.rcgu.o)' is imported by 'libtree_sitter-11c54d58852e37eb.rlib(9d101ca0d5afdee2-lib.o)' in function 'ts_language_delete'␍
+         LINK : warning LNK4217: symbol 'wasmtime_module_imports' defined in 'libwasmtime_c_api-ec42d0f06e7a4cc5.rlib(wasmtime_c_api-ec42d0f06e7a4cc5.wasmtime_c_api.57f172cf0a713fbe-cgu.12.rcgu.o)' is imported by 'libtree_sitter-11c54d58852e37eb.rlib(9d101ca0d5afdee2-lib.o)' in function 'ts_wasm_store__instantiate'␍
+         LINK : warning LNK4217: symbol 'wasmtime_module_exports' defined in 'libwasmtime_c_api-ec42d0f06e7a4cc5.rlib(wasmtime_c_api-ec42d0f06e7a4cc5.wasmtime_c_api.57f172cf0a713fbe-cgu.12.rcgu.o)' is imported by 'libtree_sitter-11c54d58852e37eb.rlib(9d101ca0d5afdee2-lib.o)' in function 'ts_wasm_store__instantiate'␍
+         LINK : warning LNK4217: symbol 'wasmtime_store_new' defined in 'libwasmtime_c_api-ec42d0f06e7a4cc5.rlib(wasmtime_c_api-ec42d0f06e7a4cc5.wasmtime_c_api.57f172cf0a713fbe-cgu.03.rcgu.o)' is imported by 'libtree_sitter-11c54d58852e37eb.rlib(9d101ca0d5afdee2-lib.o)' in function 'ts_wasm_store_new'␍
+         LINK : warning LNK4217: symbol 'wasmtime_store_context' defined in 'libwasmtime_c_api-ec42d0f06e7a4cc5.rlib(wasmtime_c_api-ec42d0f06e7a4cc5.wasmtime_c_api.57f172cf0a713fbe-cgu.03.rcgu.o)' is imported by 'libtree_sitter-11c54d58852e37eb.rlib(9d101ca0d5afdee2-lib.o)' in function 'ts_parser__external_scanner_create'␍
+         LINK : warning LNK4217: symbol 'wasmtime_store_delete' defined in 'libwasmtime_c_api-ec42d0f06e7a4cc5.rlib(wasmtime_c_api-ec42d0f06e7a4cc5.wasmtime_c_api.57f172cf0a713fbe-cgu.03.rcgu.o)' is imported by 'libtree_sitter-11c54d58852e37eb.rlib(9d101ca0d5afdee2-lib.o)' in function 'ts_wasm_store_delete'␍
+         LINK : warning LNK4217: symbol 'wasmtime_func_new_unchecked' defined in 'libwasmtime_c_api-ec42d0f06e7a4cc5.rlib(wasmtime_c_api-ec42d0f06e7a4cc5.wasmtime_c_api.57f172cf0a713fbe-cgu.12.rcgu.o)' is imported by 'libtree_sitter-11c54d58852e37eb.rlib(9d101ca0d5afdee2-lib.o)' in function 'ts_wasm_store_new'␍
+         LINK : warning LNK4217: symbol 'wasmtime_func_call' defined in 'libwasmtime_c_api-ec42d0f06e7a4cc5.rlib(wasmtime_c_api-ec42d0f06e7a4cc5.wasmtime_c_api.57f172cf0a713fbe-cgu.12.rcgu.o)' is imported by 'libtree_sitter-11c54d58852e37eb.rlib(9d101ca0d5afdee2-lib.o)' in function 'ts_wasm_store__call_module_initializer'␍
+         LINK : warning LNK4217: symbol 'wasmtime_func_call_unchecked' defined in 'libwasmtime_c_api-ec42d0f06e7a4cc5.rlib(wasmtime_c_api-ec42d0f06e7a4cc5.wasmtime_c_api.57f172cf0a713fbe-cgu.12.rcgu.o)' is imported by 'libtree_sitter-11c54d58852e37eb.rlib(9d101ca0d5afdee2-lib.o)' in function 'ts_parser__external_scanner_create'␍
+         LINK : warning LNK4217: symbol 'wasmtime_caller_context' defined in 'libwasmtime_c_api-ec42d0f06e7a4cc5.rlib(wasmtime_c_api-ec42d0f06e7a4cc5.wasmtime_c_api.57f172cf0a713fbe-cgu.12.rcgu.o)' is imported by 'libtree_sitter-11c54d58852e37eb.rlib(9d101ca0d5afdee2-lib.o)' in function 'callback__debug_message'␍
+         LINK : warning LNK4217: symbol 'wasmtime_instance_new' defined in 'libwasmtime_c_api-ec42d0f06e7a4cc5.rlib(wasmtime_c_api-ec42d0f06e7a4cc5.wasmtime_c_api.57f172cf0a713fbe-cgu.12.rcgu.o)' is imported by 'libtree_sitter-11c54d58852e37eb.rlib(9d101ca0d5afdee2-lib.o)' in function 'ts_wasm_store__instantiate'␍
+         LINK : warning LNK4217: symbol 'wasmtime_instance_export_nth' defined in 'libwasmtime_c_api-ec42d0f06e7a4cc5.rlib(wasmtime_c_api-ec42d0f06e7a4cc5.wasmtime_c_api.57f172cf0a713fbe-cgu.12.rcgu.o)' is imported by 'libtree_sitter-11c54d58852e37eb.rlib(9d101ca0d5afdee2-lib.o)' in function 'ts_wasm_store__instantiate'␍
+         LINK : warning LNK4217: symbol 'wasmtime_engine_clone' defined in 'libwasmtime_c_api-ec42d0f06e7a4cc5.rlib(wasmtime_c_api-ec42d0f06e7a4cc5.wasmtime_c_api.57f172cf0a713fbe-cgu.04.rcgu.o)' is imported by 'libtree_sitter-11c54d58852e37eb.rlib(9d101ca0d5afdee2-lib.o)' in function 'ts_wasm_store_new'␍
+         LINK : warning LNK4217: symbol 'wasmtime_global_new' defined in 'libwasmtime_c_api-ec42d0f06e7a4cc5.rlib(wasmtime_c_api-ec42d0f06e7a4cc5.wasmtime_c_api.57f172cf0a713fbe-cgu.12.rcgu.o)' is imported by 'libtree_sitter-11c54d58852e37eb.rlib(9d101ca0d5afdee2-lib.o)' in function 'ts_wasm_store__provide_builtin_import'␍
+         LINK : warning LNK4217: symbol 'wasmtime_memorytype_minimum' defined in 'libwasmtime_c_api-ec42d0f06e7a4cc5.rlib(wasmtime_c_api-ec42d0f06e7a4cc5.wasmtime_c_api.57f172cf0a713fbe-cgu.03.rcgu.o)' is imported by 'libtree_sitter-11c54d58852e37eb.rlib(9d101ca0d5afdee2-lib.o)' in function 'ts_wasm_store_new'␍
+         LINK : warning LNK4217: symbol 'wasmtime_memory_new' defined in 'libwasmtime_c_api-ec42d0f06e7a4cc5.rlib(wasmtime_c_api-ec42d0f06e7a4cc5.wasmtime_c_api.57f172cf0a713fbe-cgu.05.rcgu.o)' is imported by 'libtree_sitter-11c54d58852e37eb.rlib(9d101ca0d5afdee2-lib.o)' in function 'ts_wasm_store_new'␍
+         LINK : warning LNK4217: symbol 'wasmtime_memory_data' defined in 'libwasmtime_c_api-ec42d0f06e7a4cc5.rlib(wasmtime_c_api-ec42d0f06e7a4cc5.wasmtime_c_api.57f172cf0a713fbe-cgu.05.rcgu.o)' is imported by 'libtree_sitter-11c54d58852e37eb.rlib(9d101ca0d5afdee2-lib.o)' in function 'callback__debug_message'␍
+         LINK : warning LNK4217: symbol 'wasmtime_memory_data_size' defined in 'libwasmtime_c_api-ec42d0f06e7a4cc5.rlib(wasmtime_c_api-ec42d0f06e7a4cc5.wasmtime_c_api.57f172cf0a713fbe-cgu.05.rcgu.o)' is imported by 'libtree_sitter-11c54d58852e37eb.rlib(9d101ca0d5afdee2-lib.o)' in function 'ts_wasm_store__instantiate'␍
+         LINK : warning LNK4217: symbol 'wasmtime_memory_grow' defined in 'libwasmtime_c_api-ec42d0f06e7a4cc5.rlib(wasmtime_c_api-ec42d0f06e7a4cc5.wasmtime_c_api.57f172cf0a713fbe-cgu.05.rcgu.o)' is imported by 'libtree_sitter-11c54d58852e37eb.rlib(9d101ca0d5afdee2-lib.o)' in function 'ts_wasm_store__instantiate'␍
+         LINK : warning LNK4217: symbol 'wasmtime_table_new' defined in 'libwasmtime_c_api-ec42d0f06e7a4cc5.rlib(wasmtime_c_api-ec42d0f06e7a4cc5.wasmtime_c_api.57f172cf0a713fbe-cgu.05.rcgu.o)' is imported by 'libtree_sitter-11c54d58852e37eb.rlib(9d101ca0d5afdee2-lib.o)' in function 'ts_wasm_store_new'␍
+         LINK : warning LNK4217: symbol 'wasmtime_table_get' defined in 'libwasmtime_c_api-ec42d0f06e7a4cc5.rlib(wasmtime_c_api-ec42d0f06e7a4cc5.wasmtime_c_api.57f172cf0a713fbe-cgu.05.rcgu.o)' is imported by 'libtree_sitter-11c54d58852e37eb.rlib(9d101ca0d5afdee2-lib.o)' in function 'ts_wasm_store__get_function'␍
+         LINK : warning LNK4217: symbol 'wasmtime_table_set' defined in 'libwasmtime_c_api-ec42d0f06e7a4cc5.rlib(wasmtime_c_api-ec42d0f06e7a4cc5.wasmtime_c_api.57f172cf0a713fbe-cgu.05.rcgu.o)' is imported by 'libtree_sitter-11c54d58852e37eb.rlib(9d101ca0d5afdee2-lib.o)' in function 'ts_wasm_store_new'␍
+         LINK : warning LNK4217: symbol 'wasmtime_table_grow' defined in 'libwasmtime_c_api-ec42d0f06e7a4cc5.rlib(wasmtime_c_api-ec42d0f06e7a4cc5.wasmtime_c_api.57f172cf0a713fbe-cgu.05.rcgu.o)' is imported by 'libtree_sitter-11c54d58852e37eb.rlib(9d101ca0d5afdee2-lib.o)' in function 'ts_wasm_store__instantiate'␍
+         LINK : warning LNK4217: symbol 'wasmtime_trap_new' defined in 'libwasmtime_c_api-ec42d0f06e7a4cc5.rlib(wasmtime_c_api-ec42d0f06e7a4cc5.wasmtime_c_api.57f172cf0a713fbe-cgu.12.rcgu.o)' is imported by 'libtree_sitter-11c54d58852e37eb.rlib(9d101ca0d5afdee2-lib.o)' in function 'callback__abort'
+  |
+  = note: `#[warn(linker_messages)]` on by default
+
+warning: `settings_content` (lib test) generated 1 warning
+   Compiling language v0.1.0 (C:\Users\NikitaDev\Desktop\projects\zed-experimental\crates\language)
+   Compiling feature_flags v0.1.0 (C:\Users\NikitaDev\Desktop\projects\zed-experimental\crates\feature_flags)
+   Compiling theme_settings v0.1.0 (C:\Users\NikitaDev\Desktop\projects\zed-experimental\crates\theme_settings)
+   Compiling git_hosting_providers v0.1.0 (C:\Users\NikitaDev\Desktop\projects\zed-experimental\crates\git_hosting_providers)
+   Compiling context_server v0.1.0 (C:\Users\NikitaDev\Desktop\projects\zed-experimental\crates\context_server)
+   Compiling remote v0.1.0 (C:\Users\NikitaDev\Desktop\projects\zed-experimental\crates\remote)
+   Compiling vim_mode_setting v0.1.0 (C:\Users\NikitaDev\Desktop\projects\zed-experimental\crates\vim_mode_setting)
+   Compiling ollama v0.1.0 (C:\Users\NikitaDev\Desktop\projects\zed-experimental\crates\ollama)
+   Compiling open_router v0.1.0 (C:\Users\NikitaDev\Desktop\projects\zed-experimental\crates\open_router)
+   Compiling audio v0.1.0 (C:\Users\NikitaDev\Desktop\projects\zed-experimental\crates\audio)
+   Compiling dictation v0.1.0 (C:\Users\NikitaDev\Desktop\projects\zed-experimental\crates\dictation)
+   Compiling terminal v0.1.0 (C:\Users\NikitaDev\Desktop\projects\zed-experimental\crates\terminal)
+   Compiling worktree v0.1.0 (C:\Users\NikitaDev\Desktop\projects\zed-experimental\crates\worktree)
+   Compiling buffer_diff v0.1.0 (C:\Users\NikitaDev\Desktop\projects\zed-experimental\crates\buffer_diff)
+   Compiling prettier v0.1.0 (C:\Users\NikitaDev\Desktop\projects\zed-experimental\crates\prettier)
+   Compiling markdown v0.1.0 (C:\Users\NikitaDev\Desktop\projects\zed-experimental\crates\markdown)
+   Compiling language_detection v0.1.0 (C:\Users\NikitaDev\Desktop\projects\zed-experimental\crates\language_detection)
+   Compiling prompt_store v0.1.0 (C:\Users\NikitaDev\Desktop\projects\zed-experimental\crates\prompt_store)
+   Compiling multi_buffer v0.1.0 (C:\Users\NikitaDev\Desktop\projects\zed-experimental\crates\multi_buffer)
+   Compiling client v0.1.0 (C:\Users\NikitaDev\Desktop\projects\zed-experimental\crates\client)
+   Compiling dap v0.1.0 (C:\Users\NikitaDev\Desktop\projects\zed-experimental\crates\dap)
+   Compiling edit_prediction_types v0.1.0 (C:\Users\NikitaDev\Desktop\projects\zed-experimental\crates\edit_prediction_types)
+   Compiling ai_onboarding v0.1.0 (C:\Users\NikitaDev\Desktop\projects\zed-experimental\crates\ai_onboarding)
+   Compiling channel v0.1.0 (C:\Users\NikitaDev\Desktop\projects\zed-experimental\crates\channel)
+   Compiling extension v0.1.0 (C:\Users\NikitaDev\Desktop\projects\zed-experimental\crates\extension)
+   Compiling snippet_provider v0.1.0 (C:\Users\NikitaDev\Desktop\projects\zed-experimental\crates\snippet_provider)
+   Compiling project v0.1.0 (C:\Users\NikitaDev\Desktop\projects\zed-experimental\crates\project)
+   Compiling agent_settings v0.1.0 (C:\Users\NikitaDev\Desktop\projects\zed-experimental\crates\agent_settings)
+   Compiling action_log v0.1.0 (C:\Users\NikitaDev\Desktop\projects\zed-experimental\crates\action_log)
+   Compiling edit_prediction_context v0.1.0 (C:\Users\NikitaDev\Desktop\projects\zed-experimental\crates\edit_prediction_context)
+   Compiling extension_host v0.1.0 (C:\Users\NikitaDev\Desktop\projects\zed-experimental\crates\extension_host)
+   Compiling json_schema_store v0.1.0 (C:\Users\NikitaDev\Desktop\projects\zed-experimental\crates\json_schema_store)
+   Compiling languages v0.1.0 (C:\Users\NikitaDev\Desktop\projects\zed-experimental\crates\languages)
+   Compiling workspace v0.1.0 (C:\Users\NikitaDev\Desktop\projects\zed-experimental\crates\workspace)
+   Compiling acp_thread v0.1.0 (C:\Users\NikitaDev\Desktop\projects\zed-experimental\crates\acp_thread)
+   Compiling agent_servers v0.1.0 (C:\Users\NikitaDev\Desktop\projects\zed-experimental\crates\agent_servers)
+   Compiling command_palette_hooks v0.1.0 (C:\Users\NikitaDev\Desktop\projects\zed-experimental\crates\command_palette_hooks)
+   Compiling breadcrumbs v0.1.0 (C:\Users\NikitaDev\Desktop\projects\zed-experimental\crates\breadcrumbs)
+   Compiling picker v0.1.0 (C:\Users\NikitaDev\Desktop\projects\zed-experimental\crates\picker)
+   Compiling auto_update v0.1.0 (C:\Users\NikitaDev\Desktop\projects\zed-experimental\crates\auto_update)
+   Compiling platform_title_bar v0.1.0 (C:\Users\NikitaDev\Desktop\projects\zed-experimental\crates\platform_title_bar)
+   Compiling notifications v0.1.0 (C:\Users\NikitaDev\Desktop\projects\zed-experimental\crates\notifications)
+   Compiling editor v0.1.0 (C:\Users\NikitaDev\Desktop\projects\zed-experimental\crates\editor)
+   Compiling copilot v0.1.0 (C:\Users\NikitaDev\Desktop\projects\zed-experimental\crates\copilot)
+   Compiling remote_connection v0.1.0 (C:\Users\NikitaDev\Desktop\projects\zed-experimental\crates\remote_connection)
+   Compiling command_palette v0.1.0 (C:\Users\NikitaDev\Desktop\projects\zed-experimental\crates\command_palette)
+   Compiling copilot_ui v0.1.0 (C:\Users\NikitaDev\Desktop\projects\zed-experimental\crates\copilot_ui)
+   Compiling edit_prediction v0.1.0 (C:\Users\NikitaDev\Desktop\projects\zed-experimental\crates\edit_prediction)
+   Compiling language_models v0.1.0 (C:\Users\NikitaDev\Desktop\projects\zed-experimental\crates\language_models)
+   Compiling codestral v0.1.0 (C:\Users\NikitaDev\Desktop\projects\zed-experimental\crates\codestral)
+   Compiling agent v0.1.0 (C:\Users\NikitaDev\Desktop\projects\zed-experimental\crates\agent)
+warning: `agent_settings` (lib test) generated 1 warning (1 duplicate)
+   Compiling picker_preview v0.1.0 (C:\Users\NikitaDev\Desktop\projects\zed-experimental\crates\picker_preview)
+   Compiling terminal_view v0.1.0 (C:\Users\NikitaDev\Desktop\projects\zed-experimental\crates\terminal_view)
+   Compiling edit_prediction_ui v0.1.0 (C:\Users\NikitaDev\Desktop\projects\zed-experimental\crates\edit_prediction_ui)
+   Compiling git_ui_core v0.1.0 (C:\Users\NikitaDev\Desktop\projects\zed-experimental\crates\git_ui_core)
+warning: `agent_servers` (lib test) generated 1 warning (1 duplicate)
+   Compiling search v0.1.0 (C:\Users\NikitaDev\Desktop\projects\zed-experimental\crates\search)
+   Compiling vim v0.1.0 (C:\Users\NikitaDev\Desktop\projects\zed-experimental\crates\vim)
+   Compiling settings_ui v0.1.0 (C:\Users\NikitaDev\Desktop\projects\zed-experimental\crates\settings_ui)
+   Compiling agent_ui v0.1.0 (C:\Users\NikitaDev\Desktop\projects\zed-experimental\crates\agent_ui)
+warning: `settings_ui` (lib test) generated 1 warning (1 duplicate)
+warning: `agent_ui` (lib test) generated 1 warning (1 duplicate)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 3m 41s
+     Running unittests src\agent_servers.rs (target\debug\deps\agent_servers-99bcdfc109217584.exe)
+
+running 32 tests
+test acp::tests::only_a_text_only_session_is_refused ... ok
+test acp::tests::session_directories_drop_additional_paths_when_unsupported ... ok
+test acp::tests::client_capabilities_include_boolean_config_options ... ok
+test acp::tests::cursor_client_capabilities_include_parameterized_model_picker_meta ... ok
+test acp::tests::non_cursor_client_capabilities_do_not_include_parameterized_model_picker_meta ... ok
+test acp::tests::legacy_terminal_auth_task_returns_none_for_invalid_meta ... ok
+test acp::tests::session_directories_use_ordered_paths_when_supported ... ok
+test acp::tests::legacy_terminal_auth_task_parses_meta_and_retries_session ... ok
+test acp::tests::first_class_terminal_auth_takes_precedence_over_legacy_meta ... ok
+test acp::tests::session_info_work_dirs_deduplicate_cwd_and_additional_directories ... ok
+test acp::tests::session_info_work_dirs_preserve_cwd_then_additional_directories ... ok
+test acp::tests::terminal_auth_task_builds_spawn_from_prebuilt_command ... ok
+test acp::tests::debug_log_records_each_json_rpc_batch_entry ... ok
+test acp::tests::trailing_stderr_only_uses_final_stderr_block ... ok
+test acp::tests::session_list_delete_does_not_send_when_unsupported ... ok
+test acp::tests::session_list_delete_sends_session_delete_when_supported ... ok
+test acp::tests::session_list_includes_additional_directories_in_work_dirs ... ok
+test acp::tests::default_config_options_apply_boolean_defaults ... ok
+test custom::tests::test_agent_with_registry_settings_type_is_registry ... ok
+test custom::tests::test_unknown_agent_is_not_registry ... ok
+test custom::tests::test_agent_in_registry_store_is_registry ... ok
+test acp::tests::client_capabilities_include_elicitation_without_acp_beta ... ok
+test acp::tests::test_dropping_one_loader_during_load_preserves_other_concurrent_loader ... ok
+test acp::tests::test_dropping_loader_during_in_flight_load_closes_session ... ok
+test acp::tests::test_loaded_sessions_keep_state_until_last_handle_drops ... ok
+test acp::tests::test_load_session_replays_notifications_sent_before_response ... ok
+test acp::tests::a_text_only_session_is_refused_actions_while_an_ordinary_one_is_not ... ok
+test acp::tests::additional_directories_support_respects_agent_capability ... ok
+test acp::tests::request_scoped_elicitation_during_auth_uses_connection_store ... ok
+test acp::tests::settings_changes_refresh_active_connection_defaults ... ok
+test acp::tests::request_scoped_elicitation_ignores_open_sessions ... ok
+test acp::tests::request_scoped_url_elicitation_completion_before_consent_is_ignored ... ok
+
+test result: ok. 32 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.10s
+
+     Running unittests src\agent_settings.rs (target\debug\deps\agent_settings-2970edb33efc31b4.exe)
+
+running 47 tests
+test agent_profile::tests::explicit_true_enables_tool_when_enable_all_is_false ... ok
+test agent_profile::tests::explicit_false_disables_tool_when_enable_all_is_true ... ok
+test tests::test_dictation_language_round_trip ... ok
+test tests::test_fork_bomb_pattern_matches ... ok
+test tests::test_compiled_regex_stores_case_sensitivity ... ok
+test tests::test_default_json_dictation_language_is_english ... ok
+test tests::test_default_json_tool_permissions_parse ... ok
+test tests::test_invalid_regex_returns_none ... ok
+test tests::test_always_allow_pattern_only_matches_specified_commands ... ok
+test tests::test_parse_auto_compact_threshold ... ok
+test tests::test_empty_regex_pattern_is_invalid ... ok
+test tests::test_compiled_regex_case_sensitive ... ok
+test tests::test_compiled_regex_case_insensitive ... ok
+test tests::test_sandbox_permissions_bare_string_has_no_resolved ... ok
+test tests::test_sandbox_permissions_empty ... ok
+test tests::test_sandbox_permissions_dedup_keys_on_resolved_path ... ok
+test tests::test_confirm_takes_precedence_over_allow ... ok
+test tests::test_sandbox_permissions_normalizes_and_prunes_parent_traversal ... ok
+test tests::test_invalid_regex_is_tracked_and_valid_ones_still_compile ... ok
+test tests::test_sandbox_permissions_object_preserves_resolved ... ok
+test tests::test_sandbox_permissions_parsing_and_pruning ... ok
+test tests::test_invalid_regex_is_skipped_not_fail ... ok
+test tests::test_sandbox_permissions_warn_confusable_unicode_can_be_disabled ... ok
+test tests::test_tool_permissions_empty ... ok
+test tests::test_tool_permissions_explicit_global_default ... ok
+test tests::test_deny_takes_precedence_over_allow_and_confirm ... ok
+test tests::test_tool_rules_default ... ok
+test tests::test_tool_rules_default_returns_confirm ... ok
+test tests::test_unconfigured_tool_not_in_permissions ... ok
+test tests::test_tool_permissions_parsing ... ok
+test tests::test_regex_matches_anywhere_in_string_not_just_anchored ... ok
+test user_agents_md::tests::empty_file_is_ignored ... ok
+test user_agents_md::tests::loads_initial_content ... ok
+test user_agents_md::tests::reacts_to_file_changes ... ok
+test tests::test_tool_permissions_with_multiple_tools ... ok
+test tests::test_tool_permissions_with_all_rule_types ... ok
+test agent_profile::tests::unmodified_default_detection ... ok
+test tests::test_dictation_old_save_last_recording_key_is_ignored ... ok
+test tests::test_get_layout ... ok
+test tests::test_set_layout_minimal_diff ... ok
+test tests::test_dictation_settings_defaults_and_overrides ... ok
+test tests::test_dictation_glossary_defaults_survive_a_user_dictation_block ... ok
+test tests::test_dictation_post_processing_agent_and_announced_options_cache_are_resolved ... ok
+test tests::test_terminal_init_command_filters_empty_without_trimming ... ok
+test tests::test_backfill_editor_layout ... ok
+test tests::test_set_layout_round_trip ... ok
+test tests::test_prevent_idle_sleep_defaults_to_true_and_follows_user_settings ... ok
+
+test result: ok. 47 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.11s
+
+     Running unittests src\agent_ui.rs (target\debug\deps\agent_ui-476e3f78ed70f922.exe)
+
+running 522 tests
+test agent_panel::tests::test_build_conflicted_files_resolution_prompt_empty_paths ... ok
+test agent_panel::tests::test_build_conflict_resolution_prompt_empty_conflicts ... ok
+test agent_configuration::configure_context_server_modal::tests::context_server_http_input_preserves_existing_oauth_settings ... ok
+test agent_configuration::configure_context_server_modal::tests::parse_http_input_reads_oauth_settings ... ok
+test agent_panel::tests::test_build_conflicted_files_resolution_prompt_file_paths_only ... ok
+test agent_panel::tests::test_build_conflict_resolution_prompt_multiple_conflicts_same_file ... ok
+test agent_panel::tests::test_build_conflict_resolution_prompt_single_conflict ... ok
+test agent_panel::tests::test_build_conflict_resolution_prompt_multiple_conflicts_different_files ... ok
+test agent_panel::tests::test_conflict_resource_block_structure ... ok
+test agent_panel::tests::test_deserialize_agent_variants ... ok
+test agent_diff::tests::test_multibuffer_agent_diff ... ok
+test agent_diff::tests::test_single_file_review_diff ... ok
+test agent_panel::tests::test_empty_workspace_does_not_create_agent_entries ... ok
+test agent_panel::tests::test_draft_prompt_blocks_use_current_editor_snapshot ... ok
+test agent_panel::tests::test_create_thread_with_options_retains_thread_and_restores_agent ... ok
+test agent_panel::tests::test_add_selection_to_terminal_thread_pastes_mention ... ok
+test agent_panel::tests::test_classify_worktrees_skips_non_git_root_with_nested_repo ... ok
+test agent_panel::tests::test_clicking_tool_call_output_keeps_agent_panel_focused_and_zoomed ... ok
+test agent_panel::tests::test_active_terminal_notification_clears_when_window_reactivates ... ok
+test agent_panel::tests::test_draft_replaced_when_selected_agent_changes ... ok
+test agent_panel::tests::test_activate_draft_preserves_typed_content ... ok
+test agent_panel::tests::test_is_known_terminal_agent_command ... ok
+test agent_panel::tests::test_initial_content_for_thread_summary_uses_own_session_id ... ok
+test agent_panel::tests::test_draft_has_user_content_checks_all_live_copies ... ok
+test agent_panel::tests::test_active_terminal_serialize_and_load_round_trip ... ok
+test agent_panel::tests::test_background_thread_promoted_via_load ... ok
+test agent_panel::tests::test_external_file_drop_on_thread_does_not_paste_into_later_terminal ... ok
+test agent_panel::tests::test_focused_terminal_bell_notifies_when_window_inactive ... ok
+test agent_panel::tests::test_initialize_from_source_inherits_agent_without_draft_content ... ok
+test agent_panel::tests::test_initialize_from_source_does_not_overwrite_existing_content ... ok
+test agent_panel::tests::test_active_thread_serialize_and_load_round_trip ... ok
+test agent_panel::tests::test_initialize_from_source_transfers_draft_to_fresh_panel ... ok
+test agent_panel::tests::test_idle_non_loadable_thread_retained_when_navigating_away ... ok
+test agent_panel::tests::test_opened_workspace_does_not_inherit_uninstalled_agent_from_source ... ok
+test agent_panel::tests::test_initialize_from_source_retargets_empty_destination_draft_agent ... ok
+test agent_panel::tests::test_new_thread_uses_workspace_selected_agent ... ok
+test agent_panel::tests::test_resolve_worktree_branch_target ... ok
+test agent_panel::tests::test_new_workspace_ignores_uninstalled_global_last_used_agent ... ok
+test agent_panel::tests::test_pending_terminal_restore_prevents_initial_terminal_creation ... ok
+test agent_panel::tests::test_new_workspace_inherits_global_last_used_agent ... ok
+test agent_panel::tests::test_new_workspace_load_uses_global_terminal_entry_kind ... ok
+test agent_panel::tests::test_non_native_thread_without_metadata_is_not_restored ... ok
+test agent_panel::tests::test_repeated_activation_only_creates_one_initial_terminal ... ok
+test agent_panel::tests::test_restored_terminal_runs_init_command_once ... ok
+test agent_panel::tests::test_restored_terminal_selects_without_focusing ... ok
+test agent_panel::tests::test_draft_promotion_creates_metadata_and_new_session_on_reload ... ok
+test agent_panel::tests::test_restored_terminal_uses_metadata_title_until_shell_title_arrives ... ok
+test agent_panel::tests::test_restored_terminal_does_not_update_global_entry_kind ... ok
+test agent_panel::tests::test_reopened_workspace_uses_installed_global_agent_when_selected_agent_was_uninstalled ... ok
+test agent_panel::tests::test_rollback_all_succeed_returns_ok ... ok
+test agent_panel::tests::test_rollback_on_canceled_receiver ... ok
+test agent_panel::tests::test_rollback_cleans_up_orphan_directories ... ok
+test agent_panel::tests::test_reopening_visible_thread_keeps_thread_usable ... ok
+test agent_panel::tests::test_rollback_on_failure_attempts_all_worktrees ... ok
+test agent_panel::tests::test_new_external_agent_replaces_mismatched_ephemeral_draft ... ok
+test agent_panel::tests::test_reloaded_ephemeral_draft_preserves_original_agent ... ok
+test agent_panel::tests::test_plus_with_parked_draft_active_focuses_ephemeral ... ok
+test agent_panel::tests::test_restored_draft_drops_uninstalled_agent_but_keeps_text ... ok
+test agent_panel::tests::test_cleanup_retained_threads_keeps_five_most_recent_idle_loadable_threads ... ok
+test agent_panel::tests::test_running_thread_retained_when_navigating_away ... ok
+test agent_panel::tests::test_terminal_bell_marks_and_activation_clears_notification ... ok
+test agent_panel::tests::test_resubmitting_edited_message_keeps_zoomed_agent_panel_open ... ok
+test agent_panel::tests::test_serialize_preserves_session_id_in_load_error ... ok
+test agent_panel::tests::test_skills_menu_entry_shows_manage_skills_shortcut ... ok
+test agent_panel::tests::test_restored_thread_keeps_uninstalled_agent ... ok
+test agent_panel::tests::test_terminal_program_reports_known_agent_transitions ... ok
+test agent_panel::tests::test_retained_thread_reset_race_disassociates_session ... ok
+test agent_panel::tests::test_terminal_bell_marks_without_popup_when_sidebar_open ... ok
+test agent_panel::tests::test_terminal_notification_closed_when_panel_dropped ... ok
+test agent_panel::tests::test_terminal_custom_title_recomposes_with_live_spinner ... ok
+test agent_panel::tests::test_terminal_bell_notifies_when_sidebar_history_open ... ok
+test agent_panel::tests::test_terminal_external_paths_drop_handler_writes_image_path ... ok
+test agent_panel::tests::test_terminal_external_image_drop_writes_path ... ok
+test agent_panel::tests::test_terminal_entry_kind_controls_new_entry ... ok
+test agent_panel::tests::test_terminal_notification_dismissed_when_active_terminal_becomes_visible ... ok
+test agent_panel::tests::test_terminal_restore_working_directory_does_not_read_leased_workspace ... ok
+test agent_panel::tests::test_terminal_title_editor_excludes_spinner_prefix ... ok
+test agent_panel::tests::test_cleanup_retained_threads_preserves_idle_non_loadable_threads ... ok
+test agent_panel::tests::test_terminal_title_editor_does_not_set_custom_title_when_unchanged ... ok
+test agent_panel::tests::test_terminal_working_directory_uses_active_workspace_while_workspace_is_updating ... ok
+test buffer_codegen::tests::test_allows_model_to_output_backticks ... ok
+test agent_panel::tests::test_terminal_notification_dismissed_when_sidebar_opens ... ok
+test agent_panel::tests::test_terminal_title_omits_placeholder_title ... ok
+test agent_panel::tests::test_terminal_title_editor_is_created_only_while_editing ... ok
+test buffer_codegen::tests::test_start_clears_previous_failure ... ok
+test buffer_codegen::tests::test_strip_invalid_spans_from_codeblock ... ok
+test buffer_codegen::tests::test_tool_completion_accepts_failure_message ... ok
+test buffer_codegen::tests::test_inactive_codegen_alternative ... ok
+test buffer_codegen::tests::test_tool_completion_errors_on_eof_without_tool_call ... ok
+test agent_panel::tests::test_terminal_notification_view_activates_terminal_workspace ... ok
+test agent_panel::tests::test_title_edit_affordance_matches_threads_and_terminals ... ok
+test buffer_codegen::tests::test_tool_completion_errors_on_invalid_tool_input ... ok
+test agent_panel::tests::test_new_draft_survives_reload_when_real_thread_is_active ... ok
+test buffer_codegen::tests::test_tool_completion_errors_on_invalid_tool_json ... ok
+test buffer_codegen::tests::test_tool_completion_errors_when_incomplete_rewrite_reaches_eof ... ok
+test buffer_codegen::tests::test_tool_completion_errors_when_interrupted_after_complete_rewrite ... ok
+test buffer_codegen::tests::test_tool_completion_errors_when_incomplete_rewrite_stops ... ok
+test buffer_codegen::tests::test_tool_completion_errors_when_interrupted_after_failure_message ... ok
+test buffer_codegen::tests::test_tool_completion_errors_when_stopped_without_tool_call ... ok
+test buffer_codegen::tests::test_tool_completion_ignores_non_tool_events ... ok
+test buffer_codegen::tests::test_tool_completion_propagates_stream_error_after_rewrite ... ok
+test buffer_codegen::tests::test_tool_completion_propagates_stream_error_before_rewrite ... ok
+test buffer_codegen::tests::test_tool_completion_rejects_multiple_rewrite_tool_calls ... ok
+test buffer_codegen::tests::test_tool_completion_rejects_failure_after_rewrite ... ok
+test completion_provider::tests::test_filter_sessions_by_query ... ok
+test completion_provider::tests::test_group_by_relevance_floats_best_group_and_keeps_groups_contiguous ... ok
+test completion_provider::tests::test_mention_completion_parse ... ok
+test completion_provider::tests::test_prompt_completion_parse ... ok
+test agent_panel::tests::test_selected_agent_syncs_when_navigating_between_threads ... ok
+test completion_provider::tests::test_section_headers_visible_until_argument ... ok
+test completion_provider::tests::test_slash_command_completion_parse ... ok
+test buffer_codegen::tests::test_tool_completion_rejects_rewrite_after_failure ... ok
+test buffer_codegen::tests::test_tool_completion_rejects_rewrite_after_partial_failure ... ok
+test config_options::tests::cycling_boolean_config_option_saves_selected_value_as_default ... ok
+test config_options::tests::cycling_category_cycles_boolean_config_option_first ... ok
+test config_options::tests::cycling_config_option_saves_selected_value_as_default ... ok
+test buffer_codegen::tests::test_tool_completion_requires_failure_message_to_complete ... ok
+test conversation_view::elicitation::tests::display_url_segments_never_elide_url_characters ... ok
+test conversation_view::elicitation::tests::display_url_segments_use_larger_url_boundaries ... ok
+test config_options::tests::toggling_category_picker_without_select_config_option_is_unhandled ... ok
+test completion_provider::tests::test_search_files_path_distance_ordering ... ok
+test buffer_codegen::tests::test_autoindent_respects_tabs_in_selection ... ok
+test agent_panel::tests::test_visible_terminal_bell_is_suppressed ... ok
+test agent_panel::tests::test_vim_search_does_not_steal_focus_from_agent_panel ... ok
+test agent_panel::tests::test_typed_draft_is_parked_when_switching_agents ... ok
+test agent_panel::tests::test_visible_terminal_bell_is_suppressed_without_focus ... ok
+test conversation_view::elicitation::tests::multi_select_options_include_titled_descriptions ... ok
+test conversation_view::elicitation::tests::number_validation_rejects_non_finite_values ... ok
+test conversation_view::elicitation::tests::should_render_pending_and_accepted_url_elicitations ... ok
+test conversation_view::elicitation::tests::single_select_options_include_titled_descriptions ... ok
+test conversation_view::elicitation::tests::string_validation_rejects_email_format_mismatch ... ok
+test conversation_view::elicitation::tests::string_validation_rejects_pattern_mismatch ... ok
+test conversation_view::elicitation::tests::string_validation_rejects_patterns_outside_resource_limits ... ok
+test conversation_view::elicitation::tests::string_validation_supports_bounded_advanced_patterns ... ok
+test conversation_view::elicitation::tests::url_host_presentation_highlights_destination_and_suspicious_idn ... ok
+test conversation_view::tests::permission_option_for_action_prefers_explicit_sandbox_allow_always ... ok
+test conversation_view::tests::resolve_outcome_from_selection_dropdown_defaults_to_last_choice_when_no_selection ... ok
+test conversation_view::tests::resolve_outcome_from_selection_dropdown_out_of_range_falls_back_to_last ... ok
+test conversation_view::tests::resolve_outcome_from_selection_dropdown_uses_selected_choice ... ok
+test conversation_view::tests::resolve_outcome_from_selection_flat_allow_picks_allow_once ... ok
+test completion_provider::tests::test_source_read_selection_editor_whole_line ... ok
+test conversation_view::tests::resolve_outcome_from_selection_flat_deny_picks_reject_once ... ok
+test conversation_view::tests::resolve_outcome_from_selection_flat_ignores_selection ... ok
+test conversation_view::tests::resolve_outcome_from_selection_pattern_mode_with_checked_uses_always_with_params ... ok
+test conversation_view::tests::resolve_outcome_from_selection_pattern_mode_with_empty_checked_falls_back_to_last_choice ... ok
+test conversation_view::elicitation::tests::form_state_discards_validation_for_stale_values ... ok
+test conversation_view::elicitation::tests::form_state_rejects_invalid_single_select_value ... ok
+test context_server_configuration::tests::test_configure_extension_only_opens_modal_in_active_workspace ... ok
+test conversation_view::elicitation::tests::form_state_preserves_string_whitespace ... ok
+test agent_panel::tests::test_workspaces_maintain_independent_agent_selection ... ok
+test conversation_view::elicitation::tests::form_state_discards_invalid_optional_single_select_default ... ok
+test conversation_view::elicitation::tests::form_state_prevents_duplicate_submissions ... ok
+test buffer_codegen::tests::test_autoindent_when_generating_past_indentation ... ok
+test buffer_codegen::tests::test_autoindent_when_generating_before_indentation ... ok
+test conversation_view::elicitation::tests::form_state_reports_all_validation_errors ... ok
+test conversation_view::elicitation::tests::form_state_replaces_invalid_required_single_select_default ... ok
+test conversation_view::tests::test_accepting_a_quote_reply_fills_only_the_comment ... ok
+test buffer_codegen::tests::test_transform_autoindent ... ok
+test conversation_view::tests::test_acp_server_exit_transitions_conversation_to_load_error_without_panic ... ok
+test conversation_view::tests::test_accepting_answer_field_dictation_inserts_text_without_submitting ... ok
+test conversation_view::tests::test_data_retention_error_maps_from_provider_error ... ok
+test conversation_view::tests::test_agent_code_span_resolver_resolves_worktree_paths ... ok
+test conversation_view::tests::test_auth_required_on_initial_connect ... ok
+test conversation_view::tests::test_conversation_multiple_tool_calls_fifo_ordering ... ok
+test conversation_view::tests::test_conversation_parent_pending_tool_call_returns_first_across_threads ... ok
+test conversation_view::tests::test_close_session_returns_error_when_unsupported ... ok
+test conversation_view::tests::test_close_all_sessions_calls_close_when_supported ... ok
+test conversation_view::tests::test_close_all_sessions_skips_when_unsupported ... ok
+test conversation_view::tests::test_connect_failure_transitions_to_load_error ... ok
+test conversation_view::tests::test_conversation_subagent_scoped_pending_tool_call ... ok
+test conversation_view::tests::test_drop ... ok
+test conversation_view::tests::test_completed_plan_snapshot_keeps_list_state_in_sync ... ok
+test conversation_view::tests::test_drop_preserves_shared_pending_request_elicitations ... ok
+test conversation_view::tests::test_dictation_window_opens_over_the_answer_field_not_the_composer ... ok
+test conversation_view::tests::test_discarding_an_empty_quote_reply_removes_its_block ... ok
+test conversation_view::tests::test_authorize_tool_call_action_triggers_authorization ... ok
+test conversation_view::tests::test_authorize_tool_call_action_with_pattern_option ... ok
+test conversation_view::tests::test_allow_button_uses_selected_granularity ... ok
+test conversation_view::tests::test_external_source_prompt_requires_manual_send ... ok
+test conversation_view::tests::test_escape_when_idle_is_noop ... ok
+test conversation_view::tests::test_insert_selections ... ok
+test conversation_view::tests::test_deny_button_uses_selected_granularity ... ok
+test conversation_view::tests::test_escape_cancels_generation_from_editor_focus ... ok
+test conversation_view::tests::test_manually_editing_title_updates_acp_thread_title ... ok
+test conversation_view::tests::test_external_source_prompt_warning_clears_after_send ... ok
+test agent_panel::tests::test_work_dirs_update_when_worktrees_change ... ok
+test conversation_view::tests::test_granularity_selection_updates_state ... ok
+test conversation_view::tests::test_max_tokens_error_is_rendered ... ok
+test conversation_view::tests::test_escape_cancels_generation_from_conversation_focus ... ok
+test conversation_view::tests::test_message_doesnt_send_if_empty ... ok
+test conversation_view::tests::test_move_queued_message_to_empty_main_editor ... ok
+test conversation_view::tests::test_move_queued_message_to_non_empty_main_editor ... ok
+test conversation_view::tests::test_interrupt ... ok
+test conversation_view::tests::test_message_editing_insert_selections ... ok
+test conversation_view::tests::test_move_up_in_empty_editor_restores_last_queued_message ... ok
+test conversation_view::tests::test_message_editing_while_generating ... ok
+test conversation_view::tests::test_notification_for_error ... ok
+test conversation_view::tests::test_notification_closed_when_thread_view_dropped ... ok
+test conversation_view::tests::test_notification_for_stop_event ... ok
+test conversation_view::tests::test_option_id_transformation_for_allow ... ok
+test conversation_view::tests::test_option_id_transformation_for_deny ... ok
+test conversation_view::tests::test_notification_for_tool_authorization ... ok
+test conversation_view::tests::test_notification_dismissed_when_sidebar_opens ... ok
+test conversation_view::tests::test_notification_respects_never_setting ... ok
+test conversation_view::tests::test_no_notification_when_sidebar_open_but_different_thread_focused ... ok
+test conversation_view::tests::test_message_editing_cancel ... ok
+test conversation_view::tests::test_message_editing_regenerate ... ok
+test conversation_view::tests::test_no_notification_when_queued_message_will_be_auto_sent ... ok
+test conversation_view::tests::test_opening_another_block_accepts_the_review_first ... ok
+test conversation_view::tests::test_provider_rejection_preserves_provider_message ... ok
+test conversation_view::tests::test_notification_still_works_when_window_inactive ... ok
+test conversation_view::tests::test_notification_when_sidebar_open_but_thread_list_hidden ... ok
+test conversation_view::tests::test_pending_tool_call_for_session_scopes_to_that_session ... ok
+test conversation_view::tests::test_paste_image_into_queued_message_promotes_to_main_editor ... ok
+test conversation_view::tests::test_notification_when_different_conversation_is_active_in_visible_panel ... ok
+test conversation_view::tests::test_notification_when_panel_hidden ... ok
+test conversation_view::tests::test_paste_text_into_queued_message_promotes_to_main_editor ... ok
+test conversation_view::tests::test_notification_when_workspace_is_background_in_multi_workspace ... ok
+test conversation_view::tests::test_quote_reply_is_refused_while_a_session_runs ... ok
+test conversation_view::tests::test_permission_row_hidden_when_inline_bounds_unavailable ... ok
+test conversation_view::tests::test_queued_message_steer_defaults_off_and_toggles ... ok
+test conversation_view::tests::test_permission_row_scroll_to_dismisses_row ... ok
+test conversation_view::tests::test_permission_row_does_not_flicker_when_activity_bar_squeezes_list ... ok
+test conversation_view::tests::test_permission_row_ignores_subagent_requests ... ok
+test conversation_view::tests::test_permission_row_shown_when_inline_prompt_is_above_viewport ... ok
+test conversation_view::tests::test_permission_row_disappears_when_authorized ... ok
+test conversation_view::tests::test_reset_preserves_session_id_after_load_error ... ok
+test conversation_view::tests::test_question_withdrawn_during_review_moves_text_to_the_composer ... ok
+test conversation_view::tests::test_resume_without_history_adds_notice ... ok
+test conversation_view::tests::test_resume_thread_uses_session_cwd_when_inside_project ... ok
+test conversation_view::tests::test_restored_threads_keep_available_commands ... ok
+test conversation_view::tests::test_refusal_handling ... ok
+test conversation_view::tests::test_successful_session_creation_clears_resolved_request_elicitations ... ok
+test conversation_view::tests::test_scroll_to_most_recent_user_prompt_falls_back_to_bottom_without_user_messages ... ok
+test conversation_view::tests::test_reply_to_selection_needs_a_selection ... ok
+test conversation_view::tests::test_state_transition_preserves_shared_pending_request_elicitations ... ok
+test conversation_view::tests::test_queue_resumes_after_stop_and_new_message ... ok
+test conversation_view::tests::test_thread_search_editor_cancel_dismisses_bar ... ok
+test conversation_view::tests::test_stale_stop_does_not_disable_follow_tail_during_regenerate ... ok
+test conversation_view::tests::test_rewind_views ... ok
+test conversation_view::tests::test_scroll_to_most_recent_user_prompt ... ok
+test conversation_view::tests::test_regenerate_keeps_pending_subagent_edits ... ok
+test conversation_view::tests::test_thread_search_dismiss_clears_highlights ... ok
+test conversation_view::tests::test_thread_search_includes_expanded_thinking_blocks ... ok
+test conversation_view::tests::test_thread_search_highlights_user_message_editor ... ok
+test conversation_view::thread_view::numbered_code_block_tests::parses_cat_numbered_code_with_crlf_line_endings ... ok
+test conversation_view::thread_view::numbered_code_block_tests::parses_cat_numbered_markdown_code_block ... ok
+test conversation_view::thread_view::numbered_code_block_tests::rejects_non_cat_numbered_code_block ... ok
+test conversation_view::thread_view::numbered_code_block_tests::rejects_non_contiguous_cat_numbers ... ok
+test conversation_view::thread_view::tests::test_leading_native_command_matches_bare_and_with_remainder ... ok
+test conversation_view::tests::test_thread_view_seeds_existing_elicitation_form_state ... ok
+test conversation_view::tests::test_thread_search_includes_expanded_tool_call_content ... ok
+test conversation_view::tests::test_thread_search_finds_matches_across_entries ... ok
+test conversation_view::thread_view::tests::test_strip_leading_command ... ok
+test dictation_engine::tests::changed_configuration_loads_a_new_engine ... ok
+test dictation_engine::tests::engine_is_dropped_after_the_session_when_not_keeping_it_loaded ... ok
+test dictation_engine::tests::failed_load_frees_the_session_for_the_next_attempt ... ok
+test dictation_engine::tests::first_session_loads_the_engine_and_refuses_a_second_one ... ok
+test dictation_engine::tests::next_session_reuses_the_returned_engine_when_keeping_it_loaded ... ok
+test dictation_engine::tests::session_that_lost_its_engine_still_frees_the_slot ... ok
+test dictation_footer::tests::a_failure_is_explained_only_in_review ... ok
+test dictation_footer::tests::a_missing_configured_device_is_named_in_the_microphone_label ... ok
+test dictation_footer::tests::an_unavailable_agent_an_attempt_to_act_and_a_timeout_are_told_apart ... ok
+test dictation_footer::tests::failed_offers_only_close ... ok
+test dictation_footer::tests::play_is_offered_only_in_review_with_session_audio ... ok
+test dictation_footer::tests::post_processing_blocks_accept_and_tab_and_keeps_cancel ... ok
+test dictation_footer::tests::recognizing_blocks_accept_and_keeps_cancel ... ok
+test dictation_footer::tests::recording_shows_the_microphone_and_a_review_hint ... ok
+test dictation_footer::tests::review_showing_raw_text_after_tab_offers_show_processed ... ok
+test dictation_footer::tests::review_with_processed_text_names_the_model_and_offers_show_raw ... ok
+test dictation_footer::tests::review_without_post_processing_is_raw_without_a_tab_hint ... ok
+test dictation_footer::tests::starting_offers_only_cancel_and_shows_the_model_loading ... ok
+test dictation_footer::tests::the_language_model_failures_keep_their_texts_and_a_double_configuration_is_named ... ok
+test dictation_footer::tests::the_microphone_label_is_absent_outside_recording ... ok
+test dictation_footer::tests::the_processed_label_names_the_model_and_for_an_agent_the_agent_too ... ok
+test dictation_footer::tests::waiting_for_an_agent_names_the_agent ... ok
+test dictation_footer::tests::waiting_for_ollama_names_the_wait_and_blocks_accept_and_tab_like_post_processing ... ok
+test dictation_host::tests::accepted_text_becomes_a_composer_block_once_the_question_is_gone ... ok
+test dictation_host::tests::accepted_text_goes_to_the_answer_field_while_the_question_is_open ... ok
+test dictation_host::tests::insertion_after_a_space_adds_none ... ok
+test dictation_host::tests::insertion_at_the_end_of_a_line_keeps_the_line_break ... ok
+test dictation_host::tests::insertion_in_the_middle_of_a_word_is_spaced_on_both_sides ... ok
+test dictation_host::tests::insertion_into_an_empty_field_is_the_text_itself ... ok
+test dictation_host::tests::multi_line_text_keeps_its_line_breaks ... ok
+test dictation_host::tests::other_fields_are_refused_while_a_session_runs ... ok
+test dictation_host::tests::the_hosting_field_toggles_its_own_session ... ok
+test dictation_host::tests::without_a_session_any_field_may_start ... ok
+test dictation_model_server::tests::a_server_that_answers_after_a_few_polls_is_started_once ... ok
+test dictation_model_server::tests::a_server_that_answers_at_once_is_not_started ... ok
+test dictation_model_server::tests::a_server_that_never_answers_fails_after_the_limit_with_one_start ... ok
+test dictation_model_server::tests::a_start_that_fails_is_reported_without_polling ... ok
+test dictation_model_server::tests::an_empty_address_setting_means_the_default ... ok
+test dictation_model_server::tests::only_ollama_at_the_default_local_address_is_started ... ok
+test dictation_model_server::tests::slow_probes_count_towards_the_limit ... ok
+test dictation_post_processing::tests::a_configured_agent_is_selected_and_both_at_once_is_an_error ... ok
+test dictation_post_processing::tests::a_configured_model_is_selected_and_nothing_means_the_default_model ... ok
+test dictation_post_processing::tests::a_failed_request_and_an_empty_answer_keep_the_model_name ... ok
+test dictation_post_processing::tests::a_failed_run_still_leaves_no_session_behind ... ok
+test dictation_post_processing::tests::a_missing_model_is_reported_without_a_request ... ok
+test dictation_post_processing::tests::a_mode_announced_as_a_config_option_is_set_to_the_strictest_value_whatever_was_asked ... ok
+test dictation_post_processing::tests::a_ready_server_and_a_resolved_model_yield_the_cleaned_answer_and_the_model ... ok
+test dictation_post_processing::tests::a_refusal_and_a_prompt_error_are_told_apart_from_an_unavailable_agent ... ok
+test dictation_post_processing::tests::a_refused_action_outranks_the_text_that_came_with_it ... ok
+test dictation_post_processing::tests::a_server_that_did_not_start_skips_the_model_entirely ... ok
+test dictation_post_processing::tests::a_text_answer_is_the_cleaned_text ... ok
+test dictation_post_processing::tests::a_value_the_agent_did_not_list_and_a_value_of_the_wrong_kind_are_not_set ... ok
+test dictation_post_processing::tests::an_agent_that_can_delete_gets_the_session_deleted_and_one_that_cannot_hides_it ... ok
+test dictation_post_processing::tests::an_answer_that_takes_too_long_is_cancelled_and_reported_as_a_timeout ... ok
+test dictation_post_processing::tests::an_empty_answer_leaves_the_text_raw_and_the_session_open_for_the_resume ... ok
+test dictation_post_processing::tests::an_unconnectable_agent_is_reported_and_no_session_is_created ... ok
+test dictation_post_processing::tests::nothing_requested_sets_nothing_so_the_agent_keeps_its_own_model ... ok
+test dictation_post_processing::tests::one_session_serves_the_first_rewrite_and_the_resume_and_is_forgotten_at_the_end ... ok
+test dictation_post_processing::tests::only_announced_options_with_announced_values_are_set ... ok
+test dictation_post_processing::tests::the_answer_is_the_text_without_the_models_thinking ... ok
+test dictation_post_processing::tests::the_cache_entry_records_every_announced_option_as_declared ... ok
+test dictation_post_processing::tests::the_label_names_the_chosen_model_by_its_human_name ... ok
+test dictation_post_processing::tests::the_prompt_fills_in_the_transcript_and_the_glossary ... ok
+test dictation_post_processing::tests::the_strictest_announced_mode_is_the_one_that_always_asks ... ok
+test dictation_window::tests::prompt_preview_quotes_the_beginning_of_a_long_prompt ... ok
+test dictation_window::tests::review_post_processing_and_failure_are_silent ... ok
+test dictation_window::tests::starting_and_resuming_open_the_microphone_audibly ... ok
+test dictation_window::tests::stopping_closes_the_microphone_audibly ... ok
+test draft_prompt_store::tests::test_clean_mention_links ... ok
+test conversation_view::tests::test_thread_search_refreshes_on_new_thread_entry ... ok
+test conversation_view::tests::test_tool_permission_buttons_edit_file_with_path_pattern ... ok
+test entry_view_state::tests::test_reindex_after_removal ... ok
+test external_source_prompt::tests::collapses_newline_padding ... ok
+test external_source_prompt::tests::drops_empty_prompt ... ok
+test external_source_prompt::tests::drops_prompt_with_only_removed_characters ... ok
+test external_source_prompt::tests::keeps_multilingual_text ... ok
+test external_source_prompt::tests::keeps_normal_prompt_text ... ok
+test external_source_prompt::tests::keeps_tabs ... ok
+test external_source_prompt::tests::normalizes_carriage_returns ... ok
+test external_source_prompt::tests::strips_bidi_control_characters ... ok
+test external_source_prompt::tests::strips_other_control_characters ... ok
+test entry_view_state::tests::test_diff_sync ... ok
+test conversation_view::tests::test_thread_search_release_clears_markdown_highlights ... ok
+test language_model_selector::tests::test_exact_match ... ok
+test language_model_selector::tests::test_favorites_appear_in_other_sections ... ok
+test language_model_selector::tests::test_favorites_section_appears_when_favorites_exist ... ok
+test language_model_selector::tests::test_fuzzy_match ... ok
+test language_model_selector::tests::test_models_from_different_providers ... ok
+test language_model_selector::tests::test_models_have_correct_actions ... ok
+test language_model_selector::tests::test_no_favorites_section_when_no_favorites ... ok
+test conversation_view::tests::test_tool_permission_buttons_terminal_with_pattern ... ok
+test mention_set::tests::test_disambiguated_labels_dedupe_identical_uris ... ok
+test mention_set::tests::test_is_raster_image_path_is_case_insensitive ... ok
+test language_model_selector::tests::test_recommended_models_also_appear_in_other ... ok
+test entry_view_state::tests::test_elicitation_preserves_entry_index ... ok
+test conversation_view::tests::test_thread_search_select_next_from_thread_view_update_does_not_panic ... ok
+test mention_set::tests::test_thread_mentions_disabled ... ok
+test mention_set::tests::test_selection_mentions_supported_for_paste ... ok
+test conversation_view::tests::test_thread_search_navigates_from_outside_search_bar ... ok
+test conversation_view::thread_view::tests::test_open_link_bare_path ... ok
+test message_editor::tests::test_completion_commands_derive_category_from_meta ... ok
+test conversation_view::thread_view::tests::test_open_link_percent_escape_disambiguation ... ok
+test inline_prompt_editor::tests::test_confirm_emits_execute_false_in_terminal_mode ... ok
+test inline_prompt_editor::tests::test_secondary_confirm_emits_execute_true_in_terminal_mode ... ok
+test conversation_view::thread_view::tests::test_open_link_out_of_project_path ... ok
+test conversation_view::tests::test_tool_permission_buttons_fetch_with_domain_pattern ... ok
+test message_editor::tests::test_append_message_to_non_empty_editor ... ok
+test conversation_view::tests::test_thread_search_scrolls_to_later_user_message_match ... ok
+test conversation_view::tests::test_thread_search_passive_rescan_preserves_scroll ... ok
+test message_editor::tests::test_append_message_preserves_mention_offset ... ok
+test message_editor::tests::test_autoscroll_after_insert_selections ... ok
+test conversation_view::tests::test_tool_permission_buttons_without_pattern ... ok
+test message_editor::tests::test_append_message_to_empty_editor ... ok
+test message_editor::tests::test_at_mention_removal ... ok
+test conversation_view::tests::test_thread_search_shift_enter_navigates_with_jetbrains_keymap ... ok
+test message_editor::tests::test_completion_provider_commands ... ok
+test message_editor::tests::test_parse_mention_links ... ok
+test message_editor::tests::test_copy_with_selection_mentions_serializes_links ... ok
+test message_editor::tests::test_copying_blocks_copies_their_text ... ok
+test message_editor::tests::test_dragged_file_paths_insert_in_order_at_cursor ... ok
+test message_editor::tests::test_large_file_mention_fallback ... ok
+test message_editor::tests::test_cut_with_selection_mentions_serializes_and_removes ... ok
+test message_editor::tests::test_draft_content_blocks_snapshot_preserves_selection_mentions ... ok
+test message_editor::tests::test_cut_with_empty_cursor_on_mention_line_removes_whole_line ... ok
+test message_editor::tests::test_insert_thread_summary_skipped_for_external_agents ... ok
+test message_editor::tests::test_insert_context_with_multibyte_characters ... ok
+test message_editor::tests::test_insert_thread_summary ... ok
+test message_editor::tests::test_dragged_file_path_inserts_at_cursor ... ok
+test message_editor::tests::test_paste_external_directory_path_inserts_directory_mention ... ok
+test message_editor::tests::test_paste_external_file_path_inserts_file_mention ... ok
+test message_editor::tests::test_session_capabilities_keep_commands_and_skills_separate ... ok
+test message_editor::tests::test_editor_respects_embedded_context_capability ... ok
+test message_editor::tests::test_local_commands_complete_and_emit_event ... ok
+test message_editor::tests::test_paste_external_file_path_inserts_at_cursor ... ok
+test message_editor::tests::test_context_completion_provider_mentions ... ok
+test message_editor::tests::test_paste_mention_link_with_multiple_selections ... ok
+test message_editor::tests::test_paste_mixed_external_image_without_extension_and_file_path ... ok
+test message_editor::tests::test_quoted_fragment_is_deleted_whole ... ok
+test message_editor::tests::test_quoted_fragment_reaches_the_agent_as_a_quote_with_a_note ... ok
+test message_editor::tests::test_validate_slash_commands_accepts_scope_qualified_skill ... ok
+test message_editor::tests::test_serialized_cut_text_returns_none_when_mentions_outside_selection ... ok
+test message_editor::tests::test_quote_reply_block_keeps_its_quote_while_the_comment_changes ... ok
+test mode_selector::tests::setting_mode_saves_selected_mode_as_default ... ok
+test model_selector::tests::test_favorites_appear_in_both_sections ... ok
+test model_selector::tests::test_favorites_are_not_duplicated_when_repeated_in_other_sections ... ok
+test model_selector::tests::test_favorites_count_returns_correct_count ... ok
+test model_selector::tests::test_favorites_section_appears_when_favorites_exist ... ok
+test model_selector::tests::test_flat_model_list_with_favorites ... ok
+test model_selector::tests::test_fuzzy_match ... ok
+test model_selector::tests::test_is_favorite_flag_set_correctly_in_entries ... ok
+test model_selector::tests::test_models_have_correct_actions ... ok
+test model_selector::tests::test_no_favorites_section_when_no_favorites ... ok
+test profile_selector::tests::active_profile_selection_logic_works ... ok
+test profile_selector::tests::entries_include_custom_profiles ... ok
+test profile_selector::tests::fuzzy_filter_returns_no_results_and_keeps_configure ... ok
+test quote_reply::tests::a_code_block_keeps_its_fences_inside_the_quote ... ok
+test quote_reply::tests::a_long_comment_is_cut_after_the_first_words ... ok
+test quote_reply::tests::a_multi_line_quote_is_quoted_line_by_line ... ok
+test quote_reply::tests::a_quote_reply_puts_the_comment_after_the_note ... ok
+test quote_reply::tests::a_quote_reply_without_a_comment_is_just_the_quote ... ok
+test quote_reply::tests::a_short_comment_is_the_whole_label ... ok
+test quote_reply::tests::an_empty_comment_has_no_label ... ok
+test quote_reply::tests::blank_lines_inside_the_quote_stay_quoted ... ok
+test quote_reply::tests::the_items_are_hidden_for_anything_but_an_agent_response ... ok
+test quote_reply::tests::the_items_are_off_without_a_selection_or_during_a_session ... ok
+test quote_reply::tests::the_note_follows_the_dictation_language ... ok
+test quote_reply::tests::the_russian_note_is_used_for_russian_dictation ... ok
+test message_editor::tests::test_paste_mention_link_with_completion_trigger_does_not_panic ... ok
+test model_selector::tests::confirming_model_selects_model ... ok
+test terminal_thread_metadata_store::tests::test_terminal_thread_display_title_combines_raw_and_custom_titles ... ok
+test terminal_thread_metadata_store::tests::test_terminal_title_prefix_preserves_non_alphanumeric_prefixes ... ok
+test tests::test_agent_command_palette_visibility ... ok
+test message_editor::tests::test_set_message_normalizes_crlf_before_mention ... ok
+test message_editor::tests::test_sent_quote_reply_shows_its_quote_and_comment ... ok
+test message_editor::tests::test_serialized_copy_text_returns_none_when_mentions_outside_selection ... ok
+test tests::test_deserialize_external_agent_variants ... ok
+test tests::test_deserialize_new_external_agent_thread ... ok
+test thread_import::tests::test_collect_all_existing_returns_empty ... ok
+test thread_import::tests::test_collect_assigns_correct_agent_id_per_session ... ok
+test thread_import::tests::test_collect_deduplicates_across_agents ... ok
+test thread_import::tests::test_collect_marks_all_imported_threads_as_archived ... ok
+test thread_import::tests::test_collect_skips_sessions_already_in_existing_set ... ok
+test thread_import::tests::test_collect_skips_sessions_without_work_dirs ... ok
+test thread_import::tests::test_count_importable_threads_by_agent_counts_each_agent_independently ... ok
+test message_editor::tests::test_set_message_plain_text ... ok
+test message_editor::tests::test_several_quoted_fragments_in_one_message ... ok
+test message_editor::tests::test_slash_autocomplete_emits_opened_event ... ok
+test thread_import::tests::test_returns_empty_when_channel_db_missing ... ok
+test message_editor::tests::test_serialized_copy_text_selection_covers_only_mention ... ok
+test message_editor::tests::test_set_message_replaces_existing_content ... ok
+test thread_import::tests::test_preserves_archived_state ... ok
+test terminal_thread_metadata_store::tests::test_rename_terminal_updates_stored_custom_title ... ok
+test tests::test_backfill_is_idempotent ... ok
+test message_editor::tests::test_thread_mode_hidden_when_disabled ... ok
+test terminal_thread_metadata_store::tests::test_change_worktree_paths_reindexes_terminal_metadata ... ok
+test tests::test_backfill_new_install_sets_flag_without_writing_settings ... ok
+test tests::test_backfill_sets_kvp_flag ... ok
+test message_editor::tests::test_whitespace_trimming ... ok
+test thread_metadata_store::tests::test_dedup_db_operations_keeps_latest_insert_for_same_session ... ok
+test thread_metadata_store::tests::test_dedup_db_operations_keeps_latest_operation_for_session ... ok
+test thread_metadata_store::tests::test_dedup_db_operations_preserves_distinct_sessions ... ok
+test thread_metadata_store::tests::test_archive_nonexistent_thread_is_noop ... ok
+test message_editor::tests::test_slash_command_validation ... ok
+test thread_metadata_store::tests::test_archive_and_unarchive_thread ... ok
+test thread_metadata_store::tests::test_complete_worktree_restore_multiple_paths ... ok
+test message_editor::tests::test_thread_mode_visible_when_enabled ... ok
+test thread_metadata_store::tests::test_database_round_trips_title_override ... ok
+test thread_metadata_store::tests::test_archived_flag_persists_across_reload ... ok
+test thread_metadata_store::tests::test_complete_worktree_restore_preserves_unmatched_paths ... ok
+test thread_metadata_store::tests::test_delete_archived_worktree ... ok
+test thread_metadata_store::tests::test_create_and_retrieve_archived_worktree ... ok
+test thread_metadata_store::tests::test_entries_for_path_excludes_archived ... ok
+test thread_metadata_store::tests::test_entries_filter_by_remote_connection ... ok
+test thread_metadata_store::tests::test_migrate_thread_metadata_archives_beyond_five_most_recent_per_project ... ok
+test thread_metadata_store::tests::test_migrate_thread_metadata_noops_when_all_threads_already_exist ... ok
+test thread_import::tests::test_import_skips_already_existing_threads ... ok
+test thread_metadata_store::tests::test_collab_guest_threads_not_saved_to_metadata_store ... ok
+test thread_metadata_store::tests::test_link_multiple_threads_to_archived_worktree ... ok
+test thread_metadata_store::tests::test_collab_guest_retained_thread_paths_not_overwritten_on_worktree_change ... ok
+test thread_metadata_store::tests::test_save_followed_by_archiving_without_parking ... ok
+test thread_metadata_store::tests::test_archived_thread_retains_paths_after_worktree_removal ... ok
+test thread_metadata_store::tests::test_thread_metadata_title_prefers_override ... ok
+test thread_metadata_store::tests::test_thread_worktree_paths_add_is_idempotent ... ok
+test thread_metadata_store::tests::test_thread_worktree_paths_from_path_lists_preserves_association ... ok
+test thread_metadata_store::tests::test_thread_worktree_paths_full_add_then_remove_cycle ... ok
+test thread_metadata_store::tests::test_thread_worktree_paths_main_deduplicates_linked_worktrees ... ok
+test thread_metadata_store::tests::test_thread_worktree_paths_mismatched_lengths_returns_error ... ok
+test thread_metadata_store::tests::test_thread_worktree_paths_remove_nonexistent_is_noop ... ok
+test thread_metadata_store::tests::test_draft_thread_metadata_promotes_on_first_message ... ok
+test thread_metadata_store::tests::test_thread_id_primary_key_migration_backfills_null_thread_ids ... ok
+test thread_metadata_store::tests::test_migrate_thread_metadata_migrates_only_missing_threads ... ok
+test thread_metadata_store::tests::test_store_set_generated_title_clears_title_override ... ok
+test thread_metadata_store::tests::test_store_set_title_override_updates_cached_metadata ... ok
+test thread_metadata_store::tests::test_save_all_persists_multiple_threads ... ok
+test thread_metadata_store::tests::test_store_initializes_cache_from_database ... ok
+test thread_metadata_store::tests::test_update_restored_worktree_paths_preserves_unmatched ... ok
+test thread_metadata_store::tests::test_multiple_archived_worktrees_per_thread ... ok
+test thread_metadata_store::tests::test_migrate_thread_remote_connections_backfills_from_workspace_db ... ok
+test thread_metadata_store::tests::test_nonempty_thread_metadata_preserved_when_thread_released ... ok
+test thread_worktree_archive::tests::test_build_root_plan_returns_none_for_external_linked_worktree ... ok
+test threads_archive_view::tests::test_fuzzy_match_positions_ascii_still_works ... ok
+test threads_archive_view::tests::test_fuzzy_match_positions_case_insensitive ... ok
+test threads_archive_view::tests::test_fuzzy_match_positions_multi_byte_interior ... ok
+test threads_archive_view::tests::test_fuzzy_match_positions_no_match ... ok
+test threads_archive_view::tests::test_fuzzy_match_positions_returns_byte_indices ... ok
+test unicode_confusables::tests::deduplicates_repeated_characters ... ok
+test unicode_confusables::tests::detects_bidi_override ... ok
+test unicode_confusables::tests::detects_cyrillic_homoglyph ... ok
+test unicode_confusables::tests::detects_zero_width_space ... ok
+test unicode_confusables::tests::plain_ascii_is_never_flagged ... ok
+test unicode_confusables::tests::scan_host_decodes_punycode_lookalike ... ok
+test unicode_confusables::tests::scan_host_handles_wildcard_subdomain_patterns ... ok
+test unicode_confusables::tests::scan_host_leaves_plain_domains_alone ... ok
+test thread_metadata_store::tests::test_update_restored_worktree_paths_multiple ... ok
+test thread_metadata_store::tests::test_migration_awaits_thread_store_reload ... ok
+test thread_worktree_archive::tests::test_build_root_plan_returns_none_for_unrecorded_linked_worktree_in_managed_directory ... ok
+test thread_worktree_archive::tests::test_build_root_plan_returns_none_for_main_worktree ... ok
+test thread_metadata_store::tests::test_store_cache_updates_after_save_and_delete ... ok
+test thread_import::tests::test_import_threads_from_other_channels ... ok
+test thread_metadata_store::tests::test_subagent_threads_excluded_from_sidebar_metadata ... ok
+test thread_worktree_archive::tests::test_build_root_plan_returns_some_for_linked_worktree ... ok
+test thread_worktree_archive::tests::test_build_root_plan_with_custom_worktree_directory ... ok
+test thread_worktree_archive::tests::test_remove_root_returns_error_and_rolls_back_on_remove_dir_failure ... ok
+test thread_metadata_store::tests::test_threads_without_project_association_are_archived_by_default ... ok
+test thread_worktree_archive::tests::test_remove_root_refuses_when_worktree_recreated_outside_zed ... ok
+test thread_worktree_archive::tests::test_remove_root_succeeds_when_directory_already_gone ... ok
+test thread_worktree_archive::tests::test_remove_root_deletes_directory_and_git_metadata ... ok
+test agent_panel::tests::test_select_agent_action_updates_visible_draft ... ok
+
+test result: ok. 522 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 37.89s
+
+     Running unittests src\settings_content.rs (target\debug\deps\settings_content-6f6e89ee5129fae8.exe)
+
+running 39 tests
+test agent::tests::agent_config_option_value_merge_replaces_existing_value ... ok
+test agent::tests::agent_config_option_value_serializes_value_id_as_string ... ok
+test agent::tests::agent_config_option_value_serializes_boolean_as_boolean ... ok
+test agent::tests::test_add_sandbox_write_path_prunes_redundant_paths ... ok
+test agent::tests::test_add_tool_deny_pattern_appends_to_existing ... ok
+test agent::tests::test_add_tool_allow_pattern_appends_to_existing ... ok
+test agent::tests::test_add_tool_allow_pattern_does_not_duplicate ... ok
+test agent::tests::test_add_tool_allow_pattern_for_different_tools ... ok
+test agent::tests::test_add_tool_deny_and_allow_patterns_separate ... ok
+test agent::tests::test_add_tool_deny_pattern_creates_structure ... ok
+test agent::tests::test_add_tool_allow_pattern_creates_structure ... ok
+test agent::tests::test_add_tool_deny_pattern_does_not_duplicate ... ok
+test agent::tests::test_allow_sandbox_permissions_create_structure ... ok
+test agent::tests::test_granted_write_path_content_serializes_string_or_object ... ok
+test action::tests::build_schema_produces_anyof_of_consts_per_name ... ok
+test agent::tests::test_granted_write_path_content_deserializes_string_or_object ... ok
+test agent::tests::test_set_tool_default_permission_creates_structure ... ok
+test agent::tests::test_set_tool_default_permission_for_mcp_tool ... ok
+test agent::tests::test_set_tool_default_permission_updates_existing ... ok
+test language::test::test_configured_language_server_serialization ... ok
+test language::test::test_language_servers_merge_keeps_per_language_lists_pure ... ok
+test language::test::test_language_servers_merge_no_per_language_config_stays_unset ... ok
+test language::test::test_language_servers_merge_user_per_language_overrides ... ok
+test language::test::test_formatter_deserialization_invalid ... ok
+test language::test::test_prettier_options ... ok
+test language::test::test_formatter_deserialization ... ok
+test fallible_options::tests::test_fallible ... ok
+test language::test::test_user_per_language_config_overrides_default_disables ... ok
+test project::tests::test_file_scan_exclusions_splice_each_layer ... ok
+test project::tests::test_file_scan_exclusions_splice_edge_cases ... ok
+test project::tests::test_file_scan_exclusions_splice_rest_of_list ... ok
+test project::tests::test_file_scan_exclusions_splice_without_a_base_layer ... ok
+test project::tests::test_stdio_context_server_without_args ... ok
+test serde_helper::tests::test_serialize_f32_with_two_decimal_places ... ok
+test terminal::test::test_project_settings ... ignored
+test serde_helper::tests::test_serialize_optional_f32_with_two_decimal_places ... ok
+test theme::tests::test_buffer_line_height_deserialize_invalid ... ok
+test theme::tests::test_buffer_line_height_deserialize_valid ... ok
+test theme::tests::test_buffer_font_weight_schema_has_default ... ok
+
+test result: ok. 38 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+     Running unittests src\settings_ui.rs (target\debug\deps\settings_ui-76f31ba3a935912d.exe)
+
+running 79 tests
+test pages::dictation_page::tests::clearing_the_provider_removes_the_model_but_keeps_other_fields ... ok
+test pages::dictation_downloads::tests::a_finished_backends_download_sets_the_backends_dir_and_keeps_the_model ... ok
+test pages::dictation_downloads::tests::a_finished_model_download_sets_the_model_path ... ok
+test pages::dictation_page::tests::pasted_terms_are_added_once_each_in_order ... ok
+test pages::dictation_page::tests::choosing_a_provider_keeps_the_model_only_when_it_belongs_to_that_provider ... ok
+test pages::dictation_page::tests::glossary_is_written_under_agent_dictation ... ok
+test pages::dictation_page::tests::adding_a_term_appends_it_once_and_keeps_order ... ok
+test pages::dictation_downloads::tests::shared_progress_reports_percent_only_with_a_total ... ok
+test pages::dictation_page::tests::a_comma_separated_list_becomes_one_term_per_part ... ok
+test page_data::tests::test_write_vim_helix_mode ... ok
+test pages::dictation_page::tests::choosing_a_rewriter_drops_the_other_ones_key ... ok
+test pages::dictation_page::tests::removing_a_term_removes_only_that_term ... ok
+test pages::dictation_page::tests::resetting_the_prompt_removes_the_override ... ok
+test pages::dictation_page::tests::picking_an_agent_writes_its_id_and_drops_the_model_key ... ok
+test pages::dictation_page::tests::post_processing_model_is_written_like_the_agent_default_model ... ok
+test pages::dictation_page::tests::the_branch_follows_the_keys_and_both_at_once_is_a_conflict ... ok
+test pages::dictation_page::tests::agent_options_are_written_by_id_and_removed_by_none ... ok
+test pages::dictation_page::tests::configured_agents_are_listed_in_a_stable_order ... ok
+test pages::dictation_page::tests::the_model_label_is_the_human_name_or_the_agents_default ... ok
+test pages::dictation_page::tests::the_model_list_comes_from_the_cache_with_the_agents_default_marked ... ok
+test pages::dictation_page::tests::the_other_options_leave_out_the_model_and_the_mode ... ok
+test pages::dictation_page::tests::without_a_cache_the_models_are_not_known_rather_than_empty ... ok
+test pages::external_agents_page::tests::name_collision_covers_new_and_rename ... ok
+test pages::external_agents_page::tests::preserves_advanced_fields ... ok
+test pages::external_agents_page::tests::requires_agent_name ... ok
+test pages::external_agents_page::tests::rejects_duplicate_environment_variables ... ok
+test pages::external_agents_page::tests::requires_command ... ok
+test pages::external_agents_page::tests::builds_custom_agent ... ok
+test pages::mcp_servers_page::tests::builds_local_server ... ok
+test pages::mcp_servers_page::tests::parse_timeout_handles_empty_and_invalid ... ok
+test pages::mcp_servers_page::tests::name_collision_covers_new_and_rename ... ok
+test pages::mcp_servers_page::tests::rejects_duplicate_environment_variables ... ok
+test pages::mcp_servers_page::tests::rejects_invalid_timeout ... ok
+test pages::mcp_servers_page::tests::rejects_invalid_url ... ok
+test pages::mcp_servers_page::tests::requires_command_for_local_server ... ok
+test pages::mcp_servers_page::tests::rejects_duplicate_headers ... ok
+test pages::mcp_servers_page::tests::flags_invalid_url_in_settings ... ok
+test pages::mcp_servers_page::tests::requires_server_name ... ok
+test pages::mcp_servers_page::tests::requires_url_for_remote_server ... ok
+test pages::mcp_servers_page::tests::builds_remote_server ... ok
+test pages::skill_creator::tests::derived_skill_name_strips_markdown_extension_case_insensitively ... ok
+test pages::skill_creator::tests::format_skill_file_omits_body_when_empty ... ok
+test pages::skill_creator::tests::format_skill_file_writes_disable_model_invocation_true ... ok
+test pages::skill_creator::tests::github_blob_url_converts_to_raw_url ... ok
+test pages::skill_creator::tests::parse_imported_skill_falls_back_to_markdown_when_frontmatter_is_missing ... ok
+test pages::skill_creator::tests::truncate_description_counts_unicode_characters ... ok
+test pages::skill_creator::tests::format_skill_file_escapes_yaml_specials_in_description ... ok
+test pages::skill_creator::tests::format_skill_file_round_trips_through_parser ... ok
+test pages::skill_creator::tests::parse_imported_skill_reads_frontmatter_and_body ... ok
+test pages::skill_creator::tests::parse_imported_skill_reuses_skill_metadata_validation ... ok
+test pages::tool_permissions_setup::tests::test_all_tools_are_in_tool_info_or_excluded ... ok
+test pages::skill_creator::tests::write_skill_to_disk_refuses_to_overwrite ... ok
+test pages::skill_creator::tests::write_skill_to_disk_rejects_non_directory_at_skill_path ... ok
+test pages::skill_creator::tests::fetch_imported_skill_retries_404_with_github_token ... ok
+test pages::skill_creator::tests::fetch_imported_skill_rejects_redirect_on_authenticated_request ... ok
+test pages::skill_creator::tests::fetch_imported_skill_reports_private_or_missing_for_404 ... ok
+test pages::skill_creator::tests::fetch_imported_skill_truncates_error_response_body ... ok
+test pages::skill_creator::tests::write_skill_to_disk_creates_directory_and_file ... ok
+test pages::skill_creator::tests::fetch_imported_skill_stops_reading_after_size_limit ... ok
+test pages::llm_providers_page::tests::young_account_configuration_stays_within_provider_row ... ok
+test test::navbar_toggle_expand_propagates_selected_index ... ok
+test test::navbar_basic_second_root_entry_close ... ok
+test test::navbar_basic_open ... ok
+test test::navbar_toggle_subroot ... ok
+test test::navbar_basic_close ... ok
+test test::navbar_toggle_close_propagates_selected_index ... ok
+test test::navbar_double_click_toggle ... ok
+test project_settings_update_tests::test_creates_settings_file_if_missing ... ok
+test project_settings_update_tests::test_handles_dropped_worktree ... ok
+test project_settings_update_tests::test_updates_existing_settings_file ... ok
+test project_settings_update_tests::test_reloads_conflicted_buffer ... ok
+test project_settings_update_tests::test_queue_continues_after_failure ... ok
+test test::test_open_skill_creator_action_opens_settings_window_at_sub_page ... ok
+test project_settings_update_tests::test_updates_are_serialized ... ok
+test test::test_settings_window_shows_worktrees_from_multiple_workspaces ... ok
+test test::test_skills_page_scope_switch_updates_displayed_skills ... ok
+test test::test_settings_window_updates_when_new_workspace_created ... ok
+test test::test_open_skill_creator_navigates_to_sub_page ... ok
+test components::input_field::tests::building_text_runs_never_panics ... ok
+
+test result: ok. 79 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 3.57s
+
+TESTS EXIT 0

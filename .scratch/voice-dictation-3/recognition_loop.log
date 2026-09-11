@@ -1,0 +1,27 @@
+    Blocking waiting for file lock on artifact directory
+   Compiling audio v0.1.0 (C:\Users\NikitaDev\Desktop\projects\zed-experimental\crates\audio)
+   Compiling dictation v0.1.0 (C:\Users\NikitaDev\Desktop\projects\zed-experimental\crates\dictation)
+    Finished `release-fast` profile [optimized + debuginfo] target(s) in 1m 55s
+     Running tests\recognition_loop.rs (target\release-fast\deps\recognition_loop-53d064c236c5b5f1.exe)
+
+running 6 tests
+test repeated_ngram_detector_matches_loops_only ... ok
+ggml_vulkan: Found 2 Vulkan devices:
+ggml_vulkan: 0 = NVIDIA GeForce RTX 3070 Ti Laptop GPU (NVIDIA) | uma: 0 | fp16: 1 | bf16: 0 | fp4: 0 | warp size: 32 | shared memory: 49152 | int dot: 1 | matrix cores: KHR_coopmat
+ggml_vulkan: 1 = AMD Radeon(TM) Graphics (AMD proprietary driver) | uma: 1 | fp16: 1 | bf16: 0 | fp4: 0 | warp size: 32 | shared memory: 32768 | int dot: 1 | matrix cores: none
+load_backend: loaded Vulkan backend from C:\Users\NikitaDev\AppData\Local/zed-dictation/transcribe-native/transcribe-native-windows-x86_64-cpu-vulkan\ggml-vulkan.dll
+load_backend: loaded CPU backend from C:\Users\NikitaDev\AppData\Local/zed-dictation/transcribe-native/transcribe-native-windows-x86_64-cpu-vulkan\ggml-cpu-haswell.dll
+whisper: using vulkan backend: Vulkan0
+test confirmed_text_only_grows_by_prefix ... ok
+test digits_with_trailing_silence_yield_only_the_digits has been running for over 60 seconds
+test final_text_matches_whole_file_recognition has been running for over 60 seconds
+test source_ending_mid_file_keeps_the_tail has been running for over 60 seconds
+test stopping_mid_file_keeps_the_tail has been running for over 60 seconds
+test final_text_matches_whole_file_recognition ... ok
+test digits_with_trailing_silence_yield_only_the_digits ... ok
+test source_ending_mid_file_keeps_the_tail ... ok
+test stopping_mid_file_keeps_the_tail ... ok
+
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 126.52s
+
+exit=0

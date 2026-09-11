@@ -1,0 +1,22 @@
+test dictation_engine::tests::engine_is_dropped_after_the_session_when_not_keeping_it_loaded ... ok
+test dictation_engine::tests::session_that_lost_its_engine_still_frees_the_slot ... ok
+test dictation_engine::tests::next_session_reuses_the_returned_engine_when_keeping_it_loaded ... ok
+test dictation_engine::tests::changed_configuration_loads_a_new_engine ... ok
+test dictation_engine::tests::first_session_loads_the_engine_and_refuses_a_second_one ... ok
+test dictation_engine::tests::failed_load_frees_the_session_for_the_next_attempt ... ok
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 403 filtered out; finished in 0.00s
++ cargo clippy -p agent_ui -p dictation --release --all-targets --all-features -- --deny warnings
+    Checking dictation v0.1.0 (C:\Users\NikitaDev\Desktop\projects\zed-experimental\crates\dictation)
+    Checking agent_ui v0.1.0 (C:\Users\NikitaDev\Desktop\projects\zed-experimental\crates\agent_ui)
+    Finished `release` profile [optimized + debuginfo] target(s) in 25.75s
++ [[ -z '' ]]
++ which cargo-machete
++ exit 0
+CLIPPY EXIT 0
+test result: ok. 43 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.14s
+test result: ok. 409 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 33.65s
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+TEST EXIT 0
+DONE

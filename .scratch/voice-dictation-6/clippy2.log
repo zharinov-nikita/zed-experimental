@@ -1,0 +1,8 @@
++ cargo clippy -p agent_ui -p acp_thread -p agent --release --all-targets --all-features -- --deny warnings
+    Checking agent v0.1.0 (C:\Users\NikitaDev\Desktop\projects\zed-experimental\crates\agent)
+    Checking agent_ui v0.1.0 (C:\Users\NikitaDev\Desktop\projects\zed-experimental\crates\agent_ui)
+    Finished `release` profile [optimized + debuginfo] target(s) in 34.98s
++ [[ -z '' ]]
++ which cargo-machete
++ exit 0
+EXIT 0

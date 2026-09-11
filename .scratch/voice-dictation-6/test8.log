@@ -1,0 +1,16 @@
+    Blocking waiting for file lock on package cache
+    Blocking waiting for file lock on package cache
+    Blocking waiting for file lock on package cache
+   Compiling remote_server v0.1.0 (C:\Users\NikitaDev\Desktop\projects\zed-experimental\crates\remote_server)
+   Compiling agent_ui v0.1.0 (C:\Users\NikitaDev\Desktop\projects\zed-experimental\crates\agent_ui)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 1m 37s
+     Running unittests src\agent_ui.rs (target\debug\deps\agent_ui-4025d6c7730a98f8.exe)
+
+running 3 tests
+test message_editor::tests::test_copying_blocks_copies_their_text ... ok
+test message_editor::tests::test_serialized_copy_text_returns_none_when_mentions_outside_selection ... ok
+test message_editor::tests::test_serialized_copy_text_selection_covers_only_mention ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 465 filtered out; finished in 0.85s
+
+EXIT 0

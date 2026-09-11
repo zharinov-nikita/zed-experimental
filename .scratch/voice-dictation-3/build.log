@@ -1,0 +1,16 @@
+    Blocking waiting for file lock on artifact directory
+   Compiling audio v0.1.0 (C:\Users\NikitaDev\Desktop\projects\zed-experimental\crates\audio)
+warning: zed@1.16.0: Info: using '8ebb29ed4e02e95b6f460cdf9a2330e9d0cc9389' hash for ZED_COMMIT_SHA env var
+   Compiling livekit_client v0.1.0 (C:\Users\NikitaDev\Desktop\projects\zed-experimental\crates\livekit_client)
+   Compiling dictation v0.1.0 (C:\Users\NikitaDev\Desktop\projects\zed-experimental\crates\dictation)
+   Compiling agent_ui v0.1.0 (C:\Users\NikitaDev\Desktop\projects\zed-experimental\crates\agent_ui)
+   Compiling settings_ui v0.1.0 (C:\Users\NikitaDev\Desktop\projects\zed-experimental\crates\settings_ui)
+   Compiling call v0.1.0 (C:\Users\NikitaDev\Desktop\projects\zed-experimental\crates\call)
+   Compiling title_bar v0.1.0 (C:\Users\NikitaDev\Desktop\projects\zed-experimental\crates\title_bar)
+   Compiling git_ui v0.1.0 (C:\Users\NikitaDev\Desktop\projects\zed-experimental\crates\git_ui)
+   Compiling collab_ui v0.1.0 (C:\Users\NikitaDev\Desktop\projects\zed-experimental\crates\collab_ui)
+   Compiling acp_tools v0.1.0 (C:\Users\NikitaDev\Desktop\projects\zed-experimental\crates\acp_tools)
+   Compiling sidebar v0.1.0 (C:\Users\NikitaDev\Desktop\projects\zed-experimental\crates\sidebar)
+   Compiling zed v1.16.0 (C:\Users\NikitaDev\Desktop\projects\zed-experimental\crates\zed)
+    Finished `release-fast` profile [optimized + debuginfo] target(s) in 9m 33s
+exit=0

@@ -1,0 +1,283 @@
+    Blocking waiting for file lock on build directory
+    Checking windows-sys v0.61.2
+    Checking futures-util v0.3.32
+    Checking collections v0.1.0 (C:\Users\NikitaDev\Desktop\projects\zed-experimental\crates\collections)
+    Checking path v0.1.0 (C:\Users\NikitaDev\Desktop\projects\zed-experimental\crates\path)
+    Checking bit-vec v0.8.0
+    Checking quick-error v1.2.3
+    Checking wait-timeout v0.2.1
+   Compiling gpui v0.2.2 (C:\Users\NikitaDev\Desktop\projects\zed-experimental\crates\gpui)
+   Compiling proptest-macro v0.5.0 (https://github.com/proptest-rs/proptest?rev=3dca198a8fef1b32e3a66f1e1897c955b4dc5b5b#3dca198a)
+    Checking rand_xorshift v0.4.0
+    Checking unarray v0.1.4
+   Compiling aws-lc-rs v1.17.1
+   Compiling proto v0.1.0 (C:\Users\NikitaDev\Desktop\projects\zed-experimental\crates\proto)
+    Checking clock v0.1.0 (C:\Users\NikitaDev\Desktop\projects\zed-experimental\crates\clock)
+    Checking rand v0.8.6
+   Compiling language v0.1.0 (C:\Users\NikitaDev\Desktop\projects\zed-experimental\crates\language)
+    Checking zlog v0.1.0 (C:\Users\NikitaDev\Desktop\projects\zed-experimental\crates\zlog)
+    Checking clap_builder v4.5.49
+   Compiling tree-sitter-html v0.23.2
+    Checking unindent v0.2.4
+    Checking bit-set v0.8.0
+   Compiling gpui_windows v0.1.0 (C:\Users\NikitaDev\Desktop\projects\zed-experimental\crates\gpui_windows)
+   Compiling rustls v0.23.40
+    Checking fancy-regex v0.19.0
+    Checking num-bigint-dig v0.8.6
+    Checking rustls-webpki v0.103.13
+    Checking jsonschema v0.51.0
+    Checking rsa v0.9.10
+    Checking clap v4.5.49
+    Checking pet-core v0.1.0 (https://github.com/zed-industries/python-environment-tools.git?rev=5aad7164bfc2a58977b103c8ef8fdd7302ed2e9f#5aad7164)
+    Checking futures-executor v0.3.32
+    Checking futures v0.3.32
+    Checking postage v0.5.0
+    Checking scheduler v0.1.0 (C:\Users\NikitaDev\Desktop\projects\zed-experimental\crates\scheduler)
+    Checking telemetry v0.1.0 (C:\Users\NikitaDev\Desktop\projects\zed-experimental\crates\telemetry)
+    Checking async-pipe v0.1.3 (https://github.com/zed-industries/async-pipe-rs?rev=82d00a04211cf4e1236029aa03e6b6ce2a74c553#82d00a04)
+    Checking watch v0.1.0 (C:\Users\NikitaDev\Desktop\projects\zed-experimental\crates\watch)
+    Checking oauth_callback_server v0.1.0 (C:\Users\NikitaDev\Desktop\projects\zed-experimental\crates\oauth_callback_server)
+    Checking http_proxy v0.1.0 (C:\Users\NikitaDev\Desktop\projects\zed-experimental\crates\http_proxy)
+    Checking tungstenite v0.28.0
+    Checking winapi-util v0.1.11
+    Checking errno v0.3.14
+    Checking polling v3.11.0
+    Checking dirs-sys v0.5.0
+    Checking tempfile v3.27.0
+    Checking nu-ansi-term v0.50.3
+    Checking mio v1.2.0
+    Checking socket2 v0.6.5
+    Checking wasmtime-internal-jit-icache-coherence v48.0.1
+    Checking schannel v0.1.28
+    Checking rustls-platform-verifier v0.7.0
+    Checking miow v0.6.1
+    Checking stacker v0.1.25
+    Checking cap-primitives v4.0.3
+    Checking dirs v6.0.0
+    Checking rustix v1.1.4
+    Checking same-file v1.0.6
+    Checking termcolor v1.4.1
+    Checking rusty-fork v0.3.1
+    Checking stacksafe v1.0.3
+    Checking tracing-subscriber v0.3.22
+    Checking diffy v0.4.2
+    Checking http_client_tls v0.1.0 (C:\Users\NikitaDev\Desktop\projects\zed-experimental\crates\http_client_tls)
+    Checking alacritty_terminal v0.26.1-dev (https://github.com/zed-industries/alacritty?rev=4c129667ce56611becdc82de6e28218c80e2e88f#4c129667)
+    Checking shellexpand v3.1.1
+    Checking native-tls v0.2.18
+    Checking rustls-native-certs v0.8.3
+    Checking walkdir v2.5.0
+    Checking tokio v1.52.1
+    Checking cap-std v4.0.3
+    Checking proptest v1.10.0 (https://github.com/proptest-rs/proptest?rev=3dca198a8fef1b32e3a66f1e1897c955b4dc5b5b#3dca198a)
+    Checking wasmprinter v0.254.0
+    Checking env_logger v0.10.2
+    Checking rust-embed-utils v8.11.0
+    Checking ignore v0.4.24
+    Checking notify v9.0.0-rc.4 (https://github.com/zed-industries/notify?rev=d842f16b2716bd60f09caf3ae3a894237ab38f54#d842f16b)
+    Checking wax v0.7.0
+    Checking async-io v2.6.0
+    Checking cap-fs-ext v4.0.3
+    Checking pet-python-utils v0.1.0 (https://github.com/zed-industries/python-environment-tools.git?rev=5aad7164bfc2a58977b103c8ef8fdd7302ed2e9f#5aad7164)
+    Checking pet-jsonrpc v0.1.0 (https://github.com/zed-industries/python-environment-tools.git?rev=5aad7164bfc2a58977b103c8ef8fdd7302ed2e9f#5aad7164)
+    Checking rust-embed v8.11.0
+    Checking pet-reporter v0.1.0 (https://github.com/zed-industries/python-environment-tools.git?rev=5aad7164bfc2a58977b103c8ef8fdd7302ed2e9f#5aad7164)
+    Checking async-process v2.5.0 (https://github.com/zed-industries/async-process.git?rev=0b6d6713570af61806e1e5cb40e0f757cb93fd9d#0b6d6713)
+    Checking async-net v2.0.0
+    Checking async-global-executor v2.4.1
+    Checking handlebars v4.5.0
+    Checking ztracing v0.1.0 (C:\Users\NikitaDev\Desktop\projects\zed-experimental\crates\ztracing)
+    Checking sum_tree v0.1.0 (C:\Users\NikitaDev\Desktop\projects\zed-experimental\crates\sum_tree)
+    Checking pet-virtualenv v0.1.0 (https://github.com/zed-industries/python-environment-tools.git?rev=5aad7164bfc2a58977b103c8ef8fdd7302ed2e9f#5aad7164)
+    Checking pet-hatch v0.1.0 (https://github.com/zed-industries/python-environment-tools.git?rev=5aad7164bfc2a58977b103c8ef8fdd7302ed2e9f#5aad7164)
+    Checking pet-uv v0.1.0 (https://github.com/zed-industries/python-environment-tools.git?rev=5aad7164bfc2a58977b103c8ef8fdd7302ed2e9f#5aad7164)
+    Checking pet-telemetry v0.1.0 (https://github.com/zed-industries/python-environment-tools.git?rev=5aad7164bfc2a58977b103c8ef8fdd7302ed2e9f#5aad7164)
+    Checking async-std v1.13.2
+    Checking agent-client-protocol v2.0.0
+    Checking smol v2.0.2
+    Checking pet-conda v0.1.0 (https://github.com/zed-industries/python-environment-tools.git?rev=5aad7164bfc2a58977b103c8ef8fdd7302ed2e9f#5aad7164)
+    Checking wasmtime-environ v48.0.1
+    Checking pet-windows-store v0.1.0 (https://github.com/zed-industries/python-environment-tools.git?rev=5aad7164bfc2a58977b103c8ef8fdd7302ed2e9f#5aad7164)
+    Checking pet-mac-python-org v0.1.0 (https://github.com/zed-industries/python-environment-tools.git?rev=5aad7164bfc2a58977b103c8ef8fdd7302ed2e9f#5aad7164)
+    Checking pet-poetry v0.1.0 (https://github.com/zed-industries/python-environment-tools.git?rev=5aad7164bfc2a58977b103c8ef8fdd7302ed2e9f#5aad7164)
+    Checking util v0.1.0 (C:\Users\NikitaDev\Desktop\projects\zed-experimental\crates\util)
+    Checking net v0.1.0 (C:\Users\NikitaDev\Desktop\projects\zed-experimental\crates\net)
+    Checking sandbox v0.1.0 (C:\Users\NikitaDev\Desktop\projects\zed-experimental\crates\sandbox)
+    Checking pet-mac-xcode v0.1.0 (https://github.com/zed-industries/python-environment-tools.git?rev=5aad7164bfc2a58977b103c8ef8fdd7302ed2e9f#5aad7164)
+    Checking pet-pipenv v0.1.0 (https://github.com/zed-industries/python-environment-tools.git?rev=5aad7164bfc2a58977b103c8ef8fdd7302ed2e9f#5aad7164)
+    Checking pet-virtualenvwrapper v0.1.0 (https://github.com/zed-industries/python-environment-tools.git?rev=5aad7164bfc2a58977b103c8ef8fdd7302ed2e9f#5aad7164)
+    Checking pet-winpython v0.1.0 (https://github.com/zed-industries/python-environment-tools.git?rev=5aad7164bfc2a58977b103c8ef8fdd7302ed2e9f#5aad7164)
+    Checking pet-linux-global-python v0.1.0 (https://github.com/zed-industries/python-environment-tools.git?rev=5aad7164bfc2a58977b103c8ef8fdd7302ed2e9f#5aad7164)
+    Checking pet-mac-commandlinetools v0.1.0 (https://github.com/zed-industries/python-environment-tools.git?rev=5aad7164bfc2a58977b103c8ef8fdd7302ed2e9f#5aad7164)
+    Checking pet-venv v0.1.0 (https://github.com/zed-industries/python-environment-tools.git?rev=5aad7164bfc2a58977b103c8ef8fdd7302ed2e9f#5aad7164)
+    Checking pet-global-virtualenvs v0.1.0 (https://github.com/zed-industries/python-environment-tools.git?rev=5aad7164bfc2a58977b103c8ef8fdd7302ed2e9f#5aad7164)
+    Checking pet-pyenv v0.1.0 (https://github.com/zed-industries/python-environment-tools.git?rev=5aad7164bfc2a58977b103c8ef8fdd7302ed2e9f#5aad7164)
+    Checking pet-pixi v0.1.0 (https://github.com/zed-industries/python-environment-tools.git?rev=5aad7164bfc2a58977b103c8ef8fdd7302ed2e9f#5aad7164)
+    Checking pet-env-var-path v0.1.0 (https://github.com/zed-industries/python-environment-tools.git?rev=5aad7164bfc2a58977b103c8ef8fdd7302ed2e9f#5aad7164)
+    Checking pet-windows-registry v0.1.0 (https://github.com/zed-industries/python-environment-tools.git?rev=5aad7164bfc2a58977b103c8ef8fdd7302ed2e9f#5aad7164)
+    Checking pet v0.1.0 (https://github.com/zed-industries/python-environment-tools.git?rev=5aad7164bfc2a58977b103c8ef8fdd7302ed2e9f#5aad7164)
+    Checking paths v0.1.0 (C:\Users\NikitaDev\Desktop\projects\zed-experimental\crates\paths)
+    Checking rope v0.1.0 (C:\Users\NikitaDev\Desktop\projects\zed-experimental\crates\rope)
+    Checking sqlez v0.1.0 (C:\Users\NikitaDev\Desktop\projects\zed-experimental\crates\sqlez)
+    Checking async-tar v0.6.1 (https://github.com/zed-industries/async-tar?rev=bd3ad6f89df9a9da7a8535958756d6bf465936a0#bd3ad6f8)
+    Checking text v0.1.0 (C:\Users\NikitaDev\Desktop\projects\zed-experimental\crates\text)
+    Checking streaming_diff v0.1.0 (C:\Users\NikitaDev\Desktop\projects\zed-experimental\crates\streaming_diff)
+    Checking tokio-util v0.7.18
+    Checking tokio-rustls v0.26.4
+    Checking proxy_handshake v0.1.0 (C:\Users\NikitaDev\Desktop\projects\zed-experimental\crates\proxy_handshake)
+    Checking tokio-native-tls v0.3.1
+    Checking aws-smithy-async v1.2.14
+    Checking tower v0.5.2
+    Checking tokio-stream v0.1.17
+    Checking tokio-socks v0.5.2
+    Checking http_client v0.1.0 (C:\Users\NikitaDev\Desktop\projects\zed-experimental\crates\http_client)
+    Checking async-tungstenite v0.33.0
+    Checking livekit-runtime v0.4.0 (https://github.com/zed-industries/livekit-rust-sdks?rev=0a1c519cfce9b365229026b55de9b9dbdb6fed3c#0a1c519c)
+    Checking h2 v0.4.12
+    Checking aws-smithy-types v1.4.7
+    Checking livekit-protocol v0.7.1 (https://github.com/zed-industries/livekit-rust-sdks?rev=0a1c519cfce9b365229026b55de9b9dbdb6fed3c#0a1c519c)
+    Checking language_model_core v0.1.0 (C:\Users\NikitaDev\Desktop\projects\zed-experimental\crates\language_model_core)
+    Checking node_runtime v0.1.0 (C:\Users\NikitaDev\Desktop\projects\zed-experimental\crates\node_runtime)
+    Checking deepseek v0.1.0 (C:\Users\NikitaDev\Desktop\projects\zed-experimental\crates\deepseek)
+    Checking mistral v0.1.0 (C:\Users\NikitaDev\Desktop\projects\zed-experimental\crates\mistral)
+    Checking aws-smithy-runtime-api v1.11.4
+    Checking aws-smithy-eventstream v0.60.20
+    Checking aws-smithy-json v0.62.5
+    Checking aws-smithy-query v0.60.15
+    Checking aws-smithy-http v0.63.4
+    Checking aws-credential-types v1.2.12
+    Checking aws-smithy-observability v0.2.5
+    Checking aws_http_client v0.1.0 (C:\Users\NikitaDev\Desktop\projects\zed-experimental\crates\aws_http_client)
+    Checking anthropic v0.1.0 (C:\Users\NikitaDev\Desktop\projects\zed-experimental\crates\anthropic)
+    Checking open_ai v0.1.0 (C:\Users\NikitaDev\Desktop\projects\zed-experimental\crates\open_ai)
+    Checking google_ai v0.1.0 (C:\Users\NikitaDev\Desktop\projects\zed-experimental\crates\google_ai)
+    Checking llama_cpp v0.1.0 (C:\Users\NikitaDev\Desktop\projects\zed-experimental\crates\llama_cpp)
+    Checking lmstudio v0.1.0 (C:\Users\NikitaDev\Desktop\projects\zed-experimental\crates\lmstudio)
+    Checking aws-types v1.3.12
+    Checking aws-sigv4 v1.4.0
+    Checking opencode v0.1.0 (C:\Users\NikitaDev\Desktop\projects\zed-experimental\crates\opencode)
+    Checking hyper v1.7.0
+    Checking hyper-util v0.1.17
+    Checking wasmtime-internal-unwinder v48.0.1
+    Checking wasmtime-internal-fiber v48.0.1
+    Checking wasmtime-internal-cranelift v48.0.1
+    Checking yawc v0.3.3 (https://github.com/zed-industries/yawc?rev=71a452f551cac178367eaac5d7418a09afa1f3a2#71a452f5)
+    Checking hyper-rustls v0.27.9
+    Checking aws-smithy-http-client v1.1.10
+    Checking zed-reqwest v0.12.15-zed (https://github.com/zed-industries/reqwest.git?rev=33bc764aa15ff7b200bf7c93bd96e24878d53e14#33bc764a)
+    Checking aws-smithy-runtime v1.10.1
+    Checking reqwest_client v0.1.0 (C:\Users\NikitaDev\Desktop\projects\zed-experimental\crates\reqwest_client)
+    Checking libwebrtc v0.3.26 (https://github.com/zed-industries/livekit-rust-sdks?rev=0a1c519cfce9b365229026b55de9b9dbdb6fed3c#0a1c519c)
+    Checking wasmtime v48.0.1
+    Checking aws-runtime v1.7.0
+    Checking aws-sdk-sts v1.98.0
+    Checking aws-sdk-bedrockruntime v1.125.0
+    Checking aws-sdk-sso v1.94.0
+    Checking aws-sdk-ssooidc v1.96.0
+    Checking release_channel v0.1.0 (C:\Users\NikitaDev\Desktop\projects\zed-experimental\crates\release_channel)
+    Checking askpass v0.1.0 (C:\Users\NikitaDev\Desktop\projects\zed-experimental\crates\askpass)
+    Checking syntax_theme v0.1.0 (C:\Users\NikitaDev\Desktop\projects\zed-experimental\crates\syntax_theme)
+    Checking zed_actions v0.1.0 (C:\Users\NikitaDev\Desktop\projects\zed-experimental\crates\zed_actions)
+    Checking fuzzy v0.1.0 (C:\Users\NikitaDev\Desktop\projects\zed-experimental\crates\fuzzy)
+    Checking rpc v0.1.0 (C:\Users\NikitaDev\Desktop\projects\zed-experimental\crates\rpc)
+    Checking credentials_provider v0.1.0 (C:\Users\NikitaDev\Desktop\projects\zed-experimental\crates\credentials_provider)
+    Checking gpui_tokio v0.1.0 (C:\Users\NikitaDev\Desktop\projects\zed-experimental\crates\gpui_tokio)
+    Checking menu v0.1.0 (C:\Users\NikitaDev\Desktop\projects\zed-experimental\crates\menu)
+    Checking mermaid_render v0.1.0 (C:\Users\NikitaDev\Desktop\projects\zed-experimental\crates\mermaid_render)
+    Checking assets v0.1.0 (C:\Users\NikitaDev\Desktop\projects\zed-experimental\crates\assets)
+    Checking language_model v0.1.0 (C:\Users\NikitaDev\Desktop\projects\zed-experimental\crates\language_model)
+    Checking web_search v0.1.0 (C:\Users\NikitaDev\Desktop\projects\zed-experimental\crates\web_search)
+    Checking cloud_api_client v0.1.0 (C:\Users\NikitaDev\Desktop\projects\zed-experimental\crates\cloud_api_client)
+    Checking theme v0.1.0 (C:\Users\NikitaDev\Desktop\projects\zed-experimental\crates\theme)
+    Checking lsp v0.1.0 (C:\Users\NikitaDev\Desktop\projects\zed-experimental\crates\lsp)
+    Checking zed_credentials_provider v0.1.0 (C:\Users\NikitaDev\Desktop\projects\zed-experimental\crates\zed_credentials_provider)
+    Checking git v0.1.0 (C:\Users\NikitaDev\Desktop\projects\zed-experimental\crates\git)
+    Checking db v0.1.0 (C:\Users\NikitaDev\Desktop\projects\zed-experimental\crates\db)
+    Checking fuzzy_nucleo v0.1.0 (C:\Users\NikitaDev\Desktop\projects\zed-experimental\crates\fuzzy_nucleo)
+    Checking copilot_chat v0.1.0 (C:\Users\NikitaDev\Desktop\projects\zed-experimental\crates\copilot_chat)
+    Checking language_models_cloud v0.1.0 (C:\Users\NikitaDev\Desktop\projects\zed-experimental\crates\language_models_cloud)
+    Checking openai_subscribed v0.1.0 (C:\Users\NikitaDev\Desktop\projects\zed-experimental\crates\openai_subscribed)
+    Checking session v0.1.0 (C:\Users\NikitaDev\Desktop\projects\zed-experimental\crates\session)
+    Checking aws-config v1.8.14
+    Checking task v0.1.0 (C:\Users\NikitaDev\Desktop\projects\zed-experimental\crates\task)
+    Checking gpui_platform v0.1.0 (C:\Users\NikitaDev\Desktop\projects\zed-experimental\crates\gpui_platform)
+    Checking component v0.1.0 (C:\Users\NikitaDev\Desktop\projects\zed-experimental\crates\component)
+    Checking eval_utils v0.1.0 (C:\Users\NikitaDev\Desktop\projects\zed-experimental\crates\eval_utils)
+    Checking fs v0.1.0 (C:\Users\NikitaDev\Desktop\projects\zed-experimental\crates\fs)
+    Checking ui v0.1.0 (C:\Users\NikitaDev\Desktop\projects\zed-experimental\crates\ui)
+    Checking bedrock v0.1.0 (C:\Users\NikitaDev\Desktop\projects\zed-experimental\crates\bedrock)
+    Checking agent_skills v0.1.0 (C:\Users\NikitaDev\Desktop\projects\zed-experimental\crates\agent_skills)
+    Checking wasmtime-c-api-impl v48.0.1
+    Checking wasmtime-wasi-io v48.0.1
+    Checking wiggle v48.0.1
+    Checking tree-sitter v0.27.0 (https://github.com/tree-sitter/tree-sitter?rev=43623ec9bf0eaaf7113285c46e8a09018f181b18#43623ec9)
+    Checking ui_input v0.1.0 (C:\Users\NikitaDev\Desktop\projects\zed-experimental\crates\ui_input)
+    Checking wasmtime-wasi v48.0.1
+    Checking settings_json v0.1.0 (C:\Users\NikitaDev\Desktop\projects\zed-experimental\crates\settings_json)
+    Checking language_core v0.1.0 (C:\Users\NikitaDev\Desktop\projects\zed-experimental\crates\language_core)
+    Checking edit_prediction_metrics v0.1.0 (C:\Users\NikitaDev\Desktop\projects\zed-experimental\crates\edit_prediction_metrics)
+    Checking settings_content v0.1.0 (C:\Users\NikitaDev\Desktop\projects\zed-experimental\crates\settings_content)
+    Checking grammars v0.1.0 (C:\Users\NikitaDev\Desktop\projects\zed-experimental\crates\grammars)
+    Checking migrator v0.1.0 (C:\Users\NikitaDev\Desktop\projects\zed-experimental\crates\migrator)
+    Checking file_icons v0.1.0 (C:\Users\NikitaDev\Desktop\projects\zed-experimental\crates\file_icons)
+    Checking settings v0.1.0 (C:\Users\NikitaDev\Desktop\projects\zed-experimental\crates\settings)
+    Checking feature_flags v0.1.0 (C:\Users\NikitaDev\Desktop\projects\zed-experimental\crates\feature_flags)
+    Checking theme_settings v0.1.0 (C:\Users\NikitaDev\Desktop\projects\zed-experimental\crates\theme_settings)
+    Checking git_hosting_providers v0.1.0 (C:\Users\NikitaDev\Desktop\projects\zed-experimental\crates\git_hosting_providers)
+    Checking remote v0.1.0 (C:\Users\NikitaDev\Desktop\projects\zed-experimental\crates\remote)
+    Checking context_server v0.1.0 (C:\Users\NikitaDev\Desktop\projects\zed-experimental\crates\context_server)
+    Checking vim_mode_setting v0.1.0 (C:\Users\NikitaDev\Desktop\projects\zed-experimental\crates\vim_mode_setting)
+    Checking ollama v0.1.0 (C:\Users\NikitaDev\Desktop\projects\zed-experimental\crates\ollama)
+    Checking open_router v0.1.0 (C:\Users\NikitaDev\Desktop\projects\zed-experimental\crates\open_router)
+    Checking audio v0.1.0 (C:\Users\NikitaDev\Desktop\projects\zed-experimental\crates\audio)
+    Checking terminal v0.1.0 (C:\Users\NikitaDev\Desktop\projects\zed-experimental\crates\terminal)
+    Checking dictation v0.1.0 (C:\Users\NikitaDev\Desktop\projects\zed-experimental\crates\dictation)
+    Checking worktree v0.1.0 (C:\Users\NikitaDev\Desktop\projects\zed-experimental\crates\worktree)
+    Checking buffer_diff v0.1.0 (C:\Users\NikitaDev\Desktop\projects\zed-experimental\crates\buffer_diff)
+    Checking markdown v0.1.0 (C:\Users\NikitaDev\Desktop\projects\zed-experimental\crates\markdown)
+    Checking prettier v0.1.0 (C:\Users\NikitaDev\Desktop\projects\zed-experimental\crates\prettier)
+    Checking language_detection v0.1.0 (C:\Users\NikitaDev\Desktop\projects\zed-experimental\crates\language_detection)
+    Checking prompt_store v0.1.0 (C:\Users\NikitaDev\Desktop\projects\zed-experimental\crates\prompt_store)
+    Checking multi_buffer v0.1.0 (C:\Users\NikitaDev\Desktop\projects\zed-experimental\crates\multi_buffer)
+    Checking client v0.1.0 (C:\Users\NikitaDev\Desktop\projects\zed-experimental\crates\client)
+    Checking dap v0.1.0 (C:\Users\NikitaDev\Desktop\projects\zed-experimental\crates\dap)
+    Checking edit_prediction_types v0.1.0 (C:\Users\NikitaDev\Desktop\projects\zed-experimental\crates\edit_prediction_types)
+    Checking ai_onboarding v0.1.0 (C:\Users\NikitaDev\Desktop\projects\zed-experimental\crates\ai_onboarding)
+    Checking channel v0.1.0 (C:\Users\NikitaDev\Desktop\projects\zed-experimental\crates\channel)
+    Checking extension v0.1.0 (C:\Users\NikitaDev\Desktop\projects\zed-experimental\crates\extension)
+    Checking snippet_provider v0.1.0 (C:\Users\NikitaDev\Desktop\projects\zed-experimental\crates\snippet_provider)
+    Checking project v0.1.0 (C:\Users\NikitaDev\Desktop\projects\zed-experimental\crates\project)
+    Checking agent_settings v0.1.0 (C:\Users\NikitaDev\Desktop\projects\zed-experimental\crates\agent_settings)
+    Checking action_log v0.1.0 (C:\Users\NikitaDev\Desktop\projects\zed-experimental\crates\action_log)
+    Checking edit_prediction_context v0.1.0 (C:\Users\NikitaDev\Desktop\projects\zed-experimental\crates\edit_prediction_context)
+    Checking extension_host v0.1.0 (C:\Users\NikitaDev\Desktop\projects\zed-experimental\crates\extension_host)
+    Checking json_schema_store v0.1.0 (C:\Users\NikitaDev\Desktop\projects\zed-experimental\crates\json_schema_store)
+    Checking languages v0.1.0 (C:\Users\NikitaDev\Desktop\projects\zed-experimental\crates\languages)
+    Checking workspace v0.1.0 (C:\Users\NikitaDev\Desktop\projects\zed-experimental\crates\workspace)
+    Checking acp_thread v0.1.0 (C:\Users\NikitaDev\Desktop\projects\zed-experimental\crates\acp_thread)
+    Checking agent_servers v0.1.0 (C:\Users\NikitaDev\Desktop\projects\zed-experimental\crates\agent_servers)
+    Checking command_palette_hooks v0.1.0 (C:\Users\NikitaDev\Desktop\projects\zed-experimental\crates\command_palette_hooks)
+    Checking breadcrumbs v0.1.0 (C:\Users\NikitaDev\Desktop\projects\zed-experimental\crates\breadcrumbs)
+    Checking picker v0.1.0 (C:\Users\NikitaDev\Desktop\projects\zed-experimental\crates\picker)
+    Checking auto_update v0.1.0 (C:\Users\NikitaDev\Desktop\projects\zed-experimental\crates\auto_update)
+    Checking notifications v0.1.0 (C:\Users\NikitaDev\Desktop\projects\zed-experimental\crates\notifications)
+    Checking platform_title_bar v0.1.0 (C:\Users\NikitaDev\Desktop\projects\zed-experimental\crates\platform_title_bar)
+    Checking editor v0.1.0 (C:\Users\NikitaDev\Desktop\projects\zed-experimental\crates\editor)
+    Checking copilot v0.1.0 (C:\Users\NikitaDev\Desktop\projects\zed-experimental\crates\copilot)
+    Checking remote_connection v0.1.0 (C:\Users\NikitaDev\Desktop\projects\zed-experimental\crates\remote_connection)
+    Checking command_palette v0.1.0 (C:\Users\NikitaDev\Desktop\projects\zed-experimental\crates\command_palette)
+    Checking copilot_ui v0.1.0 (C:\Users\NikitaDev\Desktop\projects\zed-experimental\crates\copilot_ui)
+    Checking edit_prediction v0.1.0 (C:\Users\NikitaDev\Desktop\projects\zed-experimental\crates\edit_prediction)
+    Checking language_models v0.1.0 (C:\Users\NikitaDev\Desktop\projects\zed-experimental\crates\language_models)
+    Checking codestral v0.1.0 (C:\Users\NikitaDev\Desktop\projects\zed-experimental\crates\codestral)
+    Checking agent v0.1.0 (C:\Users\NikitaDev\Desktop\projects\zed-experimental\crates\agent)
+    Checking picker_preview v0.1.0 (C:\Users\NikitaDev\Desktop\projects\zed-experimental\crates\picker_preview)
+    Checking terminal_view v0.1.0 (C:\Users\NikitaDev\Desktop\projects\zed-experimental\crates\terminal_view)
+    Checking git_ui_core v0.1.0 (C:\Users\NikitaDev\Desktop\projects\zed-experimental\crates\git_ui_core)
+    Checking edit_prediction_ui v0.1.0 (C:\Users\NikitaDev\Desktop\projects\zed-experimental\crates\edit_prediction_ui)
+    Checking search v0.1.0 (C:\Users\NikitaDev\Desktop\projects\zed-experimental\crates\search)
+    Checking vim v0.1.0 (C:\Users\NikitaDev\Desktop\projects\zed-experimental\crates\vim)
+    Checking settings_ui v0.1.0 (C:\Users\NikitaDev\Desktop\projects\zed-experimental\crates\settings_ui)
+    Checking agent_ui v0.1.0 (C:\Users\NikitaDev\Desktop\projects\zed-experimental\crates\agent_ui)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 6m 21s
+CHECK EXIT 0

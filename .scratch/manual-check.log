@@ -1,0 +1,14 @@
+=== dictation integration tests
+test tests::last_recording_path_is_fixed_and_in_temp_dir ... ok
+test tests::saved_recording_loads_back_as_engine_pcm ... ok
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+test final_text_matches_whole_file_recognition ... ok
+test source_ending_mid_file_keeps_the_tail ... ok
+test confirmed_text_only_grows_by_prefix ... ok
+test stopping_mid_file_keeps_the_tail ... ok
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 27.58s
+TESTS EXIT 0
+=== build zed
+   Compiling zed v1.16.0 (C:\Users\NikitaDev\Desktop\projects\zed-experimental\crates\zed)
+    Finished `release-fast` profile [optimized + debuginfo] target(s) in 31m 49s
+BUILD EXIT 0

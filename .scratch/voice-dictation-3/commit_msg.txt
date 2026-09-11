@@ -1,0 +1,39 @@
+Local: диктовка, итерация 3 — Decoder Loop, Session Audio, устройства, Engine Download (тикеты 01–11)
+
+Движок (crates/dictation):
+- Decoder Loop отбрасывается по форме вывода (ADR 0001): сегмент из одной
+  n-граммы три и более раз подряд или с повторённой фразой из двух и более слов,
+  а также три одинаковых многословных сегмента подряд.
+- Хвост при остановке: сегмент, которого не было в Pending Text, декодируется
+  отдельно с включённым no-speech-гейтом whisper (logprob_thold = 0) и
+  отбрасывается, если декодер считает его тишиной.
+- Session Audio: WAV каждой сессии в <data dir>/dictation/audio/<id блока>.wav,
+  Resume дописывает, лимит по числу файлов (session_audio.keep, 20), 0 выключает.
+  Ключ save_last_recording и файл в temp удалены.
+- Recorder сообщает реально открытое устройство и fallback (audio::OpenedInputDevice).
+- Каталог Engine Assets и загрузчик (модели whisper.cpp с SHA1, архив
+  transcribe.cpp 0.2.3 cpu-vulkan с SHA256) с тестами на FakeHttpClient.
+- Воспроизведение Session Audio на выбранном выходе.
+- Фикстура zed-digits-with-silence.wav и интеграционный тест на Decoder Loop.
+
+Dictation Window (crates/agent_ui):
+- Подвал рисуется по чистой функции состояния (dictation_footer): во время
+  Recognizing/Post-processing доступен только Cancel, спиннер; «accept when done»
+  удалён; метка Raw / Processed · <модель> с тултипом промпта и переходом в
+  Settings › AI › Dictation; Tab — Show Raw / Show Processed; Play/Stop (ctrl-p);
+  имя микрофона с «configured device not found»; scrollbar по scrollbar.show.
+- Id Dictation Block выбирается при старте, чтобы Session Audio писался под ним.
+
+Настройки (settings_content, agent_settings, default.json):
+- agent.dictation.session_audio.keep вместо save_last_recording; промпт
+  Post-processing получает пример «Thank you».
+
+Подстраница Dictation (crates/settings_ui) и устройства (crates/audio, ui):
+- Глоссарий чипами с крестиком и полем добавления, вставка списка через запятую.
+- Кнопка Test Microphone…, поле Keep Session Audio.
+- Download… у модели (четыре модели с размерами) и бэкендов: процент, Cancel,
+  Banner ошибки, процесс-глобальная загрузка, путь пишется в settings.json.
+- Устройства называются как в Windows (friendly name), id в тултипе, список
+  обновляется при открытии списка (DropdownMenu::on_open) и при старте сессии.
+
+LOCAL_DEV.md описывает папки, фикстуру, лимит и откуда берётся версия бэкендов.

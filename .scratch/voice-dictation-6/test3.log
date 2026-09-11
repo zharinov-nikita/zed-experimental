@@ -1,0 +1,33 @@
+   Compiling remote_server v0.1.0 (C:\Users\NikitaDev\Desktop\projects\zed-experimental\crates\remote_server)
+   Compiling agent_ui v0.1.0 (C:\Users\NikitaDev\Desktop\projects\zed-experimental\crates\agent_ui)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 1m 18s
+     Running unittests src\agent_ui.rs (target\debug\deps\agent_ui-4025d6c7730a98f8.exe)
+
+running 23 tests
+test dictation_window::tests::prompt_preview_quotes_the_beginning_of_a_long_prompt ... ok
+test quote_reply::tests::a_multi_line_quote_is_quoted_line_by_line ... ok
+test quote_reply::tests::a_quote_reply_puts_the_comment_after_the_note ... ok
+test quote_reply::tests::a_code_block_keeps_its_fences_inside_the_quote ... ok
+test quote_reply::tests::a_long_comment_is_cut_after_the_first_words ... ok
+test quote_reply::tests::a_quote_reply_without_a_comment_is_just_the_quote ... ok
+test quote_reply::tests::a_short_comment_is_the_whole_label ... ok
+test quote_reply::tests::an_empty_comment_has_no_label ... ok
+test quote_reply::tests::blank_lines_inside_the_quote_stay_quoted ... ok
+test quote_reply::tests::the_items_are_hidden_for_anything_but_an_agent_response ... ok
+test quote_reply::tests::the_note_follows_the_dictation_language ... ok
+test quote_reply::tests::the_russian_note_is_used_for_russian_dictation ... ok
+test quote_reply::tests::the_items_are_off_without_a_selection_or_during_a_session ... ok
+test message_editor::tests::test_quoted_fragment_reaches_the_agent_as_a_quote_with_a_note ... ok
+test message_editor::tests::test_quote_reply_block_keeps_its_quote_while_the_comment_changes ... ok
+test conversation_view::tests::test_discarding_an_empty_quote_reply_removes_its_block ... ok
+test message_editor::tests::test_several_quoted_fragments_in_one_message ... ok
+test conversation_view::tests::test_quote_reply_is_refused_while_a_session_runs ... ok
+test message_editor::tests::test_sent_quote_reply_shows_its_quote_and_comment ... ok
+test message_editor::tests::test_quoted_fragment_is_deleted_whole ... ok
+test conversation_view::tests::test_opening_another_block_accepts_the_review_first ... ok
+test conversation_view::tests::test_accepting_a_quote_reply_fills_only_the_comment ... ok
+test conversation_view::tests::test_reply_to_selection_needs_a_selection ... ok
+
+test result: ok. 23 passed; 0 failed; 0 ignored; 0 measured; 444 filtered out; finished in 1.31s
+
+EXIT 0

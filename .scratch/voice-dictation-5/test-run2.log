@@ -1,0 +1,48 @@
+   Compiling agent_ui v0.1.0 (C:\Users\NikitaDev\Desktop\projects\zed-experimental\crates\agent_ui)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 59.03s
+     Running unittests src\agent_ui.rs (target\debug\deps\agent_ui-4025d6c7730a98f8.exe)
+
+running 39 tests
+test conversation_view::elicitation::tests::number_validation_rejects_non_finite_values ... ok
+test conversation_view::elicitation::tests::display_url_segments_never_elide_url_characters ... ok
+test conversation_view::elicitation::tests::display_url_segments_use_larger_url_boundaries ... ok
+test conversation_view::elicitation::tests::single_select_options_include_titled_descriptions ... ok
+test conversation_view::elicitation::tests::multi_select_options_include_titled_descriptions ... ok
+test conversation_view::elicitation::tests::should_render_pending_and_accepted_url_elicitations ... ok
+test conversation_view::elicitation::tests::string_validation_rejects_patterns_outside_resource_limits ... ok
+test conversation_view::elicitation::tests::url_host_presentation_highlights_destination_and_suspicious_idn ... ok
+test conversation_view::elicitation::tests::string_validation_rejects_email_format_mismatch ... ok
+test dictation_host::tests::accepted_text_becomes_a_composer_block_once_the_question_is_gone ... ok
+test dictation_host::tests::accepted_text_goes_to_the_answer_field_while_the_question_is_open ... ok
+test dictation_host::tests::insertion_after_a_space_adds_none ... ok
+test dictation_host::tests::insertion_at_the_end_of_a_line_keeps_the_line_break ... ok
+test dictation_host::tests::insertion_in_the_middle_of_a_word_is_spaced_on_both_sides ... ok
+test dictation_host::tests::insertion_into_an_empty_field_is_the_text_itself ... ok
+test conversation_view::elicitation::tests::string_validation_rejects_pattern_mismatch ... ok
+test dictation_host::tests::multi_line_text_keeps_its_line_breaks ... ok
+test dictation_host::tests::other_fields_are_refused_while_a_session_runs ... ok
+test dictation_host::tests::the_hosting_field_toggles_its_own_session ... ok
+test dictation_host::tests::without_a_session_any_field_may_start ... ok
+test dictation_window::tests::review_post_processing_and_failure_are_silent ... ok
+test dictation_window::tests::prompt_preview_quotes_the_beginning_of_a_long_prompt ... ok
+test dictation_window::tests::starting_and_resuming_open_the_microphone_audibly ... ok
+test dictation_window::tests::stopping_closes_the_microphone_audibly ... ok
+test conversation_view::elicitation::tests::string_validation_supports_bounded_advanced_patterns ... ok
+test entry_view_state::tests::test_elicitation_preserves_entry_index ... ok
+test conversation_view::elicitation::tests::form_state_discards_invalid_optional_single_select_default ... ok
+test conversation_view::elicitation::tests::form_state_prevents_duplicate_submissions ... ok
+test conversation_view::elicitation::tests::form_state_reports_all_validation_errors ... ok
+test conversation_view::elicitation::tests::form_state_preserves_string_whitespace ... ok
+test conversation_view::elicitation::tests::form_state_rejects_invalid_single_select_value ... ok
+test conversation_view::tests::test_drop_preserves_shared_pending_request_elicitations ... ok
+test conversation_view::elicitation::tests::form_state_discards_validation_for_stale_values ... ok
+test conversation_view::elicitation::tests::form_state_replaces_invalid_required_single_select_default ... ok
+test conversation_view::tests::test_dictation_window_opens_over_the_answer_field_not_the_composer ... ok
+test conversation_view::tests::test_successful_session_creation_clears_resolved_request_elicitations ... ok
+test conversation_view::tests::test_state_transition_preserves_shared_pending_request_elicitations ... ok
+test conversation_view::tests::test_thread_view_seeds_existing_elicitation_form_state ... ok
+test conversation_view::tests::test_accepting_answer_field_dictation_inserts_text_without_submitting ... ok
+
+test result: ok. 39 passed; 0 failed; 0 ignored; 0 measured; 406 filtered out; finished in 1.79s
+
+EXIT 0

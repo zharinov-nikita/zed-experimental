@@ -1,0 +1,1353 @@
+[rtk] /!\ No hook installed — run `rtk init -g` for automatic token savings
+    Blocking waiting for file lock on build directory
+   Compiling windows-sys v0.61.2
+   Compiling allocator-api2 v0.2.21
+   Compiling foldhash v0.2.0
+   Compiling scopeguard v1.2.0
+   Compiling const-oid v0.9.6
+   Compiling bitflags v2.13.1
+   Compiling crossbeam-utils v0.8.21
+   Compiling futures-sink v0.3.32
+   Compiling either v1.15.0
+   Compiling num-traits v0.2.19
+   Compiling stable_deref_trait v1.2.1
+   Compiling zerocopy v0.8.27
+   Compiling fastrand v2.3.0
+   Compiling zerofrom v0.1.6
+   Compiling tracing-core v0.1.35
+   Compiling litemap v0.8.0
+   Compiling lock_api v0.4.14
+   Compiling futures-channel v0.3.32
+   Compiling writeable v0.6.4
+   Compiling digest v0.10.7
+   Compiling yoke v0.8.3
+   Compiling write16 v1.0.0
+   Compiling utf16_iter v1.0.5
+   Compiling simd-adler32 v0.3.7
+   Compiling arrayvec v0.7.6
+   Compiling futures-lite v2.6.1
+   Compiling hashbrown v0.17.1
+   Compiling piper v0.2.4
+   Compiling futures-util v0.3.32
+   Compiling spin v0.9.8
+   Compiling parking_lot v0.12.5
+   Compiling zerovec v0.11.8
+   Compiling zerotrie v0.2.5
+   Compiling concurrent-queue v2.5.0
+   Compiling sha2 v0.10.9
+   Compiling tracing v0.1.43
+   Compiling miniz_oxide v0.8.9
+   Compiling crossbeam-epoch v0.9.18
+   Compiling windows-core v0.62.2
+   Compiling itertools v0.14.0
+   Compiling lazy_static v1.5.0
+   Compiling event-listener v5.4.1
+   Compiling rand_core v0.9.3
+   Compiling crossbeam-deque v0.8.6
+   Compiling rand_core v0.10.1
+   Compiling libbz2-rs-sys v0.2.2
+   Compiling indexmap v2.14.0
+   Compiling path v0.1.0 (C:\Users\NikitaDev\Desktop\projects\zed-experimental\crates\path)
+   Compiling async-executor v1.13.3
+   Compiling flate2 v1.1.8
+   Compiling derive_more v2.1.1
+   Compiling bytemuck v1.24.0
+   Compiling event-listener-strategy v0.5.4
+   Compiling windows-numerics v0.3.1
+   Compiling windows-future v0.3.2
+   Compiling windows-collections v0.3.2
+   Compiling getrandom v0.4.1
+   Compiling rayon-core v1.13.0
+   Compiling tinystr v0.8.4
+   Compiling potential_utf v0.1.3
+   Compiling ppv-lite86 v0.2.21
+   Compiling async-channel v2.5.0
+   Compiling async-lock v3.4.2
+   Compiling bitflags v1.3.2
+   Compiling event-listener v2.5.3
+   Compiling kv-log-macro v1.0.7
+   Compiling bzip2 v0.6.1
+   Compiling serde_json v1.0.151
+   Compiling collections v0.1.0 (C:\Users\NikitaDev\Desktop\projects\zed-experimental\crates\collections)
+   Compiling icu_locale_core v2.3.0
+   Compiling serde_json_lenient v0.2.4
+   Compiling icu_collections v2.3.0
+   Compiling blocking v1.6.2
+   Compiling windows v0.62.2
+   Compiling filetime v0.2.29
+   Compiling rustc-demangle v0.1.26
+   Compiling async-channel v1.9.0
+   Compiling rand_chacha v0.9.0
+   Compiling chrono v0.4.42
+   Compiling compression-codecs v0.4.31
+   Compiling rayon v1.11.0
+   Compiling smol_str v0.3.6
+   Compiling euclid v0.22.14
+   Compiling async-fs v2.2.0
+   Compiling windows_x86_64_msvc v0.53.1
+   Compiling sharded-slab v0.1.7
+   Compiling async-compression v0.4.32
+   Compiling polycool v0.4.0
+   Compiling tracing-log v0.2.0
+   Compiling rand v0.9.4
+   Compiling tracing-serde v0.2.0
+   Compiling futures-executor v0.3.32
+   Compiling matchers v0.2.0
+   Compiling windows-targets v0.53.5
+   Compiling async_zip v0.0.18
+   Compiling kurbo v0.13.1
+   Compiling libc v0.2.186
+   Compiling half v2.7.1
+   Compiling hash32 v0.3.1
+   Compiling icu_provider v2.3.0
+   Compiling fdeflate v0.3.7
+   Compiling zlog v0.1.0 (C:\Users\NikitaDev\Desktop\projects\zed-experimental\crates\zlog)
+   Compiling crossbeam-queue v0.3.12
+   Compiling core_maths v0.1.1
+   Compiling futures v0.3.32
+   Compiling float-cmp v0.9.0
+   Compiling heapless v0.9.2
+   Compiling slotmap v1.0.7
+   Compiling lyon_geom v1.0.17
+   Compiling roxmltree v0.21.1
+   Compiling arrayref v0.3.9
+   Compiling schemars v1.0.4
+   Compiling ttf-parser v0.25.1
+   Compiling zune-core v0.5.1
+   Compiling web-time v1.1.0
+   Compiling strict-num v0.1.1
+   Compiling data-url v0.3.2
+   Compiling bit-vec v0.8.0
+   Compiling icu_properties v2.3.0
+   Compiling icu_normalizer v2.3.0
+   Compiling quick-error v2.0.1
+   Compiling weezl v0.1.10
+   Compiling tinyvec_macros v0.1.1
+   Compiling lyon_path v1.0.16
+   Compiling zune-jpeg v0.5.15
+   Compiling svgtypes v0.16.1
+   Compiling tiny-skia-path v0.11.4
+   Compiling unicode-bidi-mirroring v0.4.0
+   Compiling bit-set v0.8.0
+   Compiling unicode-properties v0.1.3
+   Compiling byteorder-lite v0.1.0
+   Compiling tinyvec v1.10.0
+   Compiling unicode-script v0.5.8
+   Compiling unicode-ccc v0.4.0
+   Compiling memmap2 v0.9.8
+   Compiling static_assertions v1.1.0
+   Compiling color_quant v1.1.0
+   Compiling image-webp v0.2.4
+   Compiling accesskit v0.24.1
+   Compiling fax v0.2.6
+   Compiling png v0.17.16
+   Compiling windows-sys v0.60.2
+   Compiling gpui_shared_string v0.1.0 (C:\Users\NikitaDev\Desktop\projects\zed-experimental\crates\gpui_shared_string)
+   Compiling pxfm v0.1.25
+   Compiling zune-inflate v0.2.54
+   Compiling simplecss v0.2.2
+   Compiling unicode-bidi v0.3.18
+   Compiling xmlwriter v0.1.0
+   Compiling gif v0.14.2
+   Compiling pico-args v0.5.0
+   Compiling idna_adapter v1.2.1
+   Compiling unicode-vo v0.1.0
+   Compiling quick-error v1.2.3
+   Compiling float_next_after v1.0.0
+   Compiling imagesize v0.14.0
+   Compiling wait-timeout v0.2.1
+   Compiling idna v1.1.0
+   Compiling atomic v0.5.3
+   Compiling pollster v0.2.5
+   Compiling bit_field v0.10.3
+   Compiling lebe v0.5.3
+   Compiling lyon_tessellation v1.0.16
+   Compiling tiff v0.11.3
+   Compiling lyon_algorithms v1.0.16
+   Compiling tiny-skia v0.11.4
+   Compiling png v0.18.0
+   Compiling backtrace v0.3.76
+   Compiling rustybuzz v0.20.1
+   Compiling fontdb v0.23.0
+   Compiling postage v0.5.0
+   Compiling futures-concurrency v7.7.1
+   Compiling exr v1.74.0
+   Compiling url v2.5.7
+   Compiling rgb v0.8.52
+   Compiling qoi v0.4.1
+   Compiling rand_xorshift v0.4.0
+   Compiling flume v0.12.0
+   Compiling encoding_rs v0.8.35
+   Compiling link-section v0.19.2
+   Compiling unarray v0.1.4
+   Compiling svg_fmt v0.4.5
+   Compiling lyon v1.0.16
+   Compiling refineable v0.1.0 (C:\Users\NikitaDev\Desktop\projects\zed-experimental\crates\refineable)
+   Compiling profiling v1.0.17
+   Compiling taffy v0.13.0
+   Compiling scheduler v0.1.0 (C:\Users\NikitaDev\Desktop\projects\zed-experimental\crates\scheduler)
+   Compiling ctor v1.0.12
+   Compiling spin v0.10.0
+   Compiling waker-fn v1.2.0
+   Compiling raw-window-handle v0.6.2
+   Compiling etagere v0.2.15
+   Compiling inventory v0.3.21
+   Compiling num_cpus v1.17.0
+   Compiling seahash v4.1.0
+   Compiling semver v1.0.27
+   Compiling hashbrown v0.16.1
+   Compiling tree-sitter-language v0.1.8 (https://github.com/tree-sitter/tree-sitter?rev=43623ec9bf0eaaf7113285c46e8a09018f181b18#43623ec9)
+   Compiling wasmtime-internal-core v48.0.1
+   Compiling moxcms v0.8.1
+   Compiling deranged v0.5.4
+   Compiling num-integer v0.1.46
+   Compiling postcard v1.1.3
+   Compiling bumpalo v3.20.3
+   Compiling arbitrary v1.4.2
+   Compiling wasmparser v0.254.0
+   Compiling winapi-util v0.1.11
+   Compiling errno v0.3.14
+   Compiling polling v3.11.0
+   Compiling dirs-sys v0.5.0
+   Compiling tempfile v3.27.0
+   Compiling nu-ansi-term v0.50.3
+   Compiling socket2 v0.6.5
+   Compiling dirs v6.0.0
+   Compiling rustix v1.1.4
+   Compiling same-file v1.0.6
+   Compiling termcolor v1.4.1
+   Compiling rusty-fork v0.3.1
+   Compiling usvg v0.46.0
+   Compiling tracing-subscriber v0.3.22
+   Compiling mio v1.2.0
+   Compiling cranelift-bitset v0.135.1
+   Compiling gimli v0.33.0
+   Compiling walkdir v2.5.0
+   Compiling time v0.3.47
+   Compiling proptest v1.10.0 (https://github.com/proptest-rs/proptest?rev=3dca198a8fef1b32e3a66f1e1897c955b4dc5b5b#3dca198a)
+   Compiling cranelift-control v0.135.1
+   Compiling regalloc2 v0.15.2
+   Compiling cranelift-entity v0.135.1
+   Compiling async-io v2.6.0
+   Compiling pulley-interpreter v48.0.1
+   Compiling cranelift-assembler-x64 v0.135.1
+   Compiling rust-embed-utils v8.11.0
+   Compiling tokio v1.52.1
+   Compiling cranelift-bforest v0.135.1
+   Compiling rust-embed v8.11.0
+   Compiling async-process v2.5.0 (https://github.com/zed-industries/async-process.git?rev=0b6d6713570af61806e1e5cb40e0f757cb93fd9d#0b6d6713)
+   Compiling async-net v2.0.0
+   Compiling async-global-executor v2.4.1
+   Compiling ztracing v0.1.0 (C:\Users\NikitaDev\Desktop\projects\zed-experimental\crates\ztracing)
+   Compiling cloud_llm_client v0.1.0 (C:\Users\NikitaDev\Desktop\projects\zed-experimental\crates\cloud_llm_client)
+   Compiling sum_tree v0.1.0 (C:\Users\NikitaDev\Desktop\projects\zed-experimental\crates\sum_tree)
+   Compiling cpp_demangle v0.5.1
+   Compiling object v0.39.1
+   Compiling resvg v0.46.0
+   Compiling smol v2.0.2
+   Compiling async-std v1.13.2
+   Compiling wasm-encoder v0.254.0
+   Compiling getrandom v0.2.16
+   Compiling partial-json-fixer v0.5.3
+   Compiling wasmtime-internal-jit-icache-coherence v48.0.1
+   Compiling const_format v0.2.35
+   Compiling aws-lc-sys v0.42.0
+   Compiling image v0.25.10
+   Compiling ring v0.17.14
+   Compiling ignore v0.4.24
+   Compiling windows-sys v0.59.0
+   Compiling streaming-iterator v0.1.9
+   Compiling urlencoding v2.1.3
+   Compiling tree-sitter-json v0.24.8
+   Compiling windows-result v0.1.2
+   Compiling tokio-util v0.7.18
+   Compiling aws-lc-rs v1.17.1
+   Compiling proto v0.1.0 (C:\Users\NikitaDev\Desktop\projects\zed-experimental\crates\proto)
+   Compiling clock v0.1.0 (C:\Users\NikitaDev\Desktop\projects\zed-experimental\crates\clock)
+   Compiling serde_path_to_error v0.1.20
+   Compiling async-tar v0.6.1 (https://github.com/zed-industries/async-tar?rev=bd3ad6f89df9a9da7a8535958756d6bf465936a0#bd3ad6f8)
+   Compiling telemetry_events v0.1.0 (C:\Users\NikitaDev\Desktop\projects\zed-experimental\crates\telemetry_events)
+   Compiling windows-core v0.56.0
+   Compiling notify-types v2.1.0 (https://github.com/zed-industries/notify?rev=d842f16b2716bd60f09caf3ae3a894237ab38f54#d842f16b)
+   Compiling xxhash-rust v0.8.15
+   Compiling telemetry v0.1.0 (C:\Users\NikitaDev\Desktop\projects\zed-experimental\crates\telemetry)
+   Compiling is_executable v1.0.5
+   Compiling ec4rs v1.2.0
+   Compiling hex v0.4.3
+   Compiling fast-srgb8 v1.0.0
+   Compiling notify v9.0.0-rc.4 (https://github.com/zed-industries/notify?rev=d842f16b2716bd60f09caf3ae3a894237ab38f54#d842f16b)
+   Compiling wasmprinter v0.254.0
+   Compiling sha1 v0.10.6
+   Compiling rand_core v0.6.4
+   Compiling palette v0.7.6
+   Compiling h2 v0.4.12
+   Compiling windows v0.56.0
+   Compiling num-iter v0.1.45
+   Compiling rustls-webpki v0.103.13
+   Compiling base64ct v1.8.0
+   Compiling schannel v0.1.28
+   Compiling rand_chacha v0.3.1
+   Compiling hashbrown v0.15.5
+   Compiling phf v0.13.1
+   Compiling pem-rfc7468 v0.7.0
+   Compiling rand v0.8.6
+   Compiling toml_edit v0.22.27
+   Compiling rustls v0.23.40
+   Compiling data-encoding v2.9.0
+   Compiling utf-8 v0.7.6
+   Compiling der v0.7.10
+   Compiling imara-diff v0.2.0
+   Compiling wasmtime-environ v48.0.1
+   Compiling signature v2.2.0
+   Compiling num-bigint-dig v0.8.6
+   Compiling zstd-safe v5.0.2+zstd.1.5.2
+   Compiling arc-swap v1.9.0
+   Compiling shellexpand v3.1.1
+   Compiling zstd v0.11.2+zstd.1.5.2
+   Compiling spki v0.7.3
+   Compiling lru v0.16.4
+   Compiling nucleo-matcher v0.3.1
+   Compiling watch v0.1.0 (C:\Users\NikitaDev\Desktop\projects\zed-experimental\crates\watch)
+   Compiling pkcs8 v0.10.2
+   Compiling tree-sitter-diff v0.1.0
+   Compiling tree-sitter-md v0.3.2 (https://github.com/zed-industries/tree-sitter-markdown?rev=b596e737286780d7bfa9fcddceaeeb754574b352#b596e737)
+   Compiling tree-sitter-bash v0.25.1
+   Compiling tree-sitter-python v0.25.0
+   Compiling tree-sitter-regex v0.24.3
+   Compiling tree-sitter-go v0.25.0
+   Compiling tree-sitter-c v0.24.1
+   Compiling pkcs1 v0.7.5
+   Compiling tree-sitter-gitcommit v0.0.1 (https://github.com/zed-industries/tree-sitter-git-commit?rev=88309716a69dd13ab83443721ba6e0b491d37ee9#88309716)
+   Compiling toml v0.8.23
+   Compiling tree-sitter-yaml v0.6.1 (https://github.com/zed-industries/tree-sitter-yaml?rev=baff0b51c64ef6a1fb1f8390f3ad6015b83ec13a#baff0b51)
+   Compiling tree-sitter-gomod v1.1.1 (https://github.com/camdencheek/tree-sitter-go-mod?rev=2e886870578eeba1927a2dc4bd2e2b3f598c5f9a#2e886870)
+   Compiling nucleo v0.5.0
+   Compiling tree-sitter-rust v0.24.2
+   Compiling tree-sitter-cpp v0.23.4 (https://github.com/tree-sitter/tree-sitter-cpp?rev=5cb9b693cfd7bfacab1d9ff4acac1a4150700609#5cb9b693)
+   Compiling tree-sitter-css v0.23.2
+   Compiling tree-sitter-gowork v0.0.1 (https://github.com/zed-industries/tree-sitter-go-work?rev=acb0617bf7f4fda02c6217676cc64acb89536dc7#acb0617b)
+   Compiling tree-sitter-typescript v0.23.2 (https://github.com/zed-industries/tree-sitter-typescript?rev=e2c53597d6a5d9cf7bbe8dccde576fe1e46c5899#e2c53597)
+   Compiling tree-sitter-jsdoc v0.23.2
+   Compiling rsa v0.9.10
+   Compiling lsp-types v0.95.1 (https://github.com/zed-industries/lsp-types?rev=f1783e63a7f4eb4397bf51d4148b4895a1f7ab16#f1783e63)
+   Compiling async-pipe v0.1.3 (https://github.com/zed-industries/async-pipe-rs?rev=82d00a04211cf4e1236029aa03e6b6ce2a74c553#82d00a04)
+   Compiling diffy v0.4.2
+   Compiling chardetng v0.1.17
+   Compiling arraydeque v0.5.1
+   Compiling precomputed-hash v0.1.1
+   Compiling webpki-roots v1.0.8
+   Compiling hyper v1.7.0
+   Compiling diff v0.1.13
+   Compiling ciborium-io v0.2.2
+   Compiling yansi v1.0.1
+   Compiling ascii v1.1.0
+   Compiling httpdate v1.0.3
+   Compiling chunked_transfer v1.5.0
+   Compiling ciborium-ll v0.2.2
+   Compiling winapi v0.3.9
+   Compiling cranelift-codegen v0.135.1
+   Compiling pretty_assertions v1.4.1
+   Compiling zeta_prompt v0.1.0 (C:\Users\NikitaDev\Desktop\projects\zed-experimental\crates\zeta_prompt)
+   Compiling icons v0.1.0 (C:\Users\NikitaDev\Desktop\projects\zed-experimental\crates\icons)
+   Compiling nom v8.0.0
+   Compiling tiny_http v0.12.0
+   Compiling ciborium v0.2.2
+   Compiling mime v0.3.17
+   Compiling ucd-trie v0.1.7
+   Compiling dtoa v1.0.10
+   Compiling hyper-util v0.1.17
+   Compiling native-tls v0.2.18
+   Compiling dtoa-short v0.3.5
+   Compiling string_cache v0.9.0
+   Compiling proxy_handshake v0.1.0 (C:\Users\NikitaDev\Desktop\projects\zed-experimental\crates\proxy_handshake)
+   Compiling cloud_api_types v0.1.0 (C:\Users\NikitaDev\Desktop\projects\zed-experimental\crates\cloud_api_types)
+   Compiling tokio-rustls v0.26.4
+   Compiling tungstenite v0.28.0
+   Compiling rustls-platform-verifier v0.7.0
+   Compiling tokio-native-tls v0.3.1
+   Compiling cssparser v0.36.0
+   Compiling servo_arc v0.4.3
+   Compiling anstyle v1.0.13
+   Compiling once_cell_polyfill v1.70.1
+   Compiling http_client_tls v0.1.0 (C:\Users\NikitaDev\Desktop\projects\zed-experimental\crates\http_client_tls)
+   Compiling utf8parse v0.2.2
+   Compiling web_atoms v0.2.6
+   Compiling icu_locale_fallback_data v2.3.0
+   Compiling async-tungstenite v0.33.0
+   Compiling anstyle-wincon v3.0.10
+   Compiling unicode-general-category v1.1.0
+   Compiling selectors v0.37.0
+   Compiling anstyle-parse v0.2.7
+   Compiling anstyle-query v1.1.4
+   Compiling is_terminal_polyfill v1.70.1
+   Compiling colorchoice v1.0.4
+   Compiling htmlize v1.1.0
+   Compiling icu_locale_fallback v2.3.0
+   Compiling lalrpop-util v0.23.1
+   Compiling icu_collator_data v2.3.0
+   Compiling json5 v1.3.1
+   Compiling anstream v0.6.21
+   Compiling granit-parser v1.0.0
+   Compiling yawc v0.3.3 (https://github.com/zed-industries/yawc?rev=71a452f551cac178367eaac5d7418a09afa1f3a2#71a452f5)
+   Compiling markup5ever v0.39.0
+   Compiling dugong-graphlib v0.8.0-alpha.5
+   Compiling ryu-js v1.0.2
+   Compiling icu_collator v2.3.0
+   Compiling lol_html v3.0.1
+   Compiling documented v0.10.0
+   Compiling pulldown-cmark v0.13.4
+   Compiling roughr-merman v0.12.3
+   Compiling env_var v0.1.0 (C:\Users\NikitaDev\Desktop\projects\zed-experimental\crates\env_var)
+   Compiling manatee v0.8.0-alpha.5
+   Compiling num-format v0.4.4
+   Compiling quick-xml v0.41.0
+   Compiling unicode-linebreak v0.1.5
+   Compiling dugong v0.8.0-alpha.5
+   Compiling xml5ever v0.39.0
+   Compiling html5ever v0.39.0
+   Compiling psm v0.1.30
+   Compiling dap-types v0.0.1 (https://github.com/zed-industries/dap-types?rev=1b461b310481d01e02b2603c16d7144b926339f8#1b461b31)
+   Compiling cursor-icon v1.2.0
+   Compiling ntapi v0.4.1
+   Compiling stacker v0.1.25
+   Compiling oauth_callback_server v0.1.0 (C:\Users\NikitaDev\Desktop\projects\zed-experimental\crates\oauth_callback_server)
+   Compiling vte v0.15.0
+   Compiling home v0.5.11
+   Compiling merman-core v0.8.0-alpha.5
+   Compiling miow v0.6.1
+   Compiling stacksafe v1.0.3
+   Compiling pori v0.0.0
+   Compiling fancy-regex v0.19.0
+   Compiling markup5ever_rcdom v0.39.0+unofficial
+   Compiling snippet v0.1.0 (C:\Users\NikitaDev\Desktop\projects\zed-experimental\crates\snippet)
+   Compiling linkify v0.10.0
+   Compiling clap_lex v0.7.6
+   Compiling alacritty_terminal v0.26.1-dev (https://github.com/zed-industries/alacritty?rev=4c129667ce56611becdc82de6e28218c80e2e88f#4c129667)
+   Compiling wax v0.7.0
+   Compiling msvc_spectre_libs v0.1.3
+   Compiling circular-buffer v1.2.0
+   Compiling clap_builder v4.5.49
+   Compiling pet-fs v0.1.0 (https://github.com/zed-industries/python-environment-tools.git?rev=5aad7164bfc2a58977b103c8ef8fdd7302ed2e9f#5aad7164)
+   Compiling is-terminal v0.4.16
+   Compiling humantime v2.3.0
+   Compiling vsimd v0.8.0
+   Compiling outref v0.5.2
+   Compiling http v0.2.12
+   Compiling zed_env_vars v0.1.0 (C:\Users\NikitaDev\Desktop\projects\zed-experimental\crates\zed_env_vars)
+   Compiling bytes-utils v0.1.4
+   Compiling env_logger v0.10.2
+   Compiling any_vec v0.14.0
+   Compiling ahash v0.8.12
+   Compiling base64-simd v0.8.0
+   Compiling aws-smithy-async v1.2.14
+   Compiling symphonia-core v0.5.5
+   Compiling rustls-native-certs v0.8.3
+   Compiling tower v0.5.2
+   Compiling trash v5.2.5 (https://github.com/zed-industries/trash-rs?rev=41c6c800d884a89351f3b8856d12894cccee261d#41c6c800)
+   Compiling num-bigint v0.4.8
+   Compiling crossbeam-channel v0.5.15
+   Compiling http-body v0.4.6
+   Compiling hyper-rustls v0.27.9
+   Compiling hashbrown v0.14.5
+   Compiling aws-smithy-types v1.4.7
+   Compiling hmac v0.12.1
+   Compiling link-cplusplus v1.0.12
+   Compiling tokio-stream v0.1.17
+   Compiling pbjson v0.9.0
+   Compiling symphonia-metadata v0.5.5
+   Compiling extended v0.1.0
+   Compiling clap v4.5.49
+   Compiling cxx v1.0.187
+   Compiling symphonia-codec-aac v0.5.5
+   Compiling pbjson-types v0.9.0
+   Compiling pet-core v0.1.0 (https://github.com/zed-industries/python-environment-tools.git?rev=5aad7164bfc2a58977b103c8ef8fdd7302ed2e9f#5aad7164)
+   Compiling symphonia-codec-pcm v0.5.5
+   Compiling hashlink v0.8.4
+   Compiling livekit-runtime v0.4.0 (https://github.com/zed-industries/livekit-rust-sdks?rev=0a1c519cfce9b365229026b55de9b9dbdb6fed3c#0a1c519c)
+   Compiling num-rational v0.4.2
+   Compiling symphonia-utils-xiph v0.5.5
+   Compiling symphonia-bundle-mp3 v0.5.5
+   Compiling symphonia-format-riff v0.5.5
+   Compiling aws-smithy-runtime-api v1.11.4
+   Compiling aws-smithy-eventstream v0.60.20
+   Compiling aws-smithy-json v0.62.5
+   Compiling symphonia-format-isomp4 v0.5.5
+   Compiling yaml-rust2 v0.8.1
+   Compiling symphonia-codec-vorbis v0.5.5
+   Compiling pet-python-utils v0.1.0 (https://github.com/zed-industries/python-environment-tools.git?rev=5aad7164bfc2a58977b103c8ef8fdd7302ed2e9f#5aad7164)
+   Compiling pet-jsonrpc v0.1.0 (https://github.com/zed-industries/python-environment-tools.git?rev=5aad7164bfc2a58977b103c8ef8fdd7302ed2e9f#5aad7164)
+   Compiling symphonia-bundle-flac v0.5.5
+   Compiling symphonia-format-ogg v0.5.5
+   Compiling io-lifetimes v2.0.4
+   Compiling pet-reporter v0.1.0 (https://github.com/zed-industries/python-environment-tools.git?rev=5aad7164bfc2a58977b103c8ef8fdd7302ed2e9f#5aad7164)
+   Compiling io-lifetimes v3.0.1
+   Compiling ordered-float v5.5.0
+   Compiling regex-lite v0.1.8
+   Compiling fearless_simd v0.4.1
+   Compiling dasp_sample v0.11.0
+   Compiling pet-virtualenv v0.1.0 (https://github.com/zed-industries/python-environment-tools.git?rev=5aad7164bfc2a58977b103c8ef8fdd7302ed2e9f#5aad7164)
+   Compiling aws-credential-types v1.2.12
+   Compiling aws-smithy-http v0.63.4
+   Compiling aws-smithy-http-client v1.1.10
+   Compiling aws-smithy-observability v0.2.5
+   Compiling symphonia v0.5.5
+   Compiling pet-conda v0.1.0 (https://github.com/zed-industries/python-environment-tools.git?rev=5aad7164bfc2a58977b103c8ef8fdd7302ed2e9f#5aad7164)
+   Compiling io-extras v0.19.0
+   Compiling livekit-protocol v0.7.1 (https://github.com/zed-industries/livekit-rust-sdks?rev=0a1c519cfce9b365229026b55de9b9dbdb6fed3c#0a1c519c)
+   Compiling fs-set-times v0.20.3
+   Compiling webrtc-sys v0.3.23 (https://github.com/zed-industries/livekit-rust-sdks?rev=0a1c519cfce9b365229026b55de9b9dbdb6fed3c#0a1c519c)
+   Compiling winx v0.36.4
+   Compiling aws-types v1.3.12
+   Compiling rand_distr v0.5.1
+   Compiling aws-sigv4 v1.4.0
+   Compiling ambient-authority v0.0.2
+   Compiling hound v3.5.1
+   Compiling rtrb v0.3.2
+   Compiling maybe-owned v0.3.4
+   Compiling tree-sitter-html v0.23.2
+   Compiling transcribe-cpp-sys v0.2.3
+   Compiling crossbeam v0.8.4
+   Compiling emojis v0.9.0
+   Compiling cpufeatures v0.3.0
+   Compiling unindent v0.2.4
+   Compiling aws-smithy-runtime v1.10.1
+   Compiling serde_with v3.22.0
+   Compiling betlang v0.1.1
+   Compiling cap-primitives v4.0.3
+   Compiling windows-strings v0.3.1
+   Compiling transcribe-cpp v0.2.3
+   Compiling windows-result v0.3.4
+   Compiling chacha20 v0.10.1
+   Compiling proxyvars v0.2.0
+   Compiling shell-words v1.1.0
+   Compiling xmlparser v0.13.6
+   Compiling windows-registry v0.4.0
+   Compiling cap-std v4.0.3
+   Compiling http_proxy v0.1.0 (C:\Users\NikitaDev\Desktop\projects\zed-experimental\crates\http_proxy)
+   Compiling rand v0.10.2
+   Compiling nix v0.28.0
+   Compiling mime_guess v2.0.5
+   Compiling winreg v0.10.1
+   Compiling portable-atomic v1.11.1
+   Compiling aws-smithy-xml v0.60.15
+   Compiling aws-smithy-query v0.60.15
+   Compiling cap-fs-ext v4.0.3
+   Compiling filedescriptor v0.8.3
+   Compiling serial2 v0.2.33
+   Compiling winreg v0.55.0
+   Compiling tokio-socks v0.5.2
+   Compiling accesskit_consumer v0.38.0
+   Compiling rustls-pemfile v2.2.0
+   Compiling shared_library v0.1.9
+   Compiling wasmtime-internal-fiber v48.0.1
+   Compiling num-complex v0.4.6
+   Compiling env_filter v0.1.4
+   Compiling bincode v1.3.3
+   Compiling tagptr v0.2.0
+   Compiling heed-traits v0.20.0
+   Compiling cached_proc_macro_types v0.1.1
+   Compiling agent-client-protocol-schema v1.5.0
+   Compiling peg-runtime v0.8.5
+   Compiling unsafe-libyaml v0.2.11
+   Compiling jiff v0.2.15
+   Compiling downcast-rs v1.2.1
+   Compiling cached v0.56.0
+   Compiling moka v0.12.11
+   Compiling zed-reqwest v0.12.15-zed (https://github.com/zed-industries/reqwest.git?rev=33bc764aa15ff7b200bf7c93bd96e24878d53e14#33bc764a)
+   Compiling num v0.4.3
+   Compiling peg v0.8.5
+   Compiling heed-types v0.21.0
+   Compiling portable-pty v0.9.0
+   Compiling pet-windows-store v0.1.0 (https://github.com/zed-industries/python-environment-tools.git?rev=5aad7164bfc2a58977b103c8ef8fdd7302ed2e9f#5aad7164)
+   Compiling bon v3.8.2
+   Compiling sandbox v0.1.0 (C:\Users\NikitaDev\Desktop\projects\zed-experimental\crates\sandbox)
+   Compiling lmdb-master-sys v0.2.5
+   Compiling page_size v0.6.0
+   Compiling serde_yaml_ng v0.10.0
+   Compiling pest v2.8.3
+   Compiling synchronoise v1.0.1
+   Compiling utf8-chars v3.0.6
+   Compiling indenter v0.3.4
+   Compiling borrow-or-share v0.2.4
+   Compiling pet-windows-registry v0.1.0 (https://github.com/zed-industries/python-environment-tools.git?rev=5aad7164bfc2a58977b103c8ef8fdd7302ed2e9f#5aad7164)
+   Compiling fraction v0.16.0
+   Compiling heed v0.21.0
+   Compiling brush-parser v0.3.0
+   Compiling fluent-uri v0.4.1
+   Compiling aws-runtime v1.7.0
+   Compiling pet-pyenv v0.1.0 (https://github.com/zed-industries/python-environment-tools.git?rev=5aad7164bfc2a58977b103c8ef8fdd7302ed2e9f#5aad7164)
+   Compiling pet-pixi v0.1.0 (https://github.com/zed-industries/python-environment-tools.git?rev=5aad7164bfc2a58977b103c8ef8fdd7302ed2e9f#5aad7164)
+   Compiling pet-global-virtualenvs v0.1.0 (https://github.com/zed-industries/python-environment-tools.git?rev=5aad7164bfc2a58977b103c8ef8fdd7302ed2e9f#5aad7164)
+   Compiling pet-env-var-path v0.1.0 (https://github.com/zed-industries/python-environment-tools.git?rev=5aad7164bfc2a58977b103c8ef8fdd7302ed2e9f#5aad7164)
+   Compiling handlebars v4.5.0
+   Compiling pet-virtualenvwrapper v0.1.0 (https://github.com/zed-industries/python-environment-tools.git?rev=5aad7164bfc2a58977b103c8ef8fdd7302ed2e9f#5aad7164)
+   Compiling pet-poetry v0.1.0 (https://github.com/zed-industries/python-environment-tools.git?rev=5aad7164bfc2a58977b103c8ef8fdd7302ed2e9f#5aad7164)
+   Compiling pet-mac-commandlinetools v0.1.0 (https://github.com/zed-industries/python-environment-tools.git?rev=5aad7164bfc2a58977b103c8ef8fdd7302ed2e9f#5aad7164)
+   Compiling pet-linux-global-python v0.1.0 (https://github.com/zed-industries/python-environment-tools.git?rev=5aad7164bfc2a58977b103c8ef8fdd7302ed2e9f#5aad7164)
+   Compiling pet-venv v0.1.0 (https://github.com/zed-industries/python-environment-tools.git?rev=5aad7164bfc2a58977b103c8ef8fdd7302ed2e9f#5aad7164)
+   Compiling pet-mac-xcode v0.1.0 (https://github.com/zed-industries/python-environment-tools.git?rev=5aad7164bfc2a58977b103c8ef8fdd7302ed2e9f#5aad7164)
+   Compiling pet-mac-python-org v0.1.0 (https://github.com/zed-industries/python-environment-tools.git?rev=5aad7164bfc2a58977b103c8ef8fdd7302ed2e9f#5aad7164)
+   Compiling pet-winpython v0.1.0 (https://github.com/zed-industries/python-environment-tools.git?rev=5aad7164bfc2a58977b103c8ef8fdd7302ed2e9f#5aad7164)
+   Compiling pet-pipenv v0.1.0 (https://github.com/zed-industries/python-environment-tools.git?rev=5aad7164bfc2a58977b103c8ef8fdd7302ed2e9f#5aad7164)
+   Compiling pet-hatch v0.1.0 (https://github.com/zed-industries/python-environment-tools.git?rev=5aad7164bfc2a58977b103c8ef8fdd7302ed2e9f#5aad7164)
+   Compiling pet-telemetry v0.1.0 (https://github.com/zed-industries/python-environment-tools.git?rev=5aad7164bfc2a58977b103c8ef8fdd7302ed2e9f#5aad7164)
+   Compiling pet-uv v0.1.0 (https://github.com/zed-industries/python-environment-tools.git?rev=5aad7164bfc2a58977b103c8ef8fdd7302ed2e9f#5aad7164)
+   Compiling aws-sdk-ssooidc v1.96.0
+   Compiling aws-sdk-sso v1.94.0
+   Compiling aws-sdk-bedrockruntime v1.125.0
+   Compiling aws-sdk-sts v1.98.0
+   Compiling x_ai v0.1.0 (C:\Users\NikitaDev\Desktop\projects\zed-experimental\crates\x_ai)
+   Compiling num-cmp v0.1.0
+   Compiling bytecount v0.6.9
+   Compiling micromap v0.3.0
+   Compiling env_logger v0.11.8
+   Compiling shell_command_parser v0.1.0 (C:\Users\NikitaDev\Desktop\projects\zed-experimental\crates\shell_command_parser)
+   Compiling pet v0.1.0 (https://github.com/zed-industries/python-environment-tools.git?rev=5aad7164bfc2a58977b103c8ef8fdd7302ed2e9f#5aad7164)
+   Compiling uuid-simd v0.8.0
+   Compiling jsonschema-value v0.51.0
+   Compiling html_to_markdown v0.1.0 (C:\Users\NikitaDev\Desktop\projects\zed-experimental\crates\html_to_markdown)
+   Compiling referencing v0.51.0
+   Compiling email_address v0.2.9
+   Compiling jsonschema-regex v0.51.0
+   Compiling libwebrtc v0.3.26 (https://github.com/zed-industries/livekit-rust-sdks?rev=0a1c519cfce9b365229026b55de9b9dbdb6fed3c#0a1c519c)
+   Compiling jsonschema v0.51.0
+   Compiling aws-config v1.8.14
+   Compiling merman-render v0.8.0-alpha.5
+   Compiling agent-client-protocol v2.0.0
+   Compiling merman v0.8.0-alpha.5
+   Compiling util v0.1.0 (C:\Users\NikitaDev\Desktop\projects\zed-experimental\crates\util)
+   Compiling net v0.1.0 (C:\Users\NikitaDev\Desktop\projects\zed-experimental\crates\net)
+   Compiling sysinfo v0.39.6
+   Compiling cpal v0.17.1
+   Compiling accesskit_windows v0.34.0
+   Compiling rodio v0.21.1 (https://github.com/RustAudio/rodio?rev=e50e726ddd0292f6ef9de0dda6b90af4ed1fb66a#e50e726d)
+   Compiling cranelift-frontend v0.135.1
+   Compiling cranelift-native v0.135.1
+   Compiling wasmtime-internal-unwinder v48.0.1
+   Compiling http_client v0.1.0 (C:\Users\NikitaDev\Desktop\projects\zed-experimental\crates\http_client)
+   Compiling paths v0.1.0 (C:\Users\NikitaDev\Desktop\projects\zed-experimental\crates\paths)
+   Compiling rope v0.1.0 (C:\Users\NikitaDev\Desktop\projects\zed-experimental\crates\rope)
+   Compiling sqlez v0.1.0 (C:\Users\NikitaDev\Desktop\projects\zed-experimental\crates\sqlez)
+   Compiling wasmtime-internal-cranelift v48.0.1
+   Compiling text v0.1.0 (C:\Users\NikitaDev\Desktop\projects\zed-experimental\crates\text)
+   Compiling streaming_diff v0.1.0 (C:\Users\NikitaDev\Desktop\projects\zed-experimental\crates\streaming_diff)
+   Compiling gpui v0.2.2 (C:\Users\NikitaDev\Desktop\projects\zed-experimental\crates\gpui)
+   Compiling language_model_core v0.1.0 (C:\Users\NikitaDev\Desktop\projects\zed-experimental\crates\language_model_core)
+   Compiling node_runtime v0.1.0 (C:\Users\NikitaDev\Desktop\projects\zed-experimental\crates\node_runtime)
+   Compiling deepseek v0.1.0 (C:\Users\NikitaDev\Desktop\projects\zed-experimental\crates\deepseek)
+   Compiling aws_http_client v0.1.0 (C:\Users\NikitaDev\Desktop\projects\zed-experimental\crates\aws_http_client)
+   Compiling reqwest_client v0.1.0 (C:\Users\NikitaDev\Desktop\projects\zed-experimental\crates\reqwest_client)
+   Compiling mistral v0.1.0 (C:\Users\NikitaDev\Desktop\projects\zed-experimental\crates\mistral)
+   Compiling bedrock v0.1.0 (C:\Users\NikitaDev\Desktop\projects\zed-experimental\crates\bedrock)
+   Compiling anthropic v0.1.0 (C:\Users\NikitaDev\Desktop\projects\zed-experimental\crates\anthropic)
+   Compiling google_ai v0.1.0 (C:\Users\NikitaDev\Desktop\projects\zed-experimental\crates\google_ai)
+   Compiling open_ai v0.1.0 (C:\Users\NikitaDev\Desktop\projects\zed-experimental\crates\open_ai)
+   Compiling lmstudio v0.1.0 (C:\Users\NikitaDev\Desktop\projects\zed-experimental\crates\lmstudio)
+   Compiling llama_cpp v0.1.0 (C:\Users\NikitaDev\Desktop\projects\zed-experimental\crates\llama_cpp)
+   Compiling opencode v0.1.0 (C:\Users\NikitaDev\Desktop\projects\zed-experimental\crates\opencode)
+   Compiling wasmtime v48.0.1
+   Compiling release_channel v0.1.0 (C:\Users\NikitaDev\Desktop\projects\zed-experimental\crates\release_channel)
+   Compiling askpass v0.1.0 (C:\Users\NikitaDev\Desktop\projects\zed-experimental\crates\askpass)
+   Compiling syntax_theme v0.1.0 (C:\Users\NikitaDev\Desktop\projects\zed-experimental\crates\syntax_theme)
+   Compiling zed_actions v0.1.0 (C:\Users\NikitaDev\Desktop\projects\zed-experimental\crates\zed_actions)
+   Compiling rpc v0.1.0 (C:\Users\NikitaDev\Desktop\projects\zed-experimental\crates\rpc)
+   Compiling fuzzy v0.1.0 (C:\Users\NikitaDev\Desktop\projects\zed-experimental\crates\fuzzy)
+   Compiling credentials_provider v0.1.0 (C:\Users\NikitaDev\Desktop\projects\zed-experimental\crates\credentials_provider)
+   Compiling gpui_tokio v0.1.0 (C:\Users\NikitaDev\Desktop\projects\zed-experimental\crates\gpui_tokio)
+   Compiling menu v0.1.0 (C:\Users\NikitaDev\Desktop\projects\zed-experimental\crates\menu)
+   Compiling mermaid_render v0.1.0 (C:\Users\NikitaDev\Desktop\projects\zed-experimental\crates\mermaid_render)
+   Compiling assets v0.1.0 (C:\Users\NikitaDev\Desktop\projects\zed-experimental\crates\assets)
+   Compiling gpui_windows v0.1.0 (C:\Users\NikitaDev\Desktop\projects\zed-experimental\crates\gpui_windows)
+   Compiling web_search v0.1.0 (C:\Users\NikitaDev\Desktop\projects\zed-experimental\crates\web_search)
+   Compiling language_model v0.1.0 (C:\Users\NikitaDev\Desktop\projects\zed-experimental\crates\language_model)
+   Compiling cloud_api_client v0.1.0 (C:\Users\NikitaDev\Desktop\projects\zed-experimental\crates\cloud_api_client)
+   Compiling theme v0.1.0 (C:\Users\NikitaDev\Desktop\projects\zed-experimental\crates\theme)
+   Compiling lsp v0.1.0 (C:\Users\NikitaDev\Desktop\projects\zed-experimental\crates\lsp)
+   Compiling zed_credentials_provider v0.1.0 (C:\Users\NikitaDev\Desktop\projects\zed-experimental\crates\zed_credentials_provider)
+   Compiling git v0.1.0 (C:\Users\NikitaDev\Desktop\projects\zed-experimental\crates\git)
+   Compiling db v0.1.0 (C:\Users\NikitaDev\Desktop\projects\zed-experimental\crates\db)
+   Compiling fuzzy_nucleo v0.1.0 (C:\Users\NikitaDev\Desktop\projects\zed-experimental\crates\fuzzy_nucleo)
+   Compiling copilot_chat v0.1.0 (C:\Users\NikitaDev\Desktop\projects\zed-experimental\crates\copilot_chat)
+   Compiling language_models_cloud v0.1.0 (C:\Users\NikitaDev\Desktop\projects\zed-experimental\crates\language_models_cloud)
+   Compiling openai_subscribed v0.1.0 (C:\Users\NikitaDev\Desktop\projects\zed-experimental\crates\openai_subscribed)
+   Compiling session v0.1.0 (C:\Users\NikitaDev\Desktop\projects\zed-experimental\crates\session)
+   Compiling task v0.1.0 (C:\Users\NikitaDev\Desktop\projects\zed-experimental\crates\task)
+   Compiling component v0.1.0 (C:\Users\NikitaDev\Desktop\projects\zed-experimental\crates\component)
+   Compiling gpui_platform v0.1.0 (C:\Users\NikitaDev\Desktop\projects\zed-experimental\crates\gpui_platform)
+   Compiling eval_utils v0.1.0 (C:\Users\NikitaDev\Desktop\projects\zed-experimental\crates\eval_utils)
+   Compiling ui v0.1.0 (C:\Users\NikitaDev\Desktop\projects\zed-experimental\crates\ui)
+   Compiling fs v0.1.0 (C:\Users\NikitaDev\Desktop\projects\zed-experimental\crates\fs)
+   Compiling agent_skills v0.1.0 (C:\Users\NikitaDev\Desktop\projects\zed-experimental\crates\agent_skills)
+   Compiling ui_input v0.1.0 (C:\Users\NikitaDev\Desktop\projects\zed-experimental\crates\ui_input)
+   Compiling wasmtime-c-api-impl v48.0.1
+   Compiling wiggle v48.0.1
+   Compiling wasmtime-wasi-io v48.0.1
+   Compiling wasmtime-wasi v48.0.1
+   Compiling tree-sitter v0.27.0 (https://github.com/tree-sitter/tree-sitter?rev=43623ec9bf0eaaf7113285c46e8a09018f181b18#43623ec9)
+   Compiling settings_json v0.1.0 (C:\Users\NikitaDev\Desktop\projects\zed-experimental\crates\settings_json)
+   Compiling language_core v0.1.0 (C:\Users\NikitaDev\Desktop\projects\zed-experimental\crates\language_core)
+   Compiling settings_content v0.1.0 (C:\Users\NikitaDev\Desktop\projects\zed-experimental\crates\settings_content)
+   Compiling grammars v0.1.0 (C:\Users\NikitaDev\Desktop\projects\zed-experimental\crates\grammars)
+   Compiling migrator v0.1.0 (C:\Users\NikitaDev\Desktop\projects\zed-experimental\crates\migrator)
+   Compiling file_icons v0.1.0 (C:\Users\NikitaDev\Desktop\projects\zed-experimental\crates\file_icons)
+   Compiling settings v0.1.0 (C:\Users\NikitaDev\Desktop\projects\zed-experimental\crates\settings)
+   Compiling language v0.1.0 (C:\Users\NikitaDev\Desktop\projects\zed-experimental\crates\language)
+   Compiling feature_flags v0.1.0 (C:\Users\NikitaDev\Desktop\projects\zed-experimental\crates\feature_flags)
+   Compiling theme_settings v0.1.0 (C:\Users\NikitaDev\Desktop\projects\zed-experimental\crates\theme_settings)
+   Compiling remote v0.1.0 (C:\Users\NikitaDev\Desktop\projects\zed-experimental\crates\remote)
+   Compiling context_server v0.1.0 (C:\Users\NikitaDev\Desktop\projects\zed-experimental\crates\context_server)
+   Compiling git_hosting_providers v0.1.0 (C:\Users\NikitaDev\Desktop\projects\zed-experimental\crates\git_hosting_providers)
+   Compiling vim_mode_setting v0.1.0 (C:\Users\NikitaDev\Desktop\projects\zed-experimental\crates\vim_mode_setting)
+   Compiling audio v0.1.0 (C:\Users\NikitaDev\Desktop\projects\zed-experimental\crates\audio)
+   Compiling ollama v0.1.0 (C:\Users\NikitaDev\Desktop\projects\zed-experimental\crates\ollama)
+   Compiling open_router v0.1.0 (C:\Users\NikitaDev\Desktop\projects\zed-experimental\crates\open_router)
+   Compiling terminal v0.1.0 (C:\Users\NikitaDev\Desktop\projects\zed-experimental\crates\terminal)
+   Compiling dictation v0.1.0 (C:\Users\NikitaDev\Desktop\projects\zed-experimental\crates\dictation)
+   Compiling worktree v0.1.0 (C:\Users\NikitaDev\Desktop\projects\zed-experimental\crates\worktree)
+   Compiling buffer_diff v0.1.0 (C:\Users\NikitaDev\Desktop\projects\zed-experimental\crates\buffer_diff)
+   Compiling prettier v0.1.0 (C:\Users\NikitaDev\Desktop\projects\zed-experimental\crates\prettier)
+   Compiling markdown v0.1.0 (C:\Users\NikitaDev\Desktop\projects\zed-experimental\crates\markdown)
+   Compiling language_detection v0.1.0 (C:\Users\NikitaDev\Desktop\projects\zed-experimental\crates\language_detection)
+   Compiling prompt_store v0.1.0 (C:\Users\NikitaDev\Desktop\projects\zed-experimental\crates\prompt_store)
+   Compiling multi_buffer v0.1.0 (C:\Users\NikitaDev\Desktop\projects\zed-experimental\crates\multi_buffer)
+   Compiling client v0.1.0 (C:\Users\NikitaDev\Desktop\projects\zed-experimental\crates\client)
+   Compiling dap v0.1.0 (C:\Users\NikitaDev\Desktop\projects\zed-experimental\crates\dap)
+   Compiling edit_prediction_types v0.1.0 (C:\Users\NikitaDev\Desktop\projects\zed-experimental\crates\edit_prediction_types)
+   Compiling ai_onboarding v0.1.0 (C:\Users\NikitaDev\Desktop\projects\zed-experimental\crates\ai_onboarding)
+   Compiling channel v0.1.0 (C:\Users\NikitaDev\Desktop\projects\zed-experimental\crates\channel)
+warning: linker stdout: LINK : warning LNK4217: symbol 'wasm_byte_vec_delete' defined in 'libwasmtime_c_api-ec42d0f06e7a4cc5.rlib(wasmtime_c_api-ec42d0f06e7a4cc5.wasmtime_c_api.57f172cf0a713fbe-cgu.12.rcgu.o)' is imported by 'libtree_sitter-11c54d58852e37eb.rlib(9d101ca0d5afdee2-lib.o)' in function 'ts_wasm_store__instantiate'␍
+         LINK : warning LNK4217: symbol 'wasm_engine_delete' defined in 'libwasmtime_c_api-ec42d0f06e7a4cc5.rlib(wasmtime_c_api-ec42d0f06e7a4cc5.wasmtime_c_api.57f172cf0a713fbe-cgu.04.rcgu.o)' is imported by 'libtree_sitter-11c54d58852e37eb.rlib(9d101ca0d5afdee2-lib.o)' in function 'ts_wasm_store_delete'␍
+         LINK : warning LNK4217: symbol 'wasm_valtype_vec_new_empty' defined in 'libwasmtime_c_api-ec42d0f06e7a4cc5.rlib(wasmtime_c_api-ec42d0f06e7a4cc5.wasmtime_c_api.57f172cf0a713fbe-cgu.12.rcgu.o)' is imported by 'libtree_sitter-11c54d58852e37eb.rlib(9d101ca0d5afdee2-lib.o)' in function 'ts_wasm_store_new'␍
+         LINK : warning LNK4217: symbol 'wasm_valtype_vec_new' defined in 'libwasmtime_c_api-ec42d0f06e7a4cc5.rlib(wasmtime_c_api-ec42d0f06e7a4cc5.wasmtime_c_api.57f172cf0a713fbe-cgu.12.rcgu.o)' is imported by 'libtree_sitter-11c54d58852e37eb.rlib(9d101ca0d5afdee2-lib.o)' in function 'ts_wasm_store_new'␍
+         LINK : warning LNK4217: symbol 'wasm_valtype_new' defined in 'libwasmtime_c_api-ec42d0f06e7a4cc5.rlib(wasmtime_c_api-ec42d0f06e7a4cc5.wasmtime_c_api.57f172cf0a713fbe-cgu.11.rcgu.o)' is imported by 'libtree_sitter-11c54d58852e37eb.rlib(9d101ca0d5afdee2-lib.o)' in function 'ts_wasm_store_new'␍
+         LINK : warning LNK4217: symbol 'wasm_functype_delete' defined in 'libwasmtime_c_api-ec42d0f06e7a4cc5.rlib(wasmtime_c_api-ec42d0f06e7a4cc5.wasmtime_c_api.57f172cf0a713fbe-cgu.08.rcgu.o)' is imported by 'libtree_sitter-11c54d58852e37eb.rlib(9d101ca0d5afdee2-lib.o)' in function 'ts_wasm_store_new'␍
+         LINK : warning LNK4217: symbol 'wasm_functype_new' defined in 'libwasmtime_c_api-ec42d0f06e7a4cc5.rlib(wasmtime_c_api-ec42d0f06e7a4cc5.wasmtime_c_api.57f172cf0a713fbe-cgu.08.rcgu.o)' is imported by 'libtree_sitter-11c54d58852e37eb.rlib(9d101ca0d5afdee2-lib.o)' in function 'ts_wasm_store_new'␍
+         LINK : warning LNK4217: symbol 'wasm_globaltype_delete' defined in 'libwasmtime_c_api-ec42d0f06e7a4cc5.rlib(wasmtime_c_api-ec42d0f06e7a4cc5.wasmtime_c_api.57f172cf0a713fbe-cgu.12.rcgu.o)' is imported by 'libtree_sitter-11c54d58852e37eb.rlib(9d101ca0d5afdee2-lib.o)' in function 'ts_wasm_store_delete'␍
+         LINK : warning LNK4217: symbol 'wasm_globaltype_new' defined in 'libwasmtime_c_api-ec42d0f06e7a4cc5.rlib(wasmtime_c_api-ec42d0f06e7a4cc5.wasmtime_c_api.57f172cf0a713fbe-cgu.12.rcgu.o)' is imported by 'libtree_sitter-11c54d58852e37eb.rlib(9d101ca0d5afdee2-lib.o)' in function 'ts_wasm_store_new'␍
+         LINK : warning LNK4217: symbol 'wasm_tabletype_delete' defined in 'libwasmtime_c_api-ec42d0f06e7a4cc5.rlib(wasmtime_c_api-ec42d0f06e7a4cc5.wasmtime_c_api.57f172cf0a713fbe-cgu.05.rcgu.o)' is imported by 'libtree_sitter-11c54d58852e37eb.rlib(9d101ca0d5afdee2-lib.o)' in function 'ts_wasm_store_new'␍
+         LINK : warning LNK4217: symbol 'wasm_tabletype_new' defined in 'libwasmtime_c_api-ec42d0f06e7a4cc5.rlib(wasmtime_c_api-ec42d0f06e7a4cc5.wasmtime_c_api.57f172cf0a713fbe-cgu.05.rcgu.o)' is imported by 'libtree_sitter-11c54d58852e37eb.rlib(9d101ca0d5afdee2-lib.o)' in function 'ts_wasm_store_new'␍
+         LINK : warning LNK4217: symbol 'wasm_memorytype_delete' defined in 'libwasmtime_c_api-ec42d0f06e7a4cc5.rlib(wasmtime_c_api-ec42d0f06e7a4cc5.wasmtime_c_api.57f172cf0a713fbe-cgu.03.rcgu.o)' is imported by 'libtree_sitter-11c54d58852e37eb.rlib(9d101ca0d5afdee2-lib.o)' in function 'ts_wasm_store_new'␍
+         LINK : warning LNK4217: symbol 'wasm_memorytype_new' defined in 'libwasmtime_c_api-ec42d0f06e7a4cc5.rlib(wasmtime_c_api-ec42d0f06e7a4cc5.wasmtime_c_api.57f172cf0a713fbe-cgu.03.rcgu.o)' is imported by 'libtree_sitter-11c54d58852e37eb.rlib(9d101ca0d5afdee2-lib.o)' in function 'ts_wasm_store_new'␍
+         LINK : warning LNK4217: symbol 'wasm_externtype_as_memorytype_const' defined in 'libwasmtime_c_api-ec42d0f06e7a4cc5.rlib(wasmtime_c_api-ec42d0f06e7a4cc5.wasmtime_c_api.57f172cf0a713fbe-cgu.05.rcgu.o)' is imported by 'libtree_sitter-11c54d58852e37eb.rlib(9d101ca0d5afdee2-lib.o)' in function 'ts_wasm_store_new'␍
+         LINK : warning LNK4217: symbol 'wasm_importtype_vec_delete' defined in 'libwasmtime_c_api-ec42d0f06e7a4cc5.rlib(wasmtime_c_api-ec42d0f06e7a4cc5.wasmtime_c_api.57f172cf0a713fbe-cgu.12.rcgu.o)' is imported by 'libtree_sitter-11c54d58852e37eb.rlib(9d101ca0d5afdee2-lib.o)' in function 'ts_wasm_store__instantiate'␍
+         LINK : warning LNK4217: symbol 'wasm_importtype_name' defined in 'libwasmtime_c_api-ec42d0f06e7a4cc5.rlib(wasmtime_c_api-ec42d0f06e7a4cc5.wasmtime_c_api.57f172cf0a713fbe-cgu.12.rcgu.o)' is imported by 'libtree_sitter-11c54d58852e37eb.rlib(9d101ca0d5afdee2-lib.o)' in function 'ts_wasm_store__instantiate'␍
+         LINK : warning LNK4217: symbol 'wasm_importtype_type' defined in 'libwasmtime_c_api-ec42d0f06e7a4cc5.rlib(wasmtime_c_api-ec42d0f06e7a4cc5.wasmtime_c_api.57f172cf0a713fbe-cgu.12.rcgu.o)' is imported by 'libtree_sitter-11c54d58852e37eb.rlib(9d101ca0d5afdee2-lib.o)' in function 'ts_wasm_store_new'␍
+         LINK : warning LNK4217: symbol 'wasm_exporttype_vec_delete' defined in 'libwasmtime_c_api-ec42d0f06e7a4cc5.rlib(wasmtime_c_api-ec42d0f06e7a4cc5.wasmtime_c_api.57f172cf0a713fbe-cgu.12.rcgu.o)' is imported by 'libtree_sitter-11c54d58852e37eb.rlib(9d101ca0d5afdee2-lib.o)' in function 'ts_wasm_store__instantiate'␍
+         LINK : warning LNK4217: symbol 'wasm_exporttype_name' defined in 'libwasmtime_c_api-ec42d0f06e7a4cc5.rlib(wasmtime_c_api-ec42d0f06e7a4cc5.wasmtime_c_api.57f172cf0a713fbe-cgu.12.rcgu.o)' is imported by 'libtree_sitter-11c54d58852e37eb.rlib(9d101ca0d5afdee2-lib.o)' in function 'ts_wasm_store__instantiate'␍
+         LINK : warning LNK4217: symbol 'wasm_trap_delete' defined in 'libwasmtime_c_api-ec42d0f06e7a4cc5.rlib(wasmtime_c_api-ec42d0f06e7a4cc5.wasmtime_c_api.57f172cf0a713fbe-cgu.12.rcgu.o)' is imported by 'libtree_sitter-11c54d58852e37eb.rlib(9d101ca0d5afdee2-lib.o)' in function 'ts_parser__external_scanner_create'␍
+         LINK : warning LNK4217: symbol 'wasm_trap_message' defined in 'libwasmtime_c_api-ec42d0f06e7a4cc5.rlib(wasmtime_c_api-ec42d0f06e7a4cc5.wasmtime_c_api.57f172cf0a713fbe-cgu.12.rcgu.o)' is imported by 'libtree_sitter-11c54d58852e37eb.rlib(9d101ca0d5afdee2-lib.o)' in function 'ts_wasm_store__instantiate'␍
+         LINK : warning LNK4217: symbol 'wasmtime_error_delete' defined in 'libwasmtime_c_api-ec42d0f06e7a4cc5.rlib(wasmtime_c_api-ec42d0f06e7a4cc5.wasmtime_c_api.57f172cf0a713fbe-cgu.10.rcgu.o)' is imported by 'libtree_sitter-11c54d58852e37eb.rlib(9d101ca0d5afdee2-lib.o)' in function 'ts_parser__external_scanner_create'␍
+         LINK : warning LNK4217: symbol 'wasmtime_error_message' defined in 'libwasmtime_c_api-ec42d0f06e7a4cc5.rlib(wasmtime_c_api-ec42d0f06e7a4cc5.wasmtime_c_api.57f172cf0a713fbe-cgu.10.rcgu.o)' is imported by 'libtree_sitter-11c54d58852e37eb.rlib(9d101ca0d5afdee2-lib.o)' in function 'ts_wasm_store__instantiate'␍
+         LINK : warning LNK4217: symbol 'wasmtime_module_new' defined in 'libwasmtime_c_api-ec42d0f06e7a4cc5.rlib(wasmtime_c_api-ec42d0f06e7a4cc5.wasmtime_c_api.57f172cf0a713fbe-cgu.12.rcgu.o)' is imported by 'libtree_sitter-11c54d58852e37eb.rlib(9d101ca0d5afdee2-lib.o)' in function 'ts_wasm_store_load_language'␍
+         LINK : warning LNK4217: symbol 'wasmtime_module_delete' defined in 'libwasmtime_c_api-ec42d0f06e7a4cc5.rlib(wasmtime_c_api-ec42d0f06e7a4cc5.wasmtime_c_api.57f172cf0a713fbe-cgu.12.rcgu.o)' is imported by 'libtree_sitter-11c54d58852e37eb.rlib(9d101ca0d5afdee2-lib.o)' in function 'ts_language_delete'␍
+         LINK : warning LNK4217: symbol 'wasmtime_module_imports' defined in 'libwasmtime_c_api-ec42d0f06e7a4cc5.rlib(wasmtime_c_api-ec42d0f06e7a4cc5.wasmtime_c_api.57f172cf0a713fbe-cgu.12.rcgu.o)' is imported by 'libtree_sitter-11c54d58852e37eb.rlib(9d101ca0d5afdee2-lib.o)' in function 'ts_wasm_store__instantiate'␍
+         LINK : warning LNK4217: symbol 'wasmtime_module_exports' defined in 'libwasmtime_c_api-ec42d0f06e7a4cc5.rlib(wasmtime_c_api-ec42d0f06e7a4cc5.wasmtime_c_api.57f172cf0a713fbe-cgu.12.rcgu.o)' is imported by 'libtree_sitter-11c54d58852e37eb.rlib(9d101ca0d5afdee2-lib.o)' in function 'ts_wasm_store__instantiate'␍
+         LINK : warning LNK4217: symbol 'wasmtime_store_new' defined in 'libwasmtime_c_api-ec42d0f06e7a4cc5.rlib(wasmtime_c_api-ec42d0f06e7a4cc5.wasmtime_c_api.57f172cf0a713fbe-cgu.03.rcgu.o)' is imported by 'libtree_sitter-11c54d58852e37eb.rlib(9d101ca0d5afdee2-lib.o)' in function 'ts_wasm_store_new'␍
+         LINK : warning LNK4217: symbol 'wasmtime_store_context' defined in 'libwasmtime_c_api-ec42d0f06e7a4cc5.rlib(wasmtime_c_api-ec42d0f06e7a4cc5.wasmtime_c_api.57f172cf0a713fbe-cgu.03.rcgu.o)' is imported by 'libtree_sitter-11c54d58852e37eb.rlib(9d101ca0d5afdee2-lib.o)' in function 'ts_parser__external_scanner_create'␍
+         LINK : warning LNK4217: symbol 'wasmtime_store_delete' defined in 'libwasmtime_c_api-ec42d0f06e7a4cc5.rlib(wasmtime_c_api-ec42d0f06e7a4cc5.wasmtime_c_api.57f172cf0a713fbe-cgu.03.rcgu.o)' is imported by 'libtree_sitter-11c54d58852e37eb.rlib(9d101ca0d5afdee2-lib.o)' in function 'ts_wasm_store_delete'␍
+         LINK : warning LNK4217: symbol 'wasmtime_func_new_unchecked' defined in 'libwasmtime_c_api-ec42d0f06e7a4cc5.rlib(wasmtime_c_api-ec42d0f06e7a4cc5.wasmtime_c_api.57f172cf0a713fbe-cgu.12.rcgu.o)' is imported by 'libtree_sitter-11c54d58852e37eb.rlib(9d101ca0d5afdee2-lib.o)' in function 'ts_wasm_store_new'␍
+         LINK : warning LNK4217: symbol 'wasmtime_func_call' defined in 'libwasmtime_c_api-ec42d0f06e7a4cc5.rlib(wasmtime_c_api-ec42d0f06e7a4cc5.wasmtime_c_api.57f172cf0a713fbe-cgu.12.rcgu.o)' is imported by 'libtree_sitter-11c54d58852e37eb.rlib(9d101ca0d5afdee2-lib.o)' in function 'ts_wasm_store__call_module_initializer'␍
+         LINK : warning LNK4217: symbol 'wasmtime_func_call_unchecked' defined in 'libwasmtime_c_api-ec42d0f06e7a4cc5.rlib(wasmtime_c_api-ec42d0f06e7a4cc5.wasmtime_c_api.57f172cf0a713fbe-cgu.12.rcgu.o)' is imported by 'libtree_sitter-11c54d58852e37eb.rlib(9d101ca0d5afdee2-lib.o)' in function 'ts_parser__external_scanner_create'␍
+         LINK : warning LNK4217: symbol 'wasmtime_caller_context' defined in 'libwasmtime_c_api-ec42d0f06e7a4cc5.rlib(wasmtime_c_api-ec42d0f06e7a4cc5.wasmtime_c_api.57f172cf0a713fbe-cgu.12.rcgu.o)' is imported by 'libtree_sitter-11c54d58852e37eb.rlib(9d101ca0d5afdee2-lib.o)' in function 'callback__debug_message'␍
+         LINK : warning LNK4217: symbol 'wasmtime_instance_new' defined in 'libwasmtime_c_api-ec42d0f06e7a4cc5.rlib(wasmtime_c_api-ec42d0f06e7a4cc5.wasmtime_c_api.57f172cf0a713fbe-cgu.12.rcgu.o)' is imported by 'libtree_sitter-11c54d58852e37eb.rlib(9d101ca0d5afdee2-lib.o)' in function 'ts_wasm_store__instantiate'␍
+         LINK : warning LNK4217: symbol 'wasmtime_instance_export_nth' defined in 'libwasmtime_c_api-ec42d0f06e7a4cc5.rlib(wasmtime_c_api-ec42d0f06e7a4cc5.wasmtime_c_api.57f172cf0a713fbe-cgu.12.rcgu.o)' is imported by 'libtree_sitter-11c54d58852e37eb.rlib(9d101ca0d5afdee2-lib.o)' in function 'ts_wasm_store__instantiate'␍
+         LINK : warning LNK4217: symbol 'wasmtime_engine_clone' defined in 'libwasmtime_c_api-ec42d0f06e7a4cc5.rlib(wasmtime_c_api-ec42d0f06e7a4cc5.wasmtime_c_api.57f172cf0a713fbe-cgu.04.rcgu.o)' is imported by 'libtree_sitter-11c54d58852e37eb.rlib(9d101ca0d5afdee2-lib.o)' in function 'ts_wasm_store_new'␍
+         LINK : warning LNK4217: symbol 'wasmtime_global_new' defined in 'libwasmtime_c_api-ec42d0f06e7a4cc5.rlib(wasmtime_c_api-ec42d0f06e7a4cc5.wasmtime_c_api.57f172cf0a713fbe-cgu.12.rcgu.o)' is imported by 'libtree_sitter-11c54d58852e37eb.rlib(9d101ca0d5afdee2-lib.o)' in function 'ts_wasm_store__provide_builtin_import'␍
+         LINK : warning LNK4217: symbol 'wasmtime_memorytype_minimum' defined in 'libwasmtime_c_api-ec42d0f06e7a4cc5.rlib(wasmtime_c_api-ec42d0f06e7a4cc5.wasmtime_c_api.57f172cf0a713fbe-cgu.03.rcgu.o)' is imported by 'libtree_sitter-11c54d58852e37eb.rlib(9d101ca0d5afdee2-lib.o)' in function 'ts_wasm_store_new'␍
+         LINK : warning LNK4217: symbol 'wasmtime_memory_new' defined in 'libwasmtime_c_api-ec42d0f06e7a4cc5.rlib(wasmtime_c_api-ec42d0f06e7a4cc5.wasmtime_c_api.57f172cf0a713fbe-cgu.05.rcgu.o)' is imported by 'libtree_sitter-11c54d58852e37eb.rlib(9d101ca0d5afdee2-lib.o)' in function 'ts_wasm_store_new'␍
+         LINK : warning LNK4217: symbol 'wasmtime_memory_data' defined in 'libwasmtime_c_api-ec42d0f06e7a4cc5.rlib(wasmtime_c_api-ec42d0f06e7a4cc5.wasmtime_c_api.57f172cf0a713fbe-cgu.05.rcgu.o)' is imported by 'libtree_sitter-11c54d58852e37eb.rlib(9d101ca0d5afdee2-lib.o)' in function 'callback__debug_message'␍
+         LINK : warning LNK4217: symbol 'wasmtime_memory_data_size' defined in 'libwasmtime_c_api-ec42d0f06e7a4cc5.rlib(wasmtime_c_api-ec42d0f06e7a4cc5.wasmtime_c_api.57f172cf0a713fbe-cgu.05.rcgu.o)' is imported by 'libtree_sitter-11c54d58852e37eb.rlib(9d101ca0d5afdee2-lib.o)' in function 'ts_wasm_store__instantiate'␍
+         LINK : warning LNK4217: symbol 'wasmtime_memory_grow' defined in 'libwasmtime_c_api-ec42d0f06e7a4cc5.rlib(wasmtime_c_api-ec42d0f06e7a4cc5.wasmtime_c_api.57f172cf0a713fbe-cgu.05.rcgu.o)' is imported by 'libtree_sitter-11c54d58852e37eb.rlib(9d101ca0d5afdee2-lib.o)' in function 'ts_wasm_store__instantiate'␍
+         LINK : warning LNK4217: symbol 'wasmtime_table_new' defined in 'libwasmtime_c_api-ec42d0f06e7a4cc5.rlib(wasmtime_c_api-ec42d0f06e7a4cc5.wasmtime_c_api.57f172cf0a713fbe-cgu.05.rcgu.o)' is imported by 'libtree_sitter-11c54d58852e37eb.rlib(9d101ca0d5afdee2-lib.o)' in function 'ts_wasm_store_new'␍
+         LINK : warning LNK4217: symbol 'wasmtime_table_get' defined in 'libwasmtime_c_api-ec42d0f06e7a4cc5.rlib(wasmtime_c_api-ec42d0f06e7a4cc5.wasmtime_c_api.57f172cf0a713fbe-cgu.05.rcgu.o)' is imported by 'libtree_sitter-11c54d58852e37eb.rlib(9d101ca0d5afdee2-lib.o)' in function 'ts_wasm_store__get_function'␍
+         LINK : warning LNK4217: symbol 'wasmtime_table_set' defined in 'libwasmtime_c_api-ec42d0f06e7a4cc5.rlib(wasmtime_c_api-ec42d0f06e7a4cc5.wasmtime_c_api.57f172cf0a713fbe-cgu.05.rcgu.o)' is imported by 'libtree_sitter-11c54d58852e37eb.rlib(9d101ca0d5afdee2-lib.o)' in function 'ts_wasm_store_new'␍
+         LINK : warning LNK4217: symbol 'wasmtime_table_grow' defined in 'libwasmtime_c_api-ec42d0f06e7a4cc5.rlib(wasmtime_c_api-ec42d0f06e7a4cc5.wasmtime_c_api.57f172cf0a713fbe-cgu.05.rcgu.o)' is imported by 'libtree_sitter-11c54d58852e37eb.rlib(9d101ca0d5afdee2-lib.o)' in function 'ts_wasm_store__instantiate'␍
+         LINK : warning LNK4217: symbol 'wasmtime_trap_new' defined in 'libwasmtime_c_api-ec42d0f06e7a4cc5.rlib(wasmtime_c_api-ec42d0f06e7a4cc5.wasmtime_c_api.57f172cf0a713fbe-cgu.12.rcgu.o)' is imported by 'libtree_sitter-11c54d58852e37eb.rlib(9d101ca0d5afdee2-lib.o)' in function 'callback__abort'
+  |
+  = note: `#[warn(linker_messages)]` on by default
+
+warning: `dictation` (test "recognition_loop") generated 1 warning
+warning: `dictation` (example "no_speech_probe") generated 1 warning (1 duplicate)
+warning: `dictation` (example "transcribe_wav") generated 1 warning (1 duplicate)
+warning: `dictation` (lib test) generated 1 warning (1 duplicate)
+   Compiling extension v0.1.0 (C:\Users\NikitaDev\Desktop\projects\zed-experimental\crates\extension)
+   Compiling snippet_provider v0.1.0 (C:\Users\NikitaDev\Desktop\projects\zed-experimental\crates\snippet_provider)
+   Compiling project v0.1.0 (C:\Users\NikitaDev\Desktop\projects\zed-experimental\crates\project)
+   Compiling agent_settings v0.1.0 (C:\Users\NikitaDev\Desktop\projects\zed-experimental\crates\agent_settings)
+   Compiling action_log v0.1.0 (C:\Users\NikitaDev\Desktop\projects\zed-experimental\crates\action_log)
+   Compiling extension_host v0.1.0 (C:\Users\NikitaDev\Desktop\projects\zed-experimental\crates\extension_host)
+   Compiling json_schema_store v0.1.0 (C:\Users\NikitaDev\Desktop\projects\zed-experimental\crates\json_schema_store)
+   Compiling languages v0.1.0 (C:\Users\NikitaDev\Desktop\projects\zed-experimental\crates\languages)
+   Compiling workspace v0.1.0 (C:\Users\NikitaDev\Desktop\projects\zed-experimental\crates\workspace)
+   Compiling acp_thread v0.1.0 (C:\Users\NikitaDev\Desktop\projects\zed-experimental\crates\acp_thread)
+   Compiling agent_servers v0.1.0 (C:\Users\NikitaDev\Desktop\projects\zed-experimental\crates\agent_servers)
+   Compiling command_palette_hooks v0.1.0 (C:\Users\NikitaDev\Desktop\projects\zed-experimental\crates\command_palette_hooks)
+   Compiling breadcrumbs v0.1.0 (C:\Users\NikitaDev\Desktop\projects\zed-experimental\crates\breadcrumbs)
+   Compiling picker v0.1.0 (C:\Users\NikitaDev\Desktop\projects\zed-experimental\crates\picker)
+   Compiling auto_update v0.1.0 (C:\Users\NikitaDev\Desktop\projects\zed-experimental\crates\auto_update)
+   Compiling notifications v0.1.0 (C:\Users\NikitaDev\Desktop\projects\zed-experimental\crates\notifications)
+   Compiling platform_title_bar v0.1.0 (C:\Users\NikitaDev\Desktop\projects\zed-experimental\crates\platform_title_bar)
+   Compiling editor v0.1.0 (C:\Users\NikitaDev\Desktop\projects\zed-experimental\crates\editor)
+   Compiling copilot v0.1.0 (C:\Users\NikitaDev\Desktop\projects\zed-experimental\crates\copilot)
+   Compiling command_palette v0.1.0 (C:\Users\NikitaDev\Desktop\projects\zed-experimental\crates\command_palette)
+   Compiling remote_connection v0.1.0 (C:\Users\NikitaDev\Desktop\projects\zed-experimental\crates\remote_connection)
+   Compiling copilot_ui v0.1.0 (C:\Users\NikitaDev\Desktop\projects\zed-experimental\crates\copilot_ui)
+   Compiling language_models v0.1.0 (C:\Users\NikitaDev\Desktop\projects\zed-experimental\crates\language_models)
+   Compiling agent v0.1.0 (C:\Users\NikitaDev\Desktop\projects\zed-experimental\crates\agent)
+   Compiling picker_preview v0.1.0 (C:\Users\NikitaDev\Desktop\projects\zed-experimental\crates\picker_preview)
+   Compiling terminal_view v0.1.0 (C:\Users\NikitaDev\Desktop\projects\zed-experimental\crates\terminal_view)
+   Compiling git_ui_core v0.1.0 (C:\Users\NikitaDev\Desktop\projects\zed-experimental\crates\git_ui_core)
+   Compiling search v0.1.0 (C:\Users\NikitaDev\Desktop\projects\zed-experimental\crates\search)
+   Compiling vim v0.1.0 (C:\Users\NikitaDev\Desktop\projects\zed-experimental\crates\vim)
+   Compiling agent_ui v0.1.0 (C:\Users\NikitaDev\Desktop\projects\zed-experimental\crates\agent_ui)
+warning: `agent_ui` (lib test) generated 1 warning (1 duplicate)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 9m 13s
+     Running unittests src\agent_ui.rs (target\debug\deps\agent_ui-f78e99a22831f66b.exe)
+
+running 493 tests
+test agent_panel::tests::test_build_conflict_resolution_prompt_empty_conflicts ... ok
+test agent_panel::tests::test_build_conflicted_files_resolution_prompt_empty_paths ... ok
+test agent_panel::tests::test_build_conflicted_files_resolution_prompt_file_paths_only ... ok
+test agent_configuration::configure_context_server_modal::tests::context_server_http_input_preserves_existing_oauth_settings ... ok
+test agent_panel::tests::test_build_conflict_resolution_prompt_multiple_conflicts_same_file ... ok
+test agent_panel::tests::test_build_conflict_resolution_prompt_single_conflict ... ok
+test agent_panel::tests::test_build_conflict_resolution_prompt_multiple_conflicts_different_files ... ok
+test agent_configuration::configure_context_server_modal::tests::parse_http_input_reads_oauth_settings ... ok
+test agent_panel::tests::test_conflict_resource_block_structure ... ok
+test agent_panel::tests::test_deserialize_agent_variants ... ok
+test agent_diff::tests::test_multibuffer_agent_diff ... ok
+test agent_diff::tests::test_single_file_review_diff ... ok
+test agent_panel::tests::test_create_thread_with_options_retains_thread_and_restores_agent ... ok
+test agent_panel::tests::test_draft_prompt_blocks_use_current_editor_snapshot ... ok
+test agent_panel::tests::test_empty_workspace_does_not_create_agent_entries ... ok
+test agent_panel::tests::test_draft_replaced_when_selected_agent_changes ... ok
+test agent_panel::tests::test_active_terminal_notification_clears_when_window_reactivates ... ok
+test agent_panel::tests::test_background_thread_promoted_via_load ... ok
+test agent_panel::tests::test_classify_worktrees_skips_non_git_root_with_nested_repo ... ok
+test agent_panel::tests::test_clicking_tool_call_output_keeps_agent_panel_focused_and_zoomed ... ok
+test agent_panel::tests::test_add_selection_to_terminal_thread_pastes_mention ... ok
+test agent_panel::tests::test_is_known_terminal_agent_command ... ok
+test agent_panel::tests::test_activate_draft_preserves_typed_content ... ok
+test agent_panel::tests::test_initial_content_for_thread_summary_uses_own_session_id ... ok
+test agent_panel::tests::test_active_terminal_serialize_and_load_round_trip ... ok
+test agent_panel::tests::test_draft_has_user_content_checks_all_live_copies ... ok
+test agent_panel::tests::test_external_file_drop_on_thread_does_not_paste_into_later_terminal ... ok
+test agent_panel::tests::test_focused_terminal_bell_notifies_when_window_inactive ... ok
+test agent_panel::tests::test_initialize_from_source_inherits_agent_without_draft_content ... ok
+test agent_panel::tests::test_initialize_from_source_transfers_draft_to_fresh_panel ... ok
+test agent_panel::tests::test_initialize_from_source_does_not_overwrite_existing_content ... ok
+test agent_panel::tests::test_new_workspace_ignores_uninstalled_global_last_used_agent ... ok
+test agent_panel::tests::test_initialize_from_source_retargets_empty_destination_draft_agent ... ok
+test agent_panel::tests::test_idle_non_loadable_thread_retained_when_navigating_away ... ok
+test agent_panel::tests::test_opened_workspace_does_not_inherit_uninstalled_agent_from_source ... ok
+test agent_panel::tests::test_new_thread_uses_workspace_selected_agent ... ok
+test agent_panel::tests::test_resolve_worktree_branch_target ... ok
+test agent_panel::tests::test_new_workspace_inherits_global_last_used_agent ... ok
+test agent_panel::tests::test_non_native_thread_without_metadata_is_not_restored ... ok
+test agent_panel::tests::test_draft_promotion_creates_metadata_and_new_session_on_reload ... ok
+test agent_panel::tests::test_pending_terminal_restore_prevents_initial_terminal_creation ... ok
+test agent_panel::tests::test_new_workspace_load_uses_global_terminal_entry_kind ... ok
+test agent_panel::tests::test_repeated_activation_only_creates_one_initial_terminal ... ok
+test agent_panel::tests::test_new_external_agent_replaces_mismatched_ephemeral_draft ... ok
+test agent_panel::tests::test_restored_terminal_runs_init_command_once ... ok
+test agent_panel::tests::test_restored_terminal_selects_without_focusing ... ok
+test agent_panel::tests::test_restored_terminal_uses_metadata_title_until_shell_title_arrives ... ok
+test agent_panel::tests::test_active_thread_serialize_and_load_round_trip ... ok
+test agent_panel::tests::test_reopened_workspace_uses_installed_global_agent_when_selected_agent_was_uninstalled ... ok
+test agent_panel::tests::test_rollback_on_canceled_receiver ... ok
+test agent_panel::tests::test_rollback_all_succeed_returns_ok ... ok
+test agent_panel::tests::test_restored_terminal_does_not_update_global_entry_kind ... ok
+test agent_panel::tests::test_rollback_cleans_up_orphan_directories ... ok
+test agent_panel::tests::test_rollback_on_failure_attempts_all_worktrees ... ok
+test agent_panel::tests::test_reopening_visible_thread_keeps_thread_usable ... ok
+test agent_panel::tests::test_reloaded_ephemeral_draft_preserves_original_agent ... ok
+test agent_panel::tests::test_plus_with_parked_draft_active_focuses_ephemeral ... ok
+test agent_panel::tests::test_cleanup_retained_threads_keeps_five_most_recent_idle_loadable_threads ... ok
+test agent_panel::tests::test_running_thread_retained_when_navigating_away ... ok
+test agent_panel::tests::test_cleanup_retained_threads_preserves_idle_non_loadable_threads ... ok
+test agent_panel::tests::test_terminal_bell_marks_and_activation_clears_notification ... ok
+test agent_panel::tests::test_restored_thread_keeps_uninstalled_agent ... ok
+test agent_panel::tests::test_restored_draft_drops_uninstalled_agent_but_keeps_text ... ok
+test agent_panel::tests::test_skills_menu_entry_shows_manage_skills_shortcut ... ok
+test agent_panel::tests::test_resubmitting_edited_message_keeps_zoomed_agent_panel_open ... ok
+test agent_panel::tests::test_terminal_program_reports_known_agent_transitions ... ok
+test agent_panel::tests::test_terminal_bell_marks_without_popup_when_sidebar_open ... ok
+test agent_panel::tests::test_terminal_custom_title_recomposes_with_live_spinner ... ok
+test agent_panel::tests::test_terminal_external_image_drop_writes_path ... ok
+test agent_panel::tests::test_serialize_preserves_session_id_in_load_error ... ok
+test agent_panel::tests::test_terminal_external_paths_drop_handler_writes_image_path ... ok
+test agent_panel::tests::test_terminal_notification_closed_when_panel_dropped ... ok
+test agent_panel::tests::test_terminal_notification_dismissed_when_active_terminal_becomes_visible ... ok
+test agent_panel::tests::test_retained_thread_reset_race_disassociates_session ... ok
+test agent_panel::tests::test_terminal_bell_notifies_when_sidebar_history_open ... ok
+test agent_panel::tests::test_terminal_restore_working_directory_does_not_read_leased_workspace ... ok
+test agent_panel::tests::test_terminal_entry_kind_controls_new_entry ... ok
+test agent_panel::tests::test_terminal_title_editor_does_not_set_custom_title_when_unchanged ... ok
+test agent_panel::tests::test_terminal_notification_view_activates_terminal_workspace ... ok
+test agent_panel::tests::test_terminal_title_omits_placeholder_title ... ok
+test agent_panel::tests::test_terminal_title_editor_is_created_only_while_editing ... ok
+test agent_panel::tests::test_terminal_title_editor_excludes_spinner_prefix ... ok
+test buffer_codegen::tests::test_allows_model_to_output_backticks ... ok
+test buffer_codegen::tests::test_inactive_codegen_alternative ... ok
+test buffer_codegen::tests::test_start_clears_previous_failure ... ok
+test buffer_codegen::tests::test_strip_invalid_spans_from_codeblock ... ok
+test agent_panel::tests::test_terminal_working_directory_uses_active_workspace_while_workspace_is_updating ... ok
+test buffer_codegen::tests::test_tool_completion_accepts_failure_message ... ok
+test buffer_codegen::tests::test_tool_completion_errors_on_eof_without_tool_call ... ok
+test agent_panel::tests::test_terminal_notification_dismissed_when_sidebar_opens ... ok
+test agent_panel::tests::test_new_draft_survives_reload_when_real_thread_is_active ... ok
+test agent_panel::tests::test_title_edit_affordance_matches_threads_and_terminals ... ok
+test agent_panel::tests::test_selected_agent_syncs_when_navigating_between_threads ... ok
+test buffer_codegen::tests::test_tool_completion_errors_on_invalid_tool_input ... ok
+test buffer_codegen::tests::test_tool_completion_errors_on_invalid_tool_json ... ok
+test buffer_codegen::tests::test_tool_completion_errors_when_incomplete_rewrite_reaches_eof ... ok
+test buffer_codegen::tests::test_tool_completion_errors_when_incomplete_rewrite_stops ... ok
+test buffer_codegen::tests::test_tool_completion_errors_when_interrupted_after_complete_rewrite ... ok
+test buffer_codegen::tests::test_tool_completion_errors_when_interrupted_after_failure_message ... ok
+test buffer_codegen::tests::test_tool_completion_errors_when_stopped_without_tool_call ... ok
+test buffer_codegen::tests::test_tool_completion_ignores_non_tool_events ... ok
+test agent_panel::tests::test_visible_terminal_bell_is_suppressed ... ok
+test agent_panel::tests::test_typed_draft_is_parked_when_switching_agents ... ok
+test agent_panel::tests::test_workspaces_maintain_independent_agent_selection ... ok
+test completion_provider::tests::test_filter_sessions_by_query ... ok
+test completion_provider::tests::test_group_by_relevance_floats_best_group_and_keeps_groups_contiguous ... ok
+test completion_provider::tests::test_mention_completion_parse ... ok
+test completion_provider::tests::test_prompt_completion_parse ... ok
+test buffer_codegen::tests::test_tool_completion_propagates_stream_error_after_rewrite ... ok
+test completion_provider::tests::test_section_headers_visible_until_argument ... ok
+test completion_provider::tests::test_slash_command_completion_parse ... ok
+test buffer_codegen::tests::test_tool_completion_propagates_stream_error_before_rewrite ... ok
+test config_options::tests::cycling_boolean_config_option_saves_selected_value_as_default ... ok
+test buffer_codegen::tests::test_tool_completion_rejects_failure_after_rewrite ... ok
+test config_options::tests::cycling_category_cycles_boolean_config_option_first ... ok
+test config_options::tests::cycling_config_option_saves_selected_value_as_default ... ok
+test config_options::tests::toggling_category_picker_without_select_config_option_is_unhandled ... ok
+test conversation_view::elicitation::tests::display_url_segments_never_elide_url_characters ... ok
+test conversation_view::elicitation::tests::display_url_segments_use_larger_url_boundaries ... ok
+test buffer_codegen::tests::test_tool_completion_rejects_rewrite_after_failure ... ok
+test buffer_codegen::tests::test_tool_completion_rejects_multiple_rewrite_tool_calls ... ok
+test agent_panel::tests::test_visible_terminal_bell_is_suppressed_without_focus ... ok
+test buffer_codegen::tests::test_tool_completion_rejects_rewrite_after_partial_failure ... ok
+test agent_panel::tests::test_work_dirs_update_when_worktrees_change ... ok
+test buffer_codegen::tests::test_tool_completion_requires_failure_message_to_complete ... ok
+test completion_provider::tests::test_search_files_path_distance_ordering ... ok
+test conversation_view::elicitation::tests::multi_select_options_include_titled_descriptions ... ok
+test conversation_view::elicitation::tests::number_validation_rejects_non_finite_values ... ok
+test conversation_view::elicitation::tests::should_render_pending_and_accepted_url_elicitations ... ok
+test conversation_view::elicitation::tests::single_select_options_include_titled_descriptions ... ok
+test conversation_view::elicitation::tests::string_validation_rejects_email_format_mismatch ... ok
+test conversation_view::elicitation::tests::string_validation_rejects_pattern_mismatch ... ok
+test conversation_view::elicitation::tests::string_validation_rejects_patterns_outside_resource_limits ... ok
+test conversation_view::elicitation::tests::string_validation_supports_bounded_advanced_patterns ... ok
+test conversation_view::elicitation::tests::url_host_presentation_highlights_destination_and_suspicious_idn ... ok
+test conversation_view::tests::permission_option_for_action_prefers_explicit_sandbox_allow_always ... ok
+test conversation_view::tests::resolve_outcome_from_selection_dropdown_defaults_to_last_choice_when_no_selection ... ok
+test conversation_view::tests::resolve_outcome_from_selection_dropdown_out_of_range_falls_back_to_last ... ok
+test conversation_view::tests::resolve_outcome_from_selection_dropdown_uses_selected_choice ... ok
+test conversation_view::tests::resolve_outcome_from_selection_flat_allow_picks_allow_once ... ok
+test conversation_view::tests::resolve_outcome_from_selection_flat_deny_picks_reject_once ... ok
+test conversation_view::tests::resolve_outcome_from_selection_flat_ignores_selection ... ok
+test conversation_view::tests::resolve_outcome_from_selection_pattern_mode_with_checked_uses_always_with_params ... ok
+test conversation_view::tests::resolve_outcome_from_selection_pattern_mode_with_empty_checked_falls_back_to_last_choice ... ok
+test buffer_codegen::tests::test_autoindent_respects_tabs_in_selection ... ok
+test agent_panel::tests::test_vim_search_does_not_steal_focus_from_agent_panel ... ok
+test conversation_view::elicitation::tests::form_state_reports_all_validation_errors ... ok
+test buffer_codegen::tests::test_autoindent_when_generating_past_indentation ... ok
+test buffer_codegen::tests::test_autoindent_when_generating_before_indentation ... ok
+test conversation_view::elicitation::tests::form_state_discards_invalid_optional_single_select_default ... ok
+test conversation_view::elicitation::tests::form_state_discards_validation_for_stale_values ... ok
+test conversation_view::elicitation::tests::form_state_replaces_invalid_required_single_select_default ... ok
+test conversation_view::elicitation::tests::form_state_preserves_string_whitespace ... ok
+test conversation_view::elicitation::tests::form_state_rejects_invalid_single_select_value ... ok
+test completion_provider::tests::test_source_read_selection_editor_whole_line ... ok
+test conversation_view::elicitation::tests::form_state_prevents_duplicate_submissions ... ok
+test context_server_configuration::tests::test_configure_extension_only_opens_modal_in_active_workspace ... ok
+test buffer_codegen::tests::test_transform_autoindent ... ok
+test conversation_view::tests::test_acp_server_exit_transitions_conversation_to_load_error_without_panic ... ok
+test conversation_view::tests::test_accepting_a_quote_reply_fills_only_the_comment ... ok
+test conversation_view::tests::test_data_retention_error_maps_from_provider_error ... ok
+test conversation_view::tests::test_agent_code_span_resolver_resolves_worktree_paths ... ok
+test conversation_view::tests::test_conversation_parent_pending_tool_call_returns_first_across_threads ... ok
+test conversation_view::tests::test_auth_required_on_initial_connect ... ok
+test conversation_view::tests::test_close_all_sessions_calls_close_when_supported ... ok
+test conversation_view::tests::test_close_all_sessions_skips_when_unsupported ... ok
+test conversation_view::tests::test_accepting_answer_field_dictation_inserts_text_without_submitting ... ok
+test conversation_view::tests::test_conversation_multiple_tool_calls_fifo_ordering ... ok
+test conversation_view::tests::test_connect_failure_transitions_to_load_error ... ok
+test conversation_view::tests::test_conversation_subagent_scoped_pending_tool_call ... ok
+test conversation_view::tests::test_close_session_returns_error_when_unsupported ... ok
+test conversation_view::tests::test_discarding_an_empty_quote_reply_removes_its_block ... ok
+test conversation_view::tests::test_drop_preserves_shared_pending_request_elicitations ... ok
+test conversation_view::tests::test_dictation_window_opens_over_the_answer_field_not_the_composer ... ok
+test conversation_view::tests::test_authorize_tool_call_action_triggers_authorization ... ok
+test conversation_view::tests::test_drop ... ok
+test conversation_view::tests::test_completed_plan_snapshot_keeps_list_state_in_sync ... ok
+test conversation_view::tests::test_external_source_prompt_requires_manual_send ... ok
+test conversation_view::tests::test_escape_when_idle_is_noop ... ok
+test conversation_view::tests::test_allow_button_uses_selected_granularity ... ok
+test conversation_view::tests::test_authorize_tool_call_action_with_pattern_option ... ok
+test conversation_view::tests::test_deny_button_uses_selected_granularity ... ok
+test conversation_view::tests::test_insert_selections ... ok
+test conversation_view::tests::test_escape_cancels_generation_from_conversation_focus ... ok
+test conversation_view::tests::test_message_doesnt_send_if_empty ... ok
+test conversation_view::tests::test_manually_editing_title_updates_acp_thread_title ... ok
+test conversation_view::tests::test_granularity_selection_updates_state ... ok
+test conversation_view::tests::test_external_source_prompt_warning_clears_after_send ... ok
+test conversation_view::tests::test_escape_cancels_generation_from_editor_focus ... ok
+test conversation_view::tests::test_move_queued_message_to_empty_main_editor ... ok
+test conversation_view::tests::test_max_tokens_error_is_rendered ... ok
+test conversation_view::tests::test_move_queued_message_to_non_empty_main_editor ... ok
+test conversation_view::tests::test_message_editing_cancel ... ok
+test conversation_view::tests::test_message_editing_insert_selections ... ok
+test conversation_view::tests::test_move_up_in_empty_editor_restores_last_queued_message ... ok
+test conversation_view::tests::test_interrupt ... ok
+test conversation_view::tests::test_notification_for_error ... ok
+test conversation_view::tests::test_message_editing_while_generating ... ok
+test conversation_view::tests::test_option_id_transformation_for_allow ... ok
+test conversation_view::tests::test_option_id_transformation_for_deny ... ok
+test conversation_view::tests::test_notification_for_stop_event ... ok
+test conversation_view::tests::test_notification_closed_when_thread_view_dropped ... ok
+test conversation_view::tests::test_message_editing_regenerate ... ok
+test conversation_view::tests::test_no_notification_when_queued_message_will_be_auto_sent ... ok
+test conversation_view::tests::test_notification_dismissed_when_sidebar_opens ... ok
+test conversation_view::tests::test_no_notification_when_sidebar_open_but_different_thread_focused ... ok
+test conversation_view::tests::test_notification_for_tool_authorization ... ok
+test conversation_view::tests::test_notification_still_works_when_window_inactive ... ok
+test conversation_view::tests::test_paste_image_into_queued_message_promotes_to_main_editor ... ok
+test conversation_view::tests::test_provider_rejection_preserves_provider_message ... ok
+test conversation_view::tests::test_notification_respects_never_setting ... ok
+test conversation_view::tests::test_notification_when_sidebar_open_but_thread_list_hidden ... ok
+test conversation_view::tests::test_pending_tool_call_for_session_scopes_to_that_session ... ok
+test conversation_view::tests::test_opening_another_block_accepts_the_review_first ... ok
+test conversation_view::tests::test_paste_text_into_queued_message_promotes_to_main_editor ... ok
+test conversation_view::tests::test_notification_when_panel_hidden ... ok
+test conversation_view::tests::test_notification_when_different_conversation_is_active_in_visible_panel ... ok
+test conversation_view::tests::test_question_withdrawn_during_review_moves_text_to_the_composer ... ok
+test conversation_view::tests::test_permission_row_hidden_when_inline_bounds_unavailable ... ok
+test conversation_view::tests::test_notification_when_workspace_is_background_in_multi_workspace ... ok
+test conversation_view::tests::test_quote_reply_is_refused_while_a_session_runs ... ok
+test conversation_view::tests::test_permission_row_scroll_to_dismisses_row ... ok
+test conversation_view::tests::test_permission_row_does_not_flicker_when_activity_bar_squeezes_list ... ok
+test conversation_view::tests::test_permission_row_shown_when_inline_prompt_is_above_viewport ... ok
+test conversation_view::tests::test_permission_row_ignores_subagent_requests ... ok
+test conversation_view::tests::test_queued_message_steer_defaults_off_and_toggles ... ok
+test conversation_view::tests::test_permission_row_disappears_when_authorized ... ok
+test conversation_view::tests::test_resume_thread_uses_session_cwd_when_inside_project ... ok
+test conversation_view::tests::test_regenerate_keeps_pending_subagent_edits ... ok
+test conversation_view::tests::test_restored_threads_keep_available_commands ... ok
+test conversation_view::tests::test_refusal_handling ... ok
+test conversation_view::tests::test_reset_preserves_session_id_after_load_error ... ok
+test conversation_view::tests::test_state_transition_preserves_shared_pending_request_elicitations ... ok
+test conversation_view::tests::test_resume_without_history_adds_notice ... ok
+test conversation_view::tests::test_successful_session_creation_clears_resolved_request_elicitations ... ok
+test conversation_view::tests::test_reply_to_selection_needs_a_selection ... ok
+test conversation_view::tests::test_scroll_to_most_recent_user_prompt_falls_back_to_bottom_without_user_messages ... ok
+test conversation_view::tests::test_queue_resumes_after_stop_and_new_message ... ok
+test conversation_view::tests::test_thread_search_editor_cancel_dismisses_bar ... ok
+test conversation_view::tests::test_stale_stop_does_not_disable_follow_tail_during_regenerate ... ok
+test conversation_view::tests::test_scroll_to_most_recent_user_prompt ... ok
+test conversation_view::tests::test_rewind_views ... ok
+test conversation_view::tests::test_thread_search_release_clears_markdown_highlights ... ok
+test conversation_view::tests::test_thread_search_dismiss_clears_highlights ... ok
+test conversation_view::tests::test_thread_search_includes_expanded_tool_call_content ... ok
+test conversation_view::thread_view::numbered_code_block_tests::parses_cat_numbered_code_with_crlf_line_endings ... ok
+test conversation_view::thread_view::numbered_code_block_tests::parses_cat_numbered_markdown_code_block ... ok
+test conversation_view::thread_view::numbered_code_block_tests::rejects_non_cat_numbered_code_block ... ok
+test conversation_view::thread_view::numbered_code_block_tests::rejects_non_contiguous_cat_numbers ... ok
+test conversation_view::thread_view::tests::test_leading_native_command_matches_bare_and_with_remainder ... ok
+test conversation_view::tests::test_thread_search_includes_expanded_thinking_blocks ... ok
+test conversation_view::tests::test_thread_search_highlights_user_message_editor ... ok
+test conversation_view::tests::test_thread_search_finds_matches_across_entries ... ok
+test conversation_view::thread_view::tests::test_strip_leading_command ... ok
+test dictation_engine::tests::changed_configuration_loads_a_new_engine ... ok
+test dictation_engine::tests::engine_is_dropped_after_the_session_when_not_keeping_it_loaded ... ok
+test dictation_engine::tests::failed_load_frees_the_session_for_the_next_attempt ... ok
+test dictation_engine::tests::first_session_loads_the_engine_and_refuses_a_second_one ... ok
+test dictation_engine::tests::next_session_reuses_the_returned_engine_when_keeping_it_loaded ... ok
+test dictation_engine::tests::session_that_lost_its_engine_still_frees_the_slot ... ok
+test dictation_footer::tests::a_missing_configured_device_is_named_in_the_microphone_label ... ok
+test dictation_footer::tests::failed_offers_only_close ... ok
+test dictation_footer::tests::play_is_offered_only_in_review_with_session_audio ... ok
+test dictation_footer::tests::post_processing_blocks_accept_and_tab_and_keeps_cancel ... ok
+test dictation_footer::tests::recognizing_blocks_accept_and_keeps_cancel ... ok
+test dictation_footer::tests::recording_shows_the_microphone_and_a_review_hint ... ok
+test dictation_footer::tests::review_showing_raw_text_after_tab_offers_show_processed ... ok
+test dictation_footer::tests::review_with_processed_text_names_the_model_and_offers_show_raw ... ok
+test dictation_footer::tests::review_without_post_processing_is_raw_without_a_tab_hint ... ok
+test dictation_footer::tests::starting_offers_only_cancel_and_shows_the_model_loading ... ok
+test dictation_footer::tests::the_microphone_label_is_absent_outside_recording ... ok
+test dictation_footer::tests::waiting_for_ollama_names_the_wait_and_blocks_accept_and_tab_like_post_processing ... ok
+test dictation_host::tests::accepted_text_becomes_a_composer_block_once_the_question_is_gone ... ok
+test dictation_host::tests::accepted_text_goes_to_the_answer_field_while_the_question_is_open ... ok
+test dictation_host::tests::insertion_after_a_space_adds_none ... ok
+test dictation_host::tests::insertion_at_the_end_of_a_line_keeps_the_line_break ... ok
+test dictation_host::tests::insertion_in_the_middle_of_a_word_is_spaced_on_both_sides ... ok
+test dictation_host::tests::insertion_into_an_empty_field_is_the_text_itself ... ok
+test dictation_host::tests::multi_line_text_keeps_its_line_breaks ... ok
+test dictation_host::tests::other_fields_are_refused_while_a_session_runs ... ok
+test dictation_host::tests::the_hosting_field_toggles_its_own_session ... ok
+test dictation_host::tests::without_a_session_any_field_may_start ... ok
+test dictation_model_server::tests::a_server_that_answers_after_a_few_polls_is_started_once ... ok
+test dictation_model_server::tests::a_server_that_answers_at_once_is_not_started ... ok
+test dictation_model_server::tests::a_server_that_never_answers_fails_after_the_limit_with_one_start ... ok
+test dictation_model_server::tests::a_start_that_fails_is_reported_without_polling ... ok
+test dictation_model_server::tests::an_empty_address_setting_means_the_default ... ok
+test dictation_model_server::tests::only_ollama_at_the_default_local_address_is_started ... ok
+test dictation_model_server::tests::slow_probes_count_towards_the_limit ... ok
+test dictation_window::tests::prompt_preview_quotes_the_beginning_of_a_long_prompt ... ok
+test dictation_window::tests::review_post_processing_and_failure_are_silent ... ok
+test dictation_window::tests::starting_and_resuming_open_the_microphone_audibly ... ok
+test dictation_window::tests::stopping_closes_the_microphone_audibly ... ok
+test draft_prompt_store::tests::test_clean_mention_links ... ok
+test entry_view_state::tests::test_diff_sync ... ok
+test entry_view_state::tests::test_elicitation_preserves_entry_index ... ok
+test entry_view_state::tests::test_reindex_after_removal ... ok
+test external_source_prompt::tests::collapses_newline_padding ... ok
+test external_source_prompt::tests::drops_empty_prompt ... ok
+test external_source_prompt::tests::drops_prompt_with_only_removed_characters ... ok
+test external_source_prompt::tests::keeps_multilingual_text ... ok
+test external_source_prompt::tests::keeps_normal_prompt_text ... ok
+test external_source_prompt::tests::keeps_tabs ... ok
+test external_source_prompt::tests::normalizes_carriage_returns ... ok
+test external_source_prompt::tests::strips_bidi_control_characters ... ok
+test external_source_prompt::tests::strips_other_control_characters ... ok
+test conversation_view::tests::test_thread_search_navigates_from_outside_search_bar ... ok
+test conversation_view::tests::test_thread_view_seeds_existing_elicitation_form_state ... ok
+test language_model_selector::tests::test_exact_match ... ok
+test language_model_selector::tests::test_favorites_appear_in_other_sections ... ok
+test language_model_selector::tests::test_favorites_section_appears_when_favorites_exist ... ok
+test language_model_selector::tests::test_fuzzy_match ... ok
+test language_model_selector::tests::test_models_from_different_providers ... ok
+test language_model_selector::tests::test_models_have_correct_actions ... ok
+test language_model_selector::tests::test_no_favorites_section_when_no_favorites ... ok
+test language_model_selector::tests::test_recommended_models_also_appear_in_other ... ok
+test mention_set::tests::test_disambiguated_labels_dedupe_identical_uris ... ok
+test mention_set::tests::test_is_raster_image_path_is_case_insensitive ... ok
+test mention_set::tests::test_selection_mentions_supported_for_paste ... ok
+test mention_set::tests::test_thread_mentions_disabled ... ok
+test inline_prompt_editor::tests::test_confirm_emits_execute_false_in_terminal_mode ... ok
+test inline_prompt_editor::tests::test_secondary_confirm_emits_execute_true_in_terminal_mode ... ok
+test conversation_view::tests::test_thread_search_refreshes_on_new_thread_entry ... ok
+test conversation_view::tests::test_tool_permission_buttons_without_pattern ... ok
+test conversation_view::tests::test_tool_permission_buttons_edit_file_with_path_pattern ... ok
+test conversation_view::tests::test_tool_permission_buttons_fetch_with_domain_pattern ... ok
+test message_editor::tests::test_completion_commands_derive_category_from_meta ... ok
+test conversation_view::tests::test_thread_search_select_next_from_thread_view_update_does_not_panic ... ok
+test conversation_view::thread_view::tests::test_open_link_out_of_project_path ... ok
+test conversation_view::thread_view::tests::test_open_link_bare_path ... ok
+test conversation_view::tests::test_thread_search_passive_rescan_preserves_scroll ... ok
+test message_editor::tests::test_append_message_preserves_mention_offset ... ok
+test conversation_view::thread_view::tests::test_open_link_percent_escape_disambiguation ... ok
+test conversation_view::tests::test_thread_search_shift_enter_navigates_with_jetbrains_keymap ... ok
+test conversation_view::tests::test_thread_search_scrolls_to_later_user_message_match ... ok
+test message_editor::tests::test_at_mention_removal ... ok
+test message_editor::tests::test_copying_blocks_copies_their_text ... ok
+test conversation_view::tests::test_tool_permission_buttons_terminal_with_pattern ... ok
+test message_editor::tests::test_append_message_to_empty_editor ... ok
+test message_editor::tests::test_append_message_to_non_empty_editor ... ok
+test message_editor::tests::test_autoscroll_after_insert_selections ... ok
+test message_editor::tests::test_parse_mention_links ... ok
+test message_editor::tests::test_completion_provider_commands ... ok
+test message_editor::tests::test_cut_with_selection_mentions_serializes_and_removes ... ok
+test message_editor::tests::test_copy_with_selection_mentions_serializes_links ... ok
+test message_editor::tests::test_cut_with_empty_cursor_on_mention_line_removes_whole_line ... ok
+test message_editor::tests::test_draft_content_blocks_snapshot_preserves_selection_mentions ... ok
+test message_editor::tests::test_dragged_file_paths_insert_in_order_at_cursor ... ok
+test message_editor::tests::test_dragged_file_path_inserts_at_cursor ... ok
+test message_editor::tests::test_editor_respects_embedded_context_capability ... ok
+test message_editor::tests::test_large_file_mention_fallback ... ok
+test message_editor::tests::test_insert_thread_summary ... ok
+test message_editor::tests::test_insert_thread_summary_skipped_for_external_agents ... ok
+test message_editor::tests::test_context_completion_provider_mentions ... ok
+test message_editor::tests::test_insert_context_with_multibyte_characters ... ok
+test message_editor::tests::test_session_capabilities_keep_commands_and_skills_separate ... ok
+test message_editor::tests::test_paste_external_directory_path_inserts_directory_mention ... ok
+test message_editor::tests::test_paste_mention_link_with_completion_trigger_does_not_panic ... ok
+test message_editor::tests::test_paste_mention_link_with_multiple_selections ... ok
+test message_editor::tests::test_paste_external_file_path_inserts_at_cursor ... ok
+test message_editor::tests::test_paste_mixed_external_image_without_extension_and_file_path ... ok
+test message_editor::tests::test_local_commands_complete_and_emit_event ... ok
+test message_editor::tests::test_quote_reply_block_keeps_its_quote_while_the_comment_changes ... ok
+test message_editor::tests::test_quoted_fragment_is_deleted_whole ... ok
+test message_editor::tests::test_validate_slash_commands_accepts_scope_qualified_skill ... ok
+test message_editor::tests::test_quoted_fragment_reaches_the_agent_as_a_quote_with_a_note ... ok
+test mode_selector::tests::setting_mode_saves_selected_mode_as_default ... ok
+test message_editor::tests::test_paste_external_file_path_inserts_file_mention ... ok
+test model_selector::tests::test_favorites_appear_in_both_sections ... ok
+test model_selector::tests::test_favorites_are_not_duplicated_when_repeated_in_other_sections ... ok
+test model_selector::tests::test_favorites_count_returns_correct_count ... ok
+test model_selector::tests::test_favorites_section_appears_when_favorites_exist ... ok
+test model_selector::tests::test_flat_model_list_with_favorites ... ok
+test model_selector::tests::test_fuzzy_match ... ok
+test model_selector::tests::test_is_favorite_flag_set_correctly_in_entries ... ok
+test model_selector::tests::test_models_have_correct_actions ... ok
+test model_selector::tests::test_no_favorites_section_when_no_favorites ... ok
+test profile_selector::tests::active_profile_selection_logic_works ... ok
+test profile_selector::tests::entries_include_custom_profiles ... ok
+test profile_selector::tests::fuzzy_filter_returns_no_results_and_keeps_configure ... ok
+test quote_reply::tests::a_code_block_keeps_its_fences_inside_the_quote ... ok
+test quote_reply::tests::a_long_comment_is_cut_after_the_first_words ... ok
+test quote_reply::tests::a_multi_line_quote_is_quoted_line_by_line ... ok
+test quote_reply::tests::a_quote_reply_puts_the_comment_after_the_note ... ok
+test quote_reply::tests::a_quote_reply_without_a_comment_is_just_the_quote ... ok
+test quote_reply::tests::a_short_comment_is_the_whole_label ... ok
+test quote_reply::tests::an_empty_comment_has_no_label ... ok
+test quote_reply::tests::blank_lines_inside_the_quote_stay_quoted ... ok
+test quote_reply::tests::the_items_are_hidden_for_anything_but_an_agent_response ... ok
+test quote_reply::tests::the_items_are_off_without_a_selection_or_during_a_session ... ok
+test quote_reply::tests::the_note_follows_the_dictation_language ... ok
+test quote_reply::tests::the_russian_note_is_used_for_russian_dictation ... ok
+test model_selector::tests::confirming_model_selects_model ... ok
+test message_editor::tests::test_serialized_copy_text_returns_none_when_mentions_outside_selection ... ok
+test terminal_thread_metadata_store::tests::test_terminal_thread_display_title_combines_raw_and_custom_titles ... ok
+test terminal_thread_metadata_store::tests::test_terminal_title_prefix_preserves_non_alphanumeric_prefixes ... ok
+test tests::test_agent_command_palette_visibility ... ok
+test message_editor::tests::test_sent_quote_reply_shows_its_quote_and_comment ... ok
+test terminal_thread_metadata_store::tests::test_change_worktree_paths_reindexes_terminal_metadata ... ok
+test message_editor::tests::test_set_message_normalizes_crlf_before_mention ... ok
+test tests::test_deserialize_external_agent_variants ... ok
+test terminal_thread_metadata_store::tests::test_rename_terminal_updates_stored_custom_title ... ok
+test tests::test_deserialize_new_external_agent_thread ... ok
+test thread_import::tests::test_collect_all_existing_returns_empty ... ok
+test thread_import::tests::test_collect_assigns_correct_agent_id_per_session ... ok
+test thread_import::tests::test_collect_deduplicates_across_agents ... ok
+test thread_import::tests::test_collect_marks_all_imported_threads_as_archived ... ok
+test thread_import::tests::test_collect_skips_sessions_already_in_existing_set ... ok
+test thread_import::tests::test_collect_skips_sessions_without_work_dirs ... ok
+test thread_import::tests::test_count_importable_threads_by_agent_counts_each_agent_independently ... ok
+test message_editor::tests::test_slash_autocomplete_emits_opened_event ... ok
+test message_editor::tests::test_thread_mode_hidden_when_disabled ... ok
+test thread_import::tests::test_returns_empty_when_channel_db_missing ... ok
+test message_editor::tests::test_set_message_replaces_existing_content ... ok
+test message_editor::tests::test_several_quoted_fragments_in_one_message ... ok
+test thread_import::tests::test_preserves_archived_state ... ok
+test message_editor::tests::test_serialized_cut_text_returns_none_when_mentions_outside_selection ... ok
+test message_editor::tests::test_whitespace_trimming ... ok
+test tests::test_backfill_sets_kvp_flag ... ok
+test message_editor::tests::test_thread_mode_visible_when_enabled ... ok
+test message_editor::tests::test_serialized_copy_text_selection_covers_only_mention ... ok
+test thread_metadata_store::tests::test_archive_nonexistent_thread_is_noop ... ok
+test tests::test_backfill_new_install_sets_flag_without_writing_settings ... ok
+test thread_metadata_store::tests::test_dedup_db_operations_keeps_latest_insert_for_same_session ... ok
+test thread_metadata_store::tests::test_dedup_db_operations_keeps_latest_operation_for_session ... ok
+test thread_metadata_store::tests::test_dedup_db_operations_preserves_distinct_sessions ... ok
+test message_editor::tests::test_set_message_plain_text ... ok
+test tests::test_backfill_is_idempotent ... ok
+test message_editor::tests::test_slash_command_validation ... ok
+test thread_metadata_store::tests::test_database_round_trips_title_override ... ok
+test thread_metadata_store::tests::test_archived_flag_persists_across_reload ... ok
+test thread_import::tests::test_import_skips_already_existing_threads ... ok
+test thread_metadata_store::tests::test_complete_worktree_restore_multiple_paths ... ok
+test thread_metadata_store::tests::test_archive_and_unarchive_thread ... ok
+test thread_metadata_store::tests::test_complete_worktree_restore_preserves_unmatched_paths ... ok
+test thread_metadata_store::tests::test_create_and_retrieve_archived_worktree ... ok
+test thread_import::tests::test_import_threads_from_other_channels ... ok
+test thread_metadata_store::tests::test_delete_archived_worktree ... ok
+test thread_metadata_store::tests::test_collab_guest_retained_thread_paths_not_overwritten_on_worktree_change ... ok
+test thread_metadata_store::tests::test_entries_for_path_excludes_archived ... ok
+test thread_metadata_store::tests::test_link_multiple_threads_to_archived_worktree ... ok
+test thread_metadata_store::tests::test_entries_filter_by_remote_connection ... ok
+test thread_metadata_store::tests::test_migrate_thread_metadata_noops_when_all_threads_already_exist ... ok
+test thread_metadata_store::tests::test_migration_awaits_thread_store_reload ... ok
+test thread_metadata_store::tests::test_migrate_thread_remote_connections_backfills_from_workspace_db ... ok
+test thread_metadata_store::tests::test_migrate_thread_metadata_archives_beyond_five_most_recent_per_project ... ok
+test thread_metadata_store::tests::test_migrate_thread_metadata_migrates_only_missing_threads ... ok
+test thread_metadata_store::tests::test_thread_worktree_paths_add_is_idempotent ... ok
+test thread_metadata_store::tests::test_thread_worktree_paths_from_path_lists_preserves_association ... ok
+test thread_metadata_store::tests::test_thread_metadata_title_prefers_override ... ok
+test thread_metadata_store::tests::test_multiple_archived_worktrees_per_thread ... ok
+test thread_metadata_store::tests::test_archived_thread_retains_paths_after_worktree_removal ... ok
+test thread_metadata_store::tests::test_thread_worktree_paths_full_add_then_remove_cycle ... ok
+test thread_metadata_store::tests::test_thread_worktree_paths_main_deduplicates_linked_worktrees ... ok
+test thread_metadata_store::tests::test_thread_worktree_paths_mismatched_lengths_returns_error ... ok
+test thread_metadata_store::tests::test_thread_worktree_paths_remove_nonexistent_is_noop ... ok
+test thread_metadata_store::tests::test_collab_guest_threads_not_saved_to_metadata_store ... ok
+test thread_metadata_store::tests::test_thread_id_primary_key_migration_backfills_null_thread_ids ... ok
+test thread_metadata_store::tests::test_save_followed_by_archiving_without_parking ... ok
+test thread_metadata_store::tests::test_draft_thread_metadata_promotes_on_first_message ... ok
+test thread_worktree_archive::tests::test_build_root_plan_returns_none_for_external_linked_worktree ... ok
+test thread_metadata_store::tests::test_store_set_title_override_updates_cached_metadata ... ok
+test thread_metadata_store::tests::test_save_all_persists_multiple_threads ... ok
+test thread_worktree_archive::tests::test_build_root_plan_returns_none_for_main_worktree ... ok
+test thread_metadata_store::tests::test_store_initializes_cache_from_database ... ok
+test threads_archive_view::tests::test_fuzzy_match_positions_ascii_still_works ... ok
+test threads_archive_view::tests::test_fuzzy_match_positions_case_insensitive ... ok
+test threads_archive_view::tests::test_fuzzy_match_positions_multi_byte_interior ... ok
+test threads_archive_view::tests::test_fuzzy_match_positions_no_match ... ok
+test threads_archive_view::tests::test_fuzzy_match_positions_returns_byte_indices ... ok
+test unicode_confusables::tests::deduplicates_repeated_characters ... ok
+test unicode_confusables::tests::detects_bidi_override ... ok
+test unicode_confusables::tests::detects_cyrillic_homoglyph ... ok
+test unicode_confusables::tests::detects_zero_width_space ... ok
+test unicode_confusables::tests::plain_ascii_is_never_flagged ... ok
+test unicode_confusables::tests::scan_host_decodes_punycode_lookalike ... ok
+test unicode_confusables::tests::scan_host_handles_wildcard_subdomain_patterns ... ok
+test unicode_confusables::tests::scan_host_leaves_plain_domains_alone ... ok
+test thread_metadata_store::tests::test_update_restored_worktree_paths_preserves_unmatched ... ok
+test thread_metadata_store::tests::test_update_restored_worktree_paths_multiple ... ok
+test thread_metadata_store::tests::test_store_set_generated_title_clears_title_override ... ok
+test thread_worktree_archive::tests::test_build_root_plan_returns_none_for_unrecorded_linked_worktree_in_managed_directory ... ok
+test thread_worktree_archive::tests::test_build_root_plan_returns_some_for_linked_worktree ... ok
+test thread_metadata_store::tests::test_store_cache_updates_after_save_and_delete ... ok
+test thread_metadata_store::tests::test_nonempty_thread_metadata_preserved_when_thread_released ... ok
+test thread_worktree_archive::tests::test_remove_root_deletes_directory_and_git_metadata ... ok
+test thread_metadata_store::tests::test_subagent_threads_excluded_from_sidebar_metadata ... ok
+test thread_worktree_archive::tests::test_build_root_plan_with_custom_worktree_directory ... ok
+test thread_worktree_archive::tests::test_remove_root_returns_error_and_rolls_back_on_remove_dir_failure ... ok
+test thread_metadata_store::tests::test_threads_without_project_association_are_archived_by_default ... ok
+test thread_worktree_archive::tests::test_remove_root_refuses_when_worktree_recreated_outside_zed ... ok
+test thread_worktree_archive::tests::test_remove_root_succeeds_when_directory_already_gone ... ok
+test agent_panel::tests::test_select_agent_action_updates_visible_draft ... ok
+
+test result: ok. 493 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 39.29s
+
+     Running unittests src\dictation.rs (target\debug\deps\dictation-69a44a085f637582.exe)
+
+running 28 tests
+test engine_download::tests::the_catalog_is_pinned_to_the_linked_engine_version ... ok
+test engine_download::tests::result_paths_live_under_the_dictation_directory ... ok
+test speech_gate::tests::a_burst_at_the_very_start_opens_at_zero ... ok
+test speech_gate::tests::a_burst_above_the_noise_opens_the_gate_with_a_margin_before_it ... ok
+test speech_gate::tests::a_short_click_does_not_open_the_gate ... ok
+test session_audio::tests::block_ids_that_leave_the_directory_are_rejected ... ok
+test session_audio::tests::keep_zero_writes_nothing ... ok
+test engine_download::tests::a_network_error_is_returned_as_an_error ... ok
+test engine_download::tests::a_checksum_mismatch_deletes_the_file_and_reports_an_error ... ok
+test tests::a_phrase_repeated_three_or_more_times_is_a_decoder_loop ... ok
+test tests::a_run_of_identical_segments_is_a_decoder_loop_too ... ok
+test tests::looping_segments_are_dropped_and_speech_is_kept ... ok
+test engine_download::tests::a_wrong_archive_checksum_deletes_the_archive ... ok
+test speech_gate::tests::speech_end_follows_the_last_loud_frame_while_open ... ok
+test engine_download::tests::progress_without_content_length_has_no_percent ... ok
+test speech_gate::tests::quiet_noise_never_opens_the_gate ... ok
+test tests::speech_with_a_single_repeated_word_is_not_a_decoder_loop ... ok
+test speech_gate::tests::the_gate_closes_only_after_clear_silence ... ok
+test session_audio::tests::keep_zero_offers_no_file_even_when_one_is_left_over ... ok
+test speech_gate::tests::feeding_in_odd_chunks_gives_the_same_events_as_one_feed ... ok
+test session_audio::tests::a_discarded_session_is_kept_under_its_own_id ... ok
+test speech_gate::tests::steady_loud_noise_becomes_the_floor_and_stops_counting_as_speech ... ok
+test session_audio::tests::keeping_n_files_evicts_the_oldest_by_modification_time ... ok
+test tests::saved_recording_loads_back_as_engine_pcm ... ok
+test engine_download::tests::the_backends_archive_is_extracted_and_the_inner_folder_returned ... ok
+test engine_download::tests::cancel_deletes_the_partial_file ... ok
+test session_audio::tests::resume_appends_to_the_block_file ... ok
+test engine_download::tests::progress_grows_with_the_body_and_a_correct_checksum_yields_the_path ... ok
+
+test result: ok. 28 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.03s
+
+     Running tests\recognition_loop.rs (target\debug\deps\recognition_loop-17691c7dbd1986aa.exe)
+
+running 9 tests
+test digits_with_trailing_silence_yield_only_the_digits ... ok
+test microphone_silence_after_the_digits_stays_out_of_the_transcript ... ok
+test confirmed_text_only_grows_by_prefix ... ok
+test microphone_silence_alone_yields_no_text ... ok
+test final_text_matches_whole_file_recognition ... ok
+test microphone_pause_between_phrases_leaves_no_artifact ... ok
+test source_ending_mid_file_keeps_the_tail ... ok
+test repeated_ngram_detector_matches_loops_only ... ok
+test stopping_mid_file_keeps_the_tail ... ok
+
+test result: ok. 9 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+exit 0

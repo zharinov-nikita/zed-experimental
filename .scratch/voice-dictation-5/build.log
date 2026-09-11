@@ -1,0 +1,8 @@
+   Compiling agent_ui v0.1.0 (C:\Users\NikitaDev\Desktop\projects\zed-experimental\crates\agent_ui)
+   Compiling cli v0.1.0 (C:\Users\NikitaDev\Desktop\projects\zed-experimental\crates\cli)
+   Compiling zed v1.16.0 (C:\Users\NikitaDev\Desktop\projects\zed-experimental\crates\zed)
+warning: zed@1.16.0: Info: using '4fcabb47913f7efb11d1e22378897a235aa268d5' hash for ZED_COMMIT_SHA env var
+   Compiling sidebar v0.1.0 (C:\Users\NikitaDev\Desktop\projects\zed-experimental\crates\sidebar)
+   Compiling acp_tools v0.1.0 (C:\Users\NikitaDev\Desktop\projects\zed-experimental\crates\acp_tools)
+    Finished `release-fast` profile [optimized + debuginfo] target(s) in 7m 27s
+EXIT 0
