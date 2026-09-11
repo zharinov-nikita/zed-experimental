@@ -340,6 +340,8 @@ fn strictest<'a>(modes: impl IntoIterator<Item = (&'a str, &'a str)>) -> Option<
 /// the agent announced. Options the agent did not announce, and values it
 /// did not list, are not set at all; the mode is always the strictest one
 /// announced, whether as a mode or as a mode option, whatever the user asked.
+/// The model comes first among the options: setting it changes which other
+/// options the agent announces, so the rest is decided again after it.
 pub fn session_policy(
     requested: &HashMap<String, AgentConfigOptionValue>,
     announced: &Announcement,
@@ -387,6 +389,12 @@ pub fn session_policy(
             .map(|mode| (mode.id.0.as_ref(), mode.name.as_str())),
     )
     .map(|id| acp::SessionModeId::new(id.to_string()));
+    options.sort_by_key(|(id, _)| {
+        !announced
+            .config_options
+            .iter()
+            .any(|option| option.id == *id && is_model_option(option))
+    });
     SessionPolicy { options, mode }
 }
 
@@ -555,10 +563,19 @@ pub trait RewriteAgent {
         connection: &Self::Connection,
     ) -> LocalBoxFuture<'static, Result<(Self::Session, Announcement)>>;
 
-    fn apply_policy(
+    /// Sets one session config option and reports the options the agent
+    /// announces afterwards: a changed model may add or take away others.
+    fn set_option(
         &self,
         session: &Self::Session,
-        policy: &SessionPolicy,
+        option_id: acp::SessionConfigId,
+        value: acp::SessionConfigOptionValue,
+    ) -> LocalBoxFuture<'static, Result<Vec<acp::SessionConfigOption>>>;
+
+    fn set_mode(
+        &self,
+        session: &Self::Session,
+        mode: acp::SessionModeId,
     ) -> LocalBoxFuture<'static, Result<()>>;
 
     /// Sends the text and waits for the whole answer.
@@ -583,6 +600,14 @@ pub trait RewriteAgent {
 struct OpenSession<S> {
     session: S,
     processed_by: ProcessedBy,
+}
+
+/// Why there is no Post-processing Session to rewrite in.
+enum SetupError {
+    /// No connection or no session: the agent is out of reach.
+    Unavailable(anyhow::Error),
+    /// The session exists but refused its set-up; the agent is fine.
+    Setup(anyhow::Error),
 }
 
 struct RewriterState<A: RewriteAgent> {
@@ -628,12 +653,16 @@ impl<A: RewriteAgent> AgentRewriter<A> {
         Ok(connected)
     }
 
-    async fn session(&self) -> Result<Rc<OpenSession<A::Session>>> {
+    async fn session(&self) -> Result<Rc<OpenSession<A::Session>>, SetupError> {
         if let Some(session) = self.state.borrow().session.clone() {
             return Ok(session);
         }
-        let connected = self.connection().await?;
-        let (session, announcement) = self.agent.new_session(&connected.connection).await?;
+        let connected = self.connection().await.map_err(SetupError::Unavailable)?;
+        let (session, announcement) = self
+            .agent
+            .new_session(&connected.connection)
+            .await
+            .map_err(SetupError::Unavailable)?;
         self.agent
             .remember_announcement(&self.config.id, &announcement);
         let policy = session_policy(&self.config.options, &announcement);
@@ -642,9 +671,9 @@ impl<A: RewriteAgent> AgentRewriter<A> {
             model: model_label(&policy, &announcement),
             kind: RewriterKind::ExternalAgent,
         };
-        if let Err(error) = self.agent.apply_policy(&session, &policy).await {
+        if let Err(error) = self.apply_policy(&session, announcement).await {
             self.agent.forget(&session);
-            return Err(error);
+            return Err(SetupError::Setup(error));
         }
         let open = Rc::new(OpenSession {
             session,
@@ -652,6 +681,37 @@ impl<A: RewriteAgent> AgentRewriter<A> {
         });
         self.state.borrow_mut().session = Some(open.clone());
         Ok(open)
+    }
+
+    /// Sets the options one at a time and decides the rest again after each
+    /// against what the agent announces then: setting the model can take
+    /// options away (`effort` exists only on models with effort levels) or
+    /// add some, and an option the agent no longer announces is not set.
+    async fn apply_policy(&self, session: &A::Session, mut announced: Announcement) -> Result<()> {
+        let mut applied: HashSet<acp::SessionConfigId> = HashSet::default();
+        loop {
+            let policy = session_policy(&self.config.options, &announced);
+            let Some((option_id, value)) = policy
+                .options
+                .into_iter()
+                .find(|(id, _)| !applied.contains(id))
+            else {
+                break;
+            };
+            announced.config_options = self
+                .agent
+                .set_option(session, option_id.clone(), value)
+                .await
+                .with_context(|| format!("setting option {}", option_id.0))?;
+            applied.insert(option_id);
+        }
+        if let Some(mode) = session_policy(&self.config.options, &announced).mode {
+            self.agent
+                .set_mode(session, mode.clone())
+                .await
+                .with_context(|| format!("setting mode {}", mode.0))?;
+        }
+        Ok(())
     }
 
     /// The name the failure messages use: the agent as the user knows it
@@ -670,13 +730,21 @@ impl<A: RewriteAgent> AgentRewriter<A> {
     pub async fn rewrite(&self, prompt: String) -> (Option<ProcessedBy>, Result<String, Failure>) {
         let open = match self.session().await {
             Ok(open) => open,
-            Err(error) => {
+            Err(SetupError::Unavailable(error)) => {
                 return (
                     None,
                     Err(Failure::AgentUnavailable {
                         agent: self.agent_name(),
                         reason: format!("{error:#}"),
                     }),
+                );
+            }
+            Err(SetupError::Setup(error)) => {
+                return (
+                    None,
+                    Err(Failure::RequestFailed(format!(
+                        "The Post-processing Session could not be set up: {error:#}"
+                    ))),
                 );
             }
         };
@@ -880,39 +948,47 @@ impl RewriteAgent for ZedAgents {
         .boxed_local()
     }
 
-    fn apply_policy(
+    fn set_option(
         &self,
         session: &Self::Session,
-        policy: &SessionPolicy,
+        option_id: acp::SessionConfigId,
+        value: acp::SessionConfigOptionValue,
+    ) -> LocalBoxFuture<'static, Result<Vec<acp::SessionConfigOption>>> {
+        let cx = self.cx.clone();
+        let connection = session.connection.clone();
+        let session_id = session.session_id.clone();
+        async move {
+            let set = cx.update(|cx| {
+                connection
+                    .session_config_options(&session_id, cx)
+                    .map(|options| options.set_config_option(option_id, value, cx))
+            });
+            match set {
+                Some(set) => set.await,
+                None => Ok(Vec::new()),
+            }
+        }
+        .boxed_local()
+    }
+
+    fn set_mode(
+        &self,
+        session: &Self::Session,
+        mode: acp::SessionModeId,
     ) -> LocalBoxFuture<'static, Result<()>> {
         let cx = self.cx.clone();
         let connection = session.connection.clone();
         let session_id = session.session_id.clone();
-        let policy = policy.clone();
         async move {
-            for (option_id, value) in policy.options {
-                let set = cx.update(|cx| {
-                    connection
-                        .session_config_options(&session_id, cx)
-                        .map(|options| options.set_config_option(option_id.clone(), value, cx))
-                });
-                if let Some(set) = set {
-                    set.await
-                        .map_err(|error| anyhow!("setting option {}: {error:#}", option_id.0))?;
-                }
+            let set = cx.update(|cx| {
+                connection
+                    .session_modes(&session_id, cx)
+                    .map(|modes| modes.set_mode(mode, cx))
+            });
+            match set {
+                Some(set) => set.await,
+                None => Ok(()),
             }
-            if let Some(mode) = policy.mode {
-                let set = cx.update(|cx| {
-                    connection
-                        .session_modes(&session_id, cx)
-                        .map(|modes| modes.set_mode(mode.clone(), cx))
-                });
-                if let Some(set) = set {
-                    set.await
-                        .map_err(|error| anyhow!("setting mode {}: {error:#}", mode.0))?;
-                }
-            }
-            Ok(())
         }
         .boxed_local()
     }
@@ -1500,7 +1576,8 @@ mod tests {
     struct Log {
         connects: usize,
         sessions_created: usize,
-        policies: Vec<SessionPolicy>,
+        options_set: Vec<(String, acp::SessionConfigOptionValue)>,
+        modes_set: Vec<acp::SessionModeId>,
         prompts: Vec<(usize, String)>,
         cancels: usize,
         forgotten: Vec<usize>,
@@ -1514,6 +1591,10 @@ mod tests {
     struct FakeAgent {
         connectable: bool,
         announcement: Announcement,
+        /// What the agent announces once its model has been set, when that
+        /// differs from the initial announcement.
+        after_model: Option<Announcement>,
+        set_option_fails: bool,
         reply: Cell<Reply>,
         log: Rc<RefCell<Log>>,
     }
@@ -1523,6 +1604,8 @@ mod tests {
             Self {
                 connectable: true,
                 announcement: recorded_announcement(),
+                after_model: None,
+                set_option_fails: false,
                 reply: Cell::new(reply),
                 log: Rc::default(),
             }
@@ -1556,12 +1639,33 @@ mod tests {
             async move { Ok((session, announcement)) }.boxed_local()
         }
 
-        fn apply_policy(
+        fn set_option(
             &self,
             _: &usize,
-            policy: &SessionPolicy,
+            option_id: acp::SessionConfigId,
+            value: acp::SessionConfigOptionValue,
+        ) -> LocalBoxFuture<'static, Result<Vec<acp::SessionConfigOption>>> {
+            if self.set_option_fails {
+                return async { Err(anyhow!("Unknown config option")) }.boxed_local();
+            }
+            self.log
+                .borrow_mut()
+                .options_set
+                .push((option_id.0.to_string(), value));
+            let announced = match (&self.after_model, option_id.0.as_ref()) {
+                (Some(after_model), "model") => after_model,
+                _ => &self.announcement,
+            };
+            let config_options = announced.config_options.clone();
+            async move { Ok(config_options) }.boxed_local()
+        }
+
+        fn set_mode(
+            &self,
+            _: &usize,
+            mode: acp::SessionModeId,
         ) -> LocalBoxFuture<'static, Result<()>> {
-            self.log.borrow_mut().policies.push(policy.clone());
+            self.log.borrow_mut().modes_set.push(mode);
             async { Ok(()) }.boxed_local()
         }
 
@@ -1638,19 +1742,70 @@ mod tests {
             assert_eq!(log.sessions_created, 1, "one session per Dictation Session");
             assert_eq!(log.prompts, vec![(1, "first".into()), (1, "resume".into())]);
             assert_eq!(log.remembered, vec!["claude-acp".to_string()]);
-            assert_eq!(log.policies.len(), 1);
             assert_eq!(
-                set_option(&log.policies[0], "model"),
-                Some(acp::SessionConfigOptionValue::value_id("haiku"))
+                log.options_set,
+                vec![(
+                    "model".to_string(),
+                    acp::SessionConfigOptionValue::value_id("haiku")
+                )]
             );
-            assert_eq!(
-                log.policies[0].mode,
-                Some(acp::SessionModeId::new("default"))
-            );
+            assert_eq!(log.modes_set, vec![acp::SessionModeId::new("default")]);
             assert!(log.forgotten.is_empty(), "the session lives until the end");
         }
         drop(rewriter);
         assert_eq!(log.borrow().forgotten, vec![1]);
+    }
+
+    #[test]
+    fn an_option_the_model_change_takes_away_is_not_set_and_the_model_goes_first() {
+        let mut agent = FakeAgent::new(Reply::Text);
+        agent.announcement.config_options.push(select_option(
+            "effort",
+            Some(acp::SessionConfigOptionCategory::ModelConfig),
+            "medium",
+            &[("low", "Low"), ("medium", "Medium"), ("high", "High")],
+        ));
+        // Haiku has no effort levels: once the model is set, the agent no
+        // longer announces `effort`.
+        agent.after_model = Some(recorded_announcement());
+        let log = agent.log.clone();
+        let rewriter = AgentRewriter::new(
+            agent,
+            claude(&[("effort", value("high")), ("model", value("haiku"))]),
+        );
+        let (processed_by, result) = futures::executor::block_on(rewriter.rewrite("x".into()));
+        assert_eq!(result, Ok("Clean text".into()));
+        assert_eq!(processed_by, Some(processed_by_claude()));
+        assert_eq!(
+            log.borrow().options_set,
+            vec![(
+                "model".to_string(),
+                acp::SessionConfigOptionValue::value_id("haiku")
+            )],
+            "effort was asked for but is never set"
+        );
+    }
+
+    #[test]
+    fn a_session_that_refuses_its_set_up_is_a_failed_run_not_an_unavailable_agent() {
+        let mut agent = FakeAgent::new(Reply::Text);
+        agent.set_option_fails = true;
+        let (rewriter, log) = rewriter(agent);
+        let (processed_by, result) = futures::executor::block_on(rewriter.rewrite("x".into()));
+        assert_eq!(processed_by, None);
+        match result {
+            Err(Failure::RequestFailed(reason)) => {
+                assert!(reason.contains("setting option model"), "{reason}");
+                assert!(reason.contains("Unknown config option"), "{reason}");
+            }
+            other => panic!("expected a failed set-up, got {other:?}"),
+        }
+        assert_eq!(
+            log.borrow().forgotten,
+            vec![1],
+            "the half-set-up session is forgotten"
+        );
+        assert!(log.borrow().prompts.is_empty());
     }
 
     #[test]
