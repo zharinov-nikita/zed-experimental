@@ -33,7 +33,7 @@ use language_model::{
 use project::{AgentId, Project};
 use settings::{
     AgentConfigOptionValue, DictationAgentOptionContent, DictationAgentOptionKindContent,
-    DictationAgentOptionValueContent, LanguageModelSelection, SettingsStore,
+    DictationAgentOptionValueContent, LanguageModelSelection, Settings as _, SettingsStore,
 };
 use util::ResultExt as _;
 
@@ -610,6 +610,14 @@ enum SetupError {
     Setup(anyhow::Error),
 }
 
+impl SetupError {
+    fn error(&self) -> &anyhow::Error {
+        match self {
+            Self::Unavailable(error) | Self::Setup(error) => error,
+        }
+    }
+}
+
 struct RewriterState<A: RewriteAgent> {
     connection: Option<Rc<Connected<A::Connection>>>,
     session: Option<Rc<OpenSession<A::Session>>>,
@@ -636,8 +644,22 @@ impl<A: RewriteAgent> AgentRewriter<A> {
         }
     }
 
-    pub fn agent_id(&self) -> &str {
-        &self.config.id
+    pub fn config(&self) -> &DictationPostProcessingAgent {
+        &self.config
+    }
+
+    /// Opens the Post-processing Session before there is a transcript to
+    /// rewrite. Creating it is several round trips to the agent, and they
+    /// belong anywhere but between the user falling silent and the
+    /// rewritten text. A failure is not reported here: [`Self::rewrite`]
+    /// tries again and tells the user then.
+    pub async fn open(&self) {
+        if let Err(error) = self.session().await {
+            log::warn!(
+                "dictation: the Post-processing Session is not open yet: {:#}",
+                error.error()
+            );
+        }
     }
 
     pub fn agent(&self) -> &A {
@@ -1077,6 +1099,17 @@ impl RewriteAgent for ZedAgents {
         self.cx
             .spawn(async move |cx| {
                 cx.update(|cx| {
+                    // An agent announces the same options every time, so
+                    // writing them again would churn the file the user edits
+                    // by hand and reload every setting in Zed once a minute.
+                    let known = AgentSettings::get_global(cx)
+                        .dictation
+                        .post_processing_agent_options_cache
+                        .get(&agent_id)
+                        == Some(&entry);
+                    if known {
+                        return;
+                    }
                     SettingsStore::global(cx).update_settings_file(
                         <dyn fs::Fs>::global(cx),
                         move |content, _| {
@@ -1589,7 +1622,7 @@ mod tests {
     /// answers as told. The log is shared so the test can read it after the
     /// rewriter, and the agent with it, are dropped.
     struct FakeAgent {
-        connectable: bool,
+        connectable: Cell<bool>,
         announcement: Announcement,
         /// What the agent announces once its model has been set, when that
         /// differs from the initial announcement.
@@ -1602,7 +1635,7 @@ mod tests {
     impl FakeAgent {
         fn new(reply: Reply) -> Self {
             Self {
-                connectable: true,
+                connectable: Cell::new(true),
                 announcement: recorded_announcement(),
                 after_model: None,
                 set_option_fails: false,
@@ -1618,7 +1651,7 @@ mod tests {
 
         fn connect(&self, agent_id: &str) -> LocalBoxFuture<'static, Result<Connected<()>>> {
             self.log.borrow_mut().connects += 1;
-            let result = if self.connectable {
+            let result = if self.connectable.get() {
                 Ok(Connected {
                     connection: (),
                     display_name: format!("{agent_id} (display)"),
@@ -1830,8 +1863,8 @@ mod tests {
 
     #[test]
     fn an_unconnectable_agent_is_reported_and_no_session_is_created() {
-        let mut agent = FakeAgent::new(Reply::Text);
-        agent.connectable = false;
+        let agent = FakeAgent::new(Reply::Text);
+        agent.connectable.set(false);
         let (rewriter, log) = rewriter(agent);
         let (processed_by, result) = futures::executor::block_on(rewriter.rewrite("x".into()));
         assert_eq!(processed_by, None);
@@ -1847,6 +1880,52 @@ mod tests {
         assert_eq!(log.sessions_created, 0);
         assert!(log.prompts.is_empty());
         assert!(log.forgotten.is_empty());
+    }
+
+    #[test]
+    fn a_session_opened_before_the_text_is_the_one_the_rewrite_uses() {
+        let (rewriter, log) = rewriter(FakeAgent::new(Reply::Text));
+        futures::executor::block_on(rewriter.open());
+        {
+            let log = log.borrow();
+            assert_eq!(log.sessions_created, 1);
+            assert!(
+                log.prompts.is_empty(),
+                "nothing is sent while there is no text"
+            );
+            assert_eq!(
+                log.options_set,
+                vec![(
+                    "model".to_string(),
+                    acp::SessionConfigOptionValue::value_id("haiku")
+                )],
+                "the session is set up before the text arrives too"
+            );
+        }
+
+        let (processed_by, result) = futures::executor::block_on(rewriter.rewrite("x".into()));
+        assert_eq!(result, Ok("Clean text".into()));
+        assert_eq!(processed_by, Some(processed_by_claude()));
+        assert_eq!(
+            log.borrow().sessions_created,
+            1,
+            "the rewrite reuses the session opened earlier"
+        );
+    }
+
+    #[test]
+    fn a_session_that_could_not_be_opened_early_is_opened_by_the_rewrite_instead() {
+        let agent = FakeAgent::new(Reply::Text);
+        agent.connectable.set(false);
+        let (rewriter, log) = rewriter(agent);
+        futures::executor::block_on(rewriter.open());
+        assert_eq!(log.borrow().sessions_created, 0);
+
+        rewriter.agent().connectable.set(true);
+        let (processed_by, result) = futures::executor::block_on(rewriter.rewrite("x".into()));
+        assert_eq!(result, Ok("Clean text".into()));
+        assert_eq!(processed_by, Some(processed_by_claude()));
+        assert_eq!(log.borrow().sessions_created, 1);
     }
 
     #[test]

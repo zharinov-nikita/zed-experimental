@@ -253,6 +253,10 @@ pub struct DictationWindow {
     /// Post-processing needs it; Post-processing awaits it before choosing
     /// its model. `None` when nothing has to be started.
     model_server: Option<Shared<Task<ServerOutcome>>>,
+    /// Opens the Post-processing Session while the user dictates, when an
+    /// External Agent is going to rewrite; Post-processing awaits it before
+    /// sending the text. `None` when no agent is configured.
+    post_processing_session: Option<Shared<Task<()>>>,
     /// The launcher has not reported yet.
     model_server_starting: bool,
     /// Why the last Resume could not start; shown in review so the text is kept.
@@ -327,6 +331,7 @@ impl DictationWindow {
             agent_rewriter: None,
             rewriting_with_agent: None,
             model_server: None,
+            post_processing_session: None,
             model_server_starting: false,
             resume_error: None,
             playback_error: None,
@@ -479,6 +484,7 @@ impl DictationWindow {
         cx.emit(DictationWindowEvent::RecordingStarted);
         refresh_audio_devices(cx);
         self.start_model_server(&settings, cx);
+        self.start_post_processing_session(&settings, cx);
 
         let prefix = self.prefix.clone();
         let device = input_audio_device(cx);
@@ -601,6 +607,30 @@ impl DictationWindow {
             })
             .shared(),
         );
+    }
+
+    /// Opens the Post-processing Session for an External Agent while the
+    /// user dictates. Creating it is several round trips to the agent, and
+    /// running them here hides them behind the dictation, the way the
+    /// Ollama launcher above hides its start-up. A failure is left to the
+    /// rewrite, which tries again and reports it.
+    fn start_post_processing_session(
+        &mut self,
+        settings: &DictationSettings,
+        cx: &mut Context<Self>,
+    ) {
+        self.post_processing_session = None;
+        if !settings.post_processing_enabled {
+            return;
+        }
+        let Ok(Backend::ExternalAgent(config)) = post_processing::select_backend(settings) else {
+            return;
+        };
+        let Some(rewriter) = self.agent_rewriter(config, cx) else {
+            return;
+        };
+        self.post_processing_session =
+            Some(cx.spawn(async move |_, _| rewriter.open().await).shared());
     }
 
     /// A failed start of a fresh session closes with a Callout; a failed
@@ -802,7 +832,13 @@ impl DictationWindow {
                     self.post_processing_done(None, Err(failure), window, cx);
                     return;
                 };
+                let opening = self.post_processing_session.clone();
                 cx.spawn_in(window, async move |this, cx| {
+                    // The session may still be opening from the moment the
+                    // user started speaking; only one is ever opened.
+                    if let Some(opening) = opening {
+                        opening.await;
+                    }
                     let (processed_by, result) = rewriter.rewrite(prompt).await;
                     this.update_in(cx, |this, window, cx| {
                         this.post_processing_done(processed_by, result, window, cx);
@@ -821,12 +857,16 @@ impl DictationWindow {
         config: agent_settings::DictationPostProcessingAgent,
         cx: &mut Context<Self>,
     ) -> Option<Rc<AgentRewriter<ZedAgents>>> {
+        // Settings the user changed while dictating apply from now on: a
+        // session set up for the old ones is dropped, and with it forgotten
+        // at the agent.
         if let Some(rewriter) = &self.agent_rewriter
-            && rewriter.agent_id() == config.id
+            && rewriter.config() == &config
         {
             self.rewriting_with_agent = Some(rewriter.agent().display_name(&config.id, cx));
             return Some(rewriter.clone());
         }
+        self.post_processing_session = None;
         let agents = ZedAgents::new(&self.workspace, cx)?;
         self.rewriting_with_agent = Some(agents.display_name(&config.id, cx));
         let rewriter = Rc::new(AgentRewriter::new(agents, config));
