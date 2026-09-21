@@ -124,17 +124,19 @@ impl ActivityToolKind {
 pub fn entry_roles(
     entries: &[AgentThreadEntry],
     asked_permission: &HashSet<acp::ToolCallId>,
+    is_generating: bool,
     cx: &App,
 ) -> Vec<EntryRole> {
     entries
         .iter()
-        .map(|entry| entry_role(entry, asked_permission, cx))
+        .map(|entry| entry_role(entry, asked_permission, is_generating, cx))
         .collect()
 }
 
 fn entry_role(
     entry: &AgentThreadEntry,
     asked_permission: &HashSet<acp::ToolCallId>,
+    is_generating: bool,
     cx: &App,
 ) -> EntryRole {
     match entry {
@@ -157,23 +159,30 @@ fn entry_role(
             if asked_permission.contains(&tool_call.id) {
                 return EntryRole::Break;
             }
+            let call = |live: bool| EntryRole::ToolCall {
+                id: tool_call.id.clone(),
+                kind: ActivityToolKind::from_tool_call(&tool_call.kind, tool_call.is_subagent()),
+                live,
+            };
+
             match tool_call.status {
                 ToolCallStatus::WaitingForConfirmation { .. }
                 | ToolCallStatus::Failed
                 | ToolCallStatus::Rejected => EntryRole::Break,
-                // Work that did not happen folds away, but counting it would
-                // claim the agent did something it did not.
-                ToolCallStatus::Canceled => EntryRole::Silent,
+                // Only a thread that is generating has work in flight. A thread
+                // read back from history keeps whatever status its calls had
+                // when it was put down, so without this a call interrupted long
+                // ago would pulse away as a Live Action for ever.
+                ToolCallStatus::Pending | ToolCallStatus::InProgress if is_generating => call(true),
+                // A canceled call counts as work like any other. Not counting it
+                // was truer to what the agent did, but it also meant a run of
+                // canceled calls held no tool call, formed no Activity, and so
+                // stayed on screen in full — which is exactly what happens to
+                // every call in flight when a thread is reopened.
                 ToolCallStatus::Pending
                 | ToolCallStatus::InProgress
-                | ToolCallStatus::Completed => EntryRole::ToolCall {
-                    id: tool_call.id.clone(),
-                    kind: ActivityToolKind::from_tool_call(
-                        &tool_call.kind,
-                        tool_call.is_subagent(),
-                    ),
-                    live: !matches!(tool_call.status, ToolCallStatus::Completed),
-                },
+                | ToolCallStatus::Completed
+                | ToolCallStatus::Canceled => call(false),
             }
         }
     }
@@ -367,6 +376,16 @@ mod tests {
         }
     }
 
+    /// A call the thread stopped before it finished: what every call in flight
+    /// becomes when a thread is put down and read back.
+    fn canceled_tool(name: &str, kind: ActivityToolKind) -> EntryRole {
+        EntryRole::ToolCall {
+            id: acp::ToolCallId::new(name),
+            kind,
+            live: false,
+        }
+    }
+
     fn ranges(activities: &ThreadActivities) -> Vec<Range<usize>> {
         activities
             .iter()
@@ -446,6 +465,20 @@ mod tests {
             ThreadActivities::new([EntryRole::Silent, EntryRole::Silent, EntryRole::Break]);
 
         assert!(activities.is_empty());
+    }
+
+    #[test]
+    fn a_canceled_tool_call_folds_like_any_other() {
+        // Reopening a thread cancels everything that was in flight, so this is
+        // the state most of a resumed thread's last run is in.
+        let activities = ThreadActivities::new([canceled_tool("a", ActivityToolKind::Execute)]);
+
+        assert_eq!(ranges(&activities), vec![0..1]);
+        assert_eq!(
+            activities.at(0).unwrap().counts,
+            vec![(ActivityToolKind::Execute, 1)]
+        );
+        assert!(!activities.is_live(0));
     }
 
     #[test]

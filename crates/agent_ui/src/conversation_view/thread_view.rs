@@ -6745,6 +6745,7 @@ impl ThreadView {
             ThreadDisplay::Focused => ThreadActivities::new(thread_activity::entry_roles(
                 entries,
                 &self.tool_calls_that_asked_permission,
+                matches!(thread.read(cx).status(), ThreadStatus::Generating),
                 cx,
             )),
         };
