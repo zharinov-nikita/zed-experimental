@@ -43,6 +43,32 @@ pub enum SidebarSide {
     Right,
 }
 
+// Fork-local: Focused Thread.
+/// How much of what the agent did is shown in the thread in the agent panel.
+#[derive(
+    Clone,
+    Copy,
+    Debug,
+    Default,
+    PartialEq,
+    Eq,
+    Serialize,
+    Deserialize,
+    JsonSchema,
+    MergeFrom,
+    strum::VariantArray,
+    strum::VariantNames,
+)]
+#[serde(rename_all = "snake_case")]
+pub enum ThreadDisplay {
+    /// Every tool call, thought and card is laid out in the thread.
+    Full,
+    /// Runs of work the agent did without addressing the user are folded into
+    /// a single line each, which can be opened on demand.
+    #[default]
+    Focused,
+}
+
 /// How thinking blocks should be displayed by default in the agent panel.
 #[derive(
     Clone,
@@ -605,6 +631,11 @@ pub struct AgentSettingsContent {
     ///
     /// Default: automatic
     pub thinking_display: Option<ThinkingBlockDisplay>,
+    // Fork-local: Focused Thread.
+    /// How much of what the agent did is shown in the thread in the agent panel.
+    ///
+    /// Default: focused
+    pub thread_display: Option<ThreadDisplay>,
     /// Whether clicking the stop button on a running terminal tool should also cancel the agent's generation.
     /// Note that this only applies to the stop button, not to ctrl+c inside the terminal.
     ///

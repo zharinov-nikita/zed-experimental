@@ -6,7 +6,12 @@ use crate::{
     thread_metadata_store::{ThreadId, ThreadMetadataStore},
 };
 use agent_client_protocol::schema::v1 as acp;
+
+// Fork-local: Focused Thread.
+use super::thread_activity::{self, Activity, ThreadActivities};
+use settings::ThreadDisplay;
 use std::cell::RefCell;
+use std::ops::Range;
 
 use acp_thread::{
     Elicitation, ElicitationEntryId, ElicitationStatus, PlanEntry, SandboxAuthorizationDetails,
@@ -605,6 +610,15 @@ pub struct ThreadView {
     pub list_state: ListState,
     pub session_capabilities: SharedSessionCapabilities,
     pub expanded_tool_call_raw_inputs: HashSet<acp::ToolCallId>,
+    /// Fork-local: Focused Thread. Pushed in by the panel that owns this
+    /// window's mode; falls back to the setting for a thread with no panel
+    /// over it.
+    thread_display: ThreadDisplay,
+    /// Fork-local: Focused Thread. Recomputed from the thread on every render.
+    activities: ThreadActivities,
+    /// Fork-local: Focused Thread. Tool calls that have ever asked the user for
+    /// permission. Their break in an Activity is permanent.
+    tool_calls_that_asked_permission: HashSet<acp::ToolCallId>,
     collapsed_sandbox_authorization_details: HashSet<acp::ToolCallId>,
     collapsed_sandbox_network_details: HashSet<acp::ToolCallId>,
     /// Sandbox escalation prompts whose "surprising Unicode" warning the user
@@ -1028,6 +1042,9 @@ impl ThreadView {
             last_token_limit_telemetry: None,
             thread_feedback: Default::default(),
             expanded_tool_call_raw_inputs: HashSet::default(),
+            thread_display: AgentSettings::get_global(cx).thread_display,
+            activities: ThreadActivities::default(),
+            tool_calls_that_asked_permission: HashSet::default(),
             collapsed_sandbox_authorization_details: HashSet::default(),
             collapsed_sandbox_network_details: HashSet::default(),
             acknowledged_confusable_warnings: HashSet::default(),
@@ -1288,14 +1305,14 @@ impl ThreadView {
     ) {
         match &event.view_event {
             ViewEvent::NewDiff(tool_call_id) => {
-                if AgentSettings::get_global(cx).expand_edit_card {
+                if AgentSettings::get_global(cx).expand_edit_card && self.cards_auto_expand() {
                     self.entry_view_state.update(cx, |state, _cx| {
                         state.expand_tool_call(tool_call_id.clone());
                     });
                 }
             }
             ViewEvent::NewTerminal(tool_call_id) => {
-                if AgentSettings::get_global(cx).expand_terminal_card {
+                if AgentSettings::get_global(cx).expand_terminal_card && self.cards_auto_expand() {
                     self.entry_view_state.update(cx, |state, _cx| {
                         state.expand_tool_call(tool_call_id.clone());
                     });
@@ -6636,13 +6653,30 @@ impl ThreadView {
             )
         };
 
+        // Fork-local: Focused Thread.
+        self.refresh_activities(cx);
+
         list(
             self.list_state.clone(),
             cx.processor(move |this, index: usize, window, cx| {
                 let entries = this.thread.read(cx).entries();
                 if let Some(entry) = entries.get(index) {
-                    let rendered = this.render_entry(index, entries.len(), entry, window, cx);
-                    centered_container(rendered.into_any_element()).into_any_element()
+                    // Fork-local: Focused Thread.
+                    let activity = this.activities.starts_at(index).cloned();
+                    let rendered = if this.entry_is_folded(index, cx) {
+                        this.render_folded_entry(index, entries.len(), entry, cx)
+                    } else {
+                        this.render_entry(index, entries.len(), entry, window, cx)
+                    };
+                    let rendered = match activity {
+                        Some(activity) => v_flex()
+                            .w_full()
+                            .child(this.render_activity_line(&activity, window, cx))
+                            .child(rendered)
+                            .into_any_element(),
+                        None => rendered.into_any_element(),
+                    };
+                    centered_container(rendered).into_any_element()
                 } else if this.generating_indicator_in_list {
                     let confirmation = this.thread.read(cx).is_waiting_for_confirmation()
                         || this.has_pending_request_elicitation(cx);
@@ -6655,6 +6689,297 @@ impl ThreadView {
         )
         .with_sizing_behavior(gpui::ListSizingBehavior::Auto)
         .flex_grow_1()
+    }
+
+    /// Fork-local: Focused Thread. Told to this thread by the panel that owns
+    /// the window's mode. Flipping the mode changes every entry's height, and
+    /// catches up the cards `expand_edit_card` and `expand_terminal_card` speak
+    /// for: their events fired once, back when the thread was read the other
+    /// way round.
+    pub(crate) fn set_thread_display(&mut self, display: ThreadDisplay, cx: &mut Context<Self>) {
+        if self.thread_display == display {
+            return;
+        }
+        self.thread_display = display;
+
+        let total_entries = self.thread.read(cx).entries().len();
+        if matches!(display, ThreadDisplay::Full) {
+            self.expand_cards_in(0..total_entries, cx);
+        }
+        self.list_state.remeasure_items(0..total_entries);
+        cx.notify();
+    }
+
+    /// Fork-local: Focused Thread. Rebuilt from the thread's entries rather
+    /// than maintained incrementally: it is one walk over a list the thread
+    /// already owns, and a stale fold would show the reader work that has
+    /// since been folded away.
+    fn refresh_activities(&mut self, cx: &App) {
+        let thread = self.thread.clone();
+        let entries = thread.read(cx).entries();
+
+        // Collected in both modes, because the only trace a tool call leaves of
+        // having asked for permission is the moment it asks: collect it in
+        // Focused alone and the fold would depend on which mode you happened to
+        // be in when the agent asked. A thread resumed from history carries no
+        // such trace at all, so there its Activities merge across permissions
+        // that were answered in an earlier run.
+        self.tool_calls_that_asked_permission
+            .extend(thread_activity::tool_calls_awaiting_permission(entries));
+
+        self.activities = match self.thread_display {
+            ThreadDisplay::Full => ThreadActivities::default(),
+            ThreadDisplay::Focused => ThreadActivities::new(thread_activity::entry_roles(
+                entries,
+                &self.tool_calls_that_asked_permission,
+                cx,
+            )),
+        };
+    }
+
+    /// Fork-local: Focused Thread. In Focused nothing in the list unfolds into
+    /// a card on its own: a lone tool call stays one line, and a Live Action
+    /// shows its label rather than streaming its output into the thread.
+    /// `expand_edit_card` and `expand_terminal_card` are applied instead when
+    /// an Activity is opened, by [`Self::expand_cards_in_activity`].
+    fn cards_auto_expand(&self) -> bool {
+        matches!(self.thread_display, ThreadDisplay::Full)
+    }
+
+    /// Fork-local: Focused Thread. Whether the entry is folded away right now.
+    /// A Live Action is never folded, so that the thread does not look idle
+    /// while the agent works.
+    fn entry_is_folded(&self, entry_ix: usize, cx: &App) -> bool {
+        let Some(activity) = self.activities.at(entry_ix) else {
+            return false;
+        };
+        if self
+            .entry_view_state
+            .read(cx)
+            .is_activity_expanded(&activity.key)
+        {
+            return false;
+        }
+        !self.activities.is_live(entry_ix)
+    }
+
+    /// Fork-local: Focused Thread. A folded entry draws nothing of its own, but
+    /// the turn controls anchored to it have to survive the fold: otherwise a
+    /// turn that ended in work rather than in Speech would lose its copy and
+    /// retry buttons. Mirrors the tail of [`Self::render_entry`].
+    fn render_folded_entry(
+        &self,
+        entry_ix: usize,
+        total_entries: usize,
+        entry: &AgentThreadEntry,
+        cx: &Context<Self>,
+    ) -> AnyElement {
+        let thread = self.thread.clone();
+        let is_generating = matches!(thread.read(cx).status(), ThreadStatus::Generating);
+        let is_turn_end = Self::entry_is_finalized_turn_end(thread.read(cx).entries(), entry_ix)
+            .unwrap_or(!is_generating);
+        let is_last = entry_ix + 1 == total_entries;
+
+        if !is_turn_end && !is_last {
+            return Empty.into_any();
+        }
+
+        let mut container = v_flex().w_full();
+
+        if is_turn_end {
+            let user_message_index = thread
+                .read(cx)
+                .entries()
+                .iter()
+                .take(entry_ix)
+                .rposition(|entry| matches!(entry, AgentThreadEntry::UserMessage(_)));
+
+            container = container.child(self.render_thread_controls(
+                &thread,
+                entry_ix,
+                Some(entry_ix),
+                is_last,
+                user_message_index,
+                cx,
+            ));
+        }
+
+        if is_last {
+            if !matches!(entry, AgentThreadEntry::AssistantMessage(_)) {
+                let last_assistant_index = thread
+                    .read(cx)
+                    .entries()
+                    .iter()
+                    .rposition(|entry| matches!(entry, AgentThreadEntry::AssistantMessage(_)));
+
+                container = container.child(self.render_thread_controls(
+                    &thread,
+                    entry_ix,
+                    last_assistant_index,
+                    true,
+                    None,
+                    cx,
+                ));
+            }
+
+            if let Some(editor) = self.thread_feedback.comments_editor.clone() {
+                container = container.child(Self::render_feedback_feedback_editor(editor, cx));
+            }
+        }
+
+        container.into_any_element()
+    }
+
+    /// Fork-local: Focused Thread. The line that stands in for one Activity:
+    /// how much of what kind was done, and a disclosure to see it.
+    fn render_activity_line(
+        &self,
+        activity: &Activity,
+        window: &Window,
+        cx: &Context<Self>,
+    ) -> AnyElement {
+        let is_open = self
+            .entry_view_state
+            .read(cx)
+            .is_activity_expanded(&activity.key);
+        let hover_group = SharedString::from("activity-line");
+        let summary = activity
+            .counts
+            .iter()
+            .map(|(kind, count)| kind.describe(*count))
+            .collect::<Vec<_>>()
+            .join(", ");
+        let tooltip = if is_open {
+            format!("Fold away {summary}")
+        } else {
+            format!("Show {summary}")
+        };
+        let key = activity.key.clone();
+
+        div()
+            .px_5()
+            .py_1()
+            .w_full()
+            .child(
+                h_flex()
+                    .id(("activity-line", activity.range.start))
+                    .group(&hover_group)
+                    .w_full()
+                    .pr_1()
+                    .justify_between()
+                    .child(
+                        h_flex()
+                            .h(window.line_height() - px(2.))
+                            .gap_2()
+                            .overflow_hidden()
+                            .children(activity.counts.iter().map(|(kind, count)| {
+                                h_flex()
+                                    .gap_0p5()
+                                    .child(
+                                        Icon::new(kind.icon())
+                                            .size(IconSize::Small)
+                                            .color(Color::Muted),
+                                    )
+                                    .child(
+                                        div()
+                                            .text_size(self.tool_name_font_size())
+                                            .text_color(cx.theme().colors().text_muted)
+                                            .child(count.to_string()),
+                                    )
+                            })),
+                    )
+                    .child(
+                        Disclosure::new(("activity-disclosure", activity.range.start), is_open)
+                            .opened_icon(IconName::ChevronUp)
+                            .closed_icon(IconName::ChevronDown)
+                            .visible_on_hover(&hover_group)
+                            .on_click(cx.listener({
+                                let key = key.clone();
+                                move |this, _event: &ClickEvent, window, cx| {
+                                    this.toggle_activity_expansion(&key, window, cx);
+                                }
+                            })),
+                    )
+                    .tooltip(Tooltip::text(tooltip))
+                    .on_click(cx.listener(move |this, _event: &ClickEvent, window, cx| {
+                        this.toggle_activity_expansion(&key, window, cx);
+                    })),
+            )
+            .into_any_element()
+    }
+
+    /// Fork-local: Focused Thread. Opening an Activity is where
+    /// `expand_edit_card` and `expand_terminal_card` finally get their say: the
+    /// cards they speak for exist only once the Activity they sit in is open.
+    fn expand_cards_in(&mut self, range: Range<usize>, cx: &mut Context<Self>) {
+        let settings = AgentSettings::get_global(cx);
+        let expand_edit_card = settings.expand_edit_card;
+        let expand_terminal_card = settings.expand_terminal_card;
+        if !expand_edit_card && !expand_terminal_card {
+            return;
+        }
+
+        let thread = self.thread.clone();
+        let to_expand: Vec<acp::ToolCallId> = thread
+            .read(cx)
+            .entries()
+            .get(range)
+            .unwrap_or_default()
+            .iter()
+            .filter_map(|entry| {
+                let AgentThreadEntry::ToolCall(tool_call) = entry else {
+                    return None;
+                };
+                let has_card = tool_call.content.iter().any(|content| match content {
+                    ToolCallContent::Diff(_) => expand_edit_card,
+                    ToolCallContent::Terminal(_) => expand_terminal_card,
+                    ToolCallContent::ContentBlock(_) => false,
+                });
+                has_card.then(|| tool_call.id.clone())
+            })
+            .collect();
+
+        self.entry_view_state.update(cx, |state, _cx| {
+            for tool_call_id in to_expand {
+                state.expand_tool_call(tool_call_id);
+            }
+        });
+    }
+
+    /// Fork-local: Focused Thread.
+    fn toggle_activity_expansion(
+        &mut self,
+        key: &acp::ToolCallId,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        let Some(range) = self
+            .activities
+            .iter()
+            .find(|activity| activity.key == *key)
+            .map(|activity| activity.range.clone())
+        else {
+            return;
+        };
+
+        let opening = !self.entry_view_state.read(cx).is_activity_expanded(key);
+        if opening {
+            // Opening an Activity while the thread is following the agent would
+            // otherwise yank the reader to the bottom of what just appeared,
+            // which is the opposite of why they opened it.
+            if self.list_state.is_following_tail() {
+                self.list_state.pause_following_tail();
+            }
+            self.expand_cards_in(range.clone(), cx);
+        }
+        self.entry_view_state.update(cx, |state, _cx| {
+            state.toggle_activity_expansion(key);
+        });
+        // Every entry in the Activity just changed height, and the list caches
+        // what it measured.
+        self.list_state.remeasure_items(range);
+        self.refresh_thread_search(window, cx);
+        cx.notify();
     }
 
     fn render_entry(

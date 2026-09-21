@@ -610,6 +610,7 @@ mod tests {
             show_merge_conflict_indicator: true,
             sidebar_side: Default::default(),
             thinking_display: Default::default(),
+            thread_display: Default::default(),
             // Local: voice dictation has no say in tool permissions.
             dictation: agent_settings::DictationSettings {
                 model_path: None,
@@ -622,6 +623,8 @@ mod tests {
                 post_processing_enabled: false,
                 post_processing_model: None,
                 post_processing_prompt: String::new(),
+                post_processing_agent: None,
+                post_processing_agent_options_cache: Default::default(),
             },
         }
     }

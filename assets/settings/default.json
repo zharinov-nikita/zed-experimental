@@ -1411,6 +1411,12 @@
     //
     // Default: auto
     "thinking_display": "auto",
+    // How much of what the agent did is shown in the thread in the agent panel.
+    // "full" lays out every tool call, thought and card; "focused" folds runs of
+    // work the agent did without addressing you into a single line each.
+    //
+    // Default: focused
+    "thread_display": "focused",
     // Whether clicking the stop button on a running terminal tool should also cancel the agent's generation.
     // Note that this only applies to the stop button, not to ctrl+c inside the terminal.
     //

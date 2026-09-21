@@ -52,7 +52,7 @@ use crate::{
     AgentDiffPane, ConversationView, CopyThreadToClipboard, Follow, LoadThreadFromClipboard,
     NewTerminalThread, NewThread, OpenActiveThreadAsMarkdown, OpenAgentDiff, ResetFastModeWarnings,
     ResetTrialEndUpsell, ResetTrialUpsell, ShowAllSidebarThreadMetadata, ShowThreadMetadata,
-    ToggleNewThreadMenu, ToggleOptionsMenu,
+    ToggleNewThreadMenu, ToggleOptionsMenu, ToggleThreadDisplay,
     conversation_view::{
         AcpThreadViewEvent, RootThreadUpdated, ThreadView, reset_fast_mode_warnings,
     },
@@ -84,7 +84,7 @@ use language_model::LanguageModelRegistry;
 use notifications::status_toast::StatusToast;
 use project::{Project, ProjectPath, Worktree};
 use settings::TerminalDockPosition;
-use settings::{NotifyWhenAgentWaiting, Settings, update_settings_file};
+use settings::{NotifyWhenAgentWaiting, Settings, ThreadDisplay, update_settings_file};
 
 use search::{BufferSearchBar, buffer_search::Deploy as DeployBufferSearch};
 use terminal::{Event as TerminalEvent, terminal_settings::TerminalSettings};
@@ -460,6 +460,14 @@ pub fn init(cx: &mut App) {
 
                     if let Some(thread) = thread {
                         AgentDiffPane::deploy_in_workspace(thread, workspace, window, cx);
+                    }
+                })
+                // Fork-local: Focused Thread.
+                .register_action(|workspace, _: &ToggleThreadDisplay, window, cx| {
+                    if let Some(panel) = workspace.panel::<AgentPanel>(cx) {
+                        panel.update(cx, |panel, cx| {
+                            panel.toggle_thread_display(&ToggleThreadDisplay, window, cx);
+                        });
                     }
                 })
                 .register_action(|workspace, _: &ToggleOptionsMenu, window, cx| {
@@ -1186,6 +1194,11 @@ pub struct AgentPanel {
     _active_draft_reclaim_observation: Option<Subscription>,
     _thread_metadata_store_subscription: Subscription,
     last_context_source: Option<AgentContextSource>,
+    /// Fork-local: Focused Thread. Set by this window's toggle, which wins over
+    /// the `agent.thread_display` setting until Zed restarts. Deliberately not
+    /// persisted: a toggle that quietly rewrites your settings is a way to be
+    /// surprised later.
+    thread_display_override: Option<ThreadDisplay>,
 
     is_active: bool,
 }
@@ -1584,6 +1597,7 @@ impl AgentPanel {
             pending_terminal_spawn: None,
             new_thread_menu_handle: PopoverMenuHandle::default(),
             agent_panel_menu_handle: PopoverMenuHandle::default(),
+            thread_display_override: None,
 
             _extension_subscription: extension_subscription,
             _project_subscription,
@@ -3601,6 +3615,31 @@ impl AgentPanel {
             active_thread.expand_message_editor(&ExpandMessageEditor, window, cx);
             active_thread.activation_focus_handle(cx).focus(window, cx);
         })
+    }
+
+    /// Fork-local: Focused Thread. The one place the mode is resolved, so that
+    /// the panel and the thread it holds cannot disagree about it.
+    pub fn thread_display(&self, cx: &App) -> ThreadDisplay {
+        self.thread_display_override
+            .unwrap_or_else(|| AgentSettings::get_global(cx).thread_display)
+    }
+
+    /// Fork-local: Focused Thread. The mode is a property of this window rather
+    /// than of a thread, so that a thread does not read one way here and
+    /// another way there for no visible reason.
+    pub fn toggle_thread_display(
+        &mut self,
+        _: &ToggleThreadDisplay,
+        _window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        self.thread_display_override = Some(match self.thread_display(cx) {
+            ThreadDisplay::Full => ThreadDisplay::Focused,
+            ThreadDisplay::Focused => ThreadDisplay::Full,
+        });
+        // The thread hears about it from the toolbar on the next frame, which
+        // is also what keeps a thread opened later in this window in step.
+        cx.notify();
     }
 
     pub fn toggle_options_menu(
@@ -5842,6 +5881,8 @@ impl AgentPanel {
 
     fn render_toolbar(&self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let agent_server_store = self.project.read(cx).agent_server_store().clone();
+        // Fork-local: Focused Thread.
+        let thread_display = self.thread_display(cx);
 
         let focus_handle = self.focus_handle(cx);
 
@@ -6167,11 +6208,42 @@ impl AgentPanel {
                 .with_handle(self.new_thread_menu_handle.clone())
                 .menu(move |window, cx| new_thread_menu_builder(window, cx));
 
+            // Fork-local: Focused Thread.
+            let is_focused_thread = matches!(thread_display, ThreadDisplay::Focused);
+            let thread_display_button =
+                IconButton::new("toggle-thread-display", IconName::ListCollapse)
+                    .icon_size(IconSize::Small)
+                    .toggle_state(is_focused_thread)
+                    .tooltip({
+                        let focus_handle = self.focus_handle.clone();
+                        move |_window, cx| {
+                            Tooltip::for_action_in(
+                                if is_focused_thread {
+                                    "Lay Out Everything The Agent Did"
+                                } else {
+                                    "Fold Away What The Agent Did"
+                                },
+                                &ToggleThreadDisplay,
+                                &focus_handle,
+                                cx,
+                            )
+                        }
+                    })
+                    .on_click(cx.listener(|this, _event, window, cx| {
+                        this.toggle_thread_display(&ToggleThreadDisplay, window, cx);
+                    }));
+
             let sandbox_status = self
                 .active_conversation_view()
                 .and_then(|conversation_view| conversation_view.read(cx).root_thread_view())
                 .and_then(|thread_view| {
-                    thread_view.update(cx, |thread_view, cx| thread_view.render_sandbox_status(cx))
+                    // Fork-local: Focused Thread. The mode belongs to the
+                    // window, so the panel hands it to whichever thread it is
+                    // showing rather than having the thread reach back for it.
+                    thread_view.update(cx, |thread_view, cx| {
+                        thread_view.set_thread_display(thread_display, cx);
+                        thread_view.render_sandbox_status(cx)
+                    })
                 });
 
             base_container
@@ -6198,6 +6270,7 @@ impl AgentPanel {
                         .gap_1()
                         .children(sandbox_status)
                         .when(can_create_entries, |this| this.child(new_thread_menu))
+                        .child(thread_display_button)
                         .child(full_screen_button)
                         .child(self.render_panel_options_menu(window, cx)),
                 )

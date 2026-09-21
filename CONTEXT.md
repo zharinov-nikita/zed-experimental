@@ -1,6 +1,6 @@
-# Zed Experimental — Voice Dictation
+# Zed Experimental
 
-Fork-local feature: the user speaks instead of typing, and the speech becomes the text of a prompt in the AI agent panel composer. The user's voice never leaves the machine; the transcript does only if the user points Post-processing at something remote.
+Fork-local features for the owner's own use. **Voice Dictation**: the user speaks instead of typing, and the speech becomes the text of a prompt in the AI agent panel composer — the voice never leaves the machine, and the transcript does only if the user points Post-processing at something remote. **Focused Thread**: a way of reading a Thread in which everything the agent did, rather than said, folds out of the way.
 
 ## Language
 
@@ -114,7 +114,7 @@ _Avoid_: Message editor, input box, prompt field
 
 **Agent Question**:
 A question the agent asks the user in the middle of its work and waits to have answered before it continues. Shown as a card in the agent panel; the user answers there, not in the Composer.
-_Avoid_: Elicitation, prompt, permission request, form
+_Avoid_: Elicitation, prompt, form
 
 **Answer Field**:
 A text field inside an Agent Question where the user writes the answer. Dictation can go into it the same way it goes into the Composer, but the result is plain text, not a Dictation Block.
@@ -133,3 +133,29 @@ _Avoid_: Selection, excerpt, citation
 **Quote Reply Block**:
 A Quoted Fragment and the dictated comment on it, kept together as one unit in the Composer and in the sent message, so it is always clear what the comment refers to. Only the comment can be resumed or edited; the fragment stays as selected.
 _Avoid_: Quote with audio, annotated quote, reply chip
+
+### Focused Thread (adjacent feature, designed after Quote Reply)
+
+**Thread**:
+Everything one conversation with the agent has produced, shown as a single list in the agent panel: the user's messages, the agent's Speech, and everything the agent did in between.
+_Avoid_: Chat, conversation, history, log
+
+**Focused**:
+A way of reading a Thread in which every run of work the agent did folds into an Activity, so that Speech, Agent Questions, Permission Requests and failures are all that remain in the list. Its opposite is Full, where the Thread reads as it does upstream.
+_Avoid_: Quiet mode, compact mode, clean view, minimal, distraction-free
+
+**Speech**:
+What the agent says to the user, as opposed to what it does. Never folded, and its presence is what ends an Activity.
+_Avoid_: Text, message, prose, response, output
+
+**Activity**:
+One unbroken run of work the agent did without addressing the user, shown in Focused as a single line saying how much of what kind was done, which opens on demand. It is ended by Speech, a user message, an Agent Question, a Permission Request, or a failure — never by the kind of work itself, so a thought between two tool calls stays inside it.
+_Avoid_: Group, batch, trace, bundle, collapsed tools
+
+**Permission Request**:
+The agent asking to be allowed to run one particular tool call, answered with buttons on that call. Distinct from an Agent Question, which asks the user for information rather than for permission; both are always visible, but only a Permission Request is attached to a single tool call and leaves a permanent mark in the Thread once answered.
+_Avoid_: Confirmation, elicitation, approval prompt, Agent Question
+
+**Live Action**:
+A tool call the agent is running right now, shown as its own line beneath the Activity it will join, so that a Focused Thread never looks idle while the agent works. There is one line per call in flight, so an agent running several at once shows several.
+_Avoid_: Spinner, status line, current tool, progress row

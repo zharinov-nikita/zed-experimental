@@ -48,6 +48,9 @@ pub struct EntryViewState {
     user_toggled_thinking_blocks: HashSet<(usize, usize)>,
     expanded_compactions: HashSet<usize>,
     expanded_tool_calls: HashSet<acp::ToolCallId>,
+    // Fork-local: Focused Thread. Keyed by the id of the Activity's first tool
+    // call, so it survives further work arriving in the same Activity.
+    expanded_activities: HashSet<acp::ToolCallId>,
 }
 
 impl EntryViewState {
@@ -70,6 +73,7 @@ impl EntryViewState {
             user_toggled_thinking_blocks: HashSet::default(),
             expanded_compactions: HashSet::default(),
             expanded_tool_calls: HashSet::default(),
+            expanded_activities: HashSet::default(),
         }
     }
 
@@ -88,6 +92,17 @@ impl EntryViewState {
     pub(crate) fn toggle_tool_call_expansion(&mut self, tool_call_id: &acp::ToolCallId) {
         if !self.expanded_tool_calls.remove(tool_call_id) {
             self.expanded_tool_calls.insert(tool_call_id.clone());
+        }
+    }
+
+    // Fork-local: Focused Thread.
+    pub(crate) fn is_activity_expanded(&self, key: &acp::ToolCallId) -> bool {
+        self.expanded_activities.contains(key)
+    }
+
+    pub(crate) fn toggle_activity_expansion(&mut self, key: &acp::ToolCallId) {
+        if !self.expanded_activities.remove(key) {
+            self.expanded_activities.insert(key.clone());
         }
     }
 

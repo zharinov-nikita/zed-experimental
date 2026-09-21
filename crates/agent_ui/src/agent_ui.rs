@@ -224,6 +224,9 @@ actions!(
         ToggleNewThreadMenu,
         /// Toggles the options menu for agent settings and preferences.
         ToggleOptionsMenu,
+        /// Fork-local: Focused Thread. Toggles between folding the agent's work
+        /// into Activity lines and laying all of it out.
+        ToggleThreadDisplay,
         /// Toggles the profile or mode selector for switching between agent profiles.
         ToggleProfileSelector,
         /// Cycles through available session modes.
@@ -1035,6 +1038,7 @@ mod tests {
             show_merge_conflict_indicator: true,
             sidebar_side: Default::default(),
             thinking_display: Default::default(),
+            thread_display: Default::default(),
         };
 
         cx.update(|cx| {

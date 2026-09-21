@@ -19,7 +19,7 @@ use settings::{
     AgentConfigOptionValue, DictationAgentOptionContent, DictationLanguage, DockPosition, DockSide,
     IntoGpui, LanguageModelParameters, LanguageModelSelection, NotifyWhenAgentWaiting,
     PlaySoundWhenAgentDone, RegisterSetting, Settings, SettingsContent, SettingsStore,
-    SidebarDockPosition, SidebarSide, ThinkingBlockDisplay, ToolPermissionMode,
+    SidebarDockPosition, SidebarSide, ThinkingBlockDisplay, ThreadDisplay, ToolPermissionMode,
     update_settings_file, update_settings_file_with_completion,
 };
 use util::ResultExt as _;
@@ -268,6 +268,8 @@ pub struct AgentSettings {
     pub expand_terminal_card: bool,
     pub terminal_init_command: Option<String>,
     pub thinking_display: ThinkingBlockDisplay,
+    // Fork-local: Focused Thread.
+    pub thread_display: ThreadDisplay,
     pub cancel_generation_on_terminal_stop: bool,
     pub use_modifier_to_send: bool,
     pub message_editor_min_lines: usize,
@@ -877,6 +879,7 @@ impl Settings for AgentSettings {
                 .terminal_init_command
                 .filter(|command| !command.trim().is_empty()),
             thinking_display: agent.thinking_display.unwrap(),
+            thread_display: agent.thread_display.unwrap(),
             cancel_generation_on_terminal_stop: agent.cancel_generation_on_terminal_stop.unwrap(),
             use_modifier_to_send: agent.use_modifier_to_send.unwrap(),
             message_editor_min_lines: agent.message_editor_min_lines.unwrap(),
