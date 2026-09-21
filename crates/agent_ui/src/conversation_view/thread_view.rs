@@ -8,7 +8,7 @@ use crate::{
 use agent_client_protocol::schema::v1 as acp;
 
 // Fork-local: Focused Thread.
-use super::thread_activity::{self, Activity, EntryFold, ThreadActivities};
+use super::thread_activity::{self, Activity, CompactCall, EntryFold, ThreadActivities};
 use settings::ThreadDisplay;
 use std::cell::RefCell;
 use std::ops::Range;
@@ -6663,21 +6663,17 @@ impl ThreadView {
                 if let Some(entry) = entries.get(index) {
                     // Fork-local: Focused Thread.
                     let activity = this.activities.starts_at(index).cloned();
-                    let rendered = match this.entry_fold(index, cx) {
+                    let rendered = match this.entry_fold(index, entry, cx) {
                         EntryFold::Shown => {
                             this.render_entry(index, entries.len(), entry, window, cx)
                         }
                         EntryFold::Folded => {
                             this.render_folded_entry(index, entries.len(), entry, cx)
                         }
-                        EntryFold::LiveLine(activity_key) => match entry {
-                            AgentThreadEntry::ToolCall(tool_call) => this.render_live_action_line(
-                                index,
-                                tool_call,
-                                activity_key,
-                                window,
-                                cx,
-                            ),
+                        EntryFold::Line(compact) => match entry {
+                            AgentThreadEntry::ToolCall(tool_call) => {
+                                this.render_compact_call_line(index, tool_call, compact, window, cx)
+                            }
                             _ => this.render_folded_entry(index, entries.len(), entry, cx),
                         },
                     };
@@ -6761,7 +6757,23 @@ impl ThreadView {
     }
 
     /// Fork-local: Focused Thread. What the list does with one entry.
-    fn entry_fold(&self, entry_ix: usize, cx: &App) -> EntryFold {
+    fn entry_fold(&self, entry_ix: usize, entry: &AgentThreadEntry, cx: &App) -> EntryFold {
+        // A failure ends the Activity it borders, so it is never inside one.
+        // That keeps it easy to find, which is not the same as wanting to read
+        // the command that failed.
+        if let AgentThreadEntry::ToolCall(tool_call) = entry
+            && matches!(
+                tool_call.status,
+                ToolCallStatus::Failed | ToolCallStatus::Rejected
+            )
+            && !self
+                .entry_view_state
+                .read(cx)
+                .is_tool_call_expanded(&tool_call.id)
+        {
+            return EntryFold::Line(CompactCall::Failed);
+        }
+
         let Some(activity) = self.activities.at(entry_ix) else {
             return EntryFold::Shown;
         };
@@ -6773,7 +6785,9 @@ impl ThreadView {
             return EntryFold::Shown;
         }
         if self.activities.is_live(entry_ix) {
-            return EntryFold::LiveLine(activity.key.clone());
+            return EntryFold::Line(CompactCall::Live {
+                activity: activity.key.clone(),
+            });
         }
         EntryFold::Folded
     }
@@ -6802,22 +6816,51 @@ impl ThreadView {
         }
     }
 
-    /// Fork-local: Focused Thread. The line a Live Action gets while the
-    /// Activity it will join is folded. Clicking it opens that Activity, which
-    /// is also the way to see what the call is printing.
-    fn render_live_action_line(
+    /// Fork-local: Focused Thread. One line instead of a whole call: for a
+    /// call running now, and for one that failed. Both say which call it is and
+    /// nothing else; the click is how you see the rest.
+    fn render_compact_call_line(
         &self,
         entry_ix: usize,
         tool_call: &ToolCall,
-        activity_key: acp::ToolCallId,
+        compact: CompactCall,
         window: &Window,
         cx: &Context<Self>,
     ) -> AnyElement {
         let label = Self::one_line_label(&tool_call.label, cx);
-        let kind = thread_activity::ActivityToolKind::from_tool_call(
-            &tool_call.kind,
-            tool_call.is_subagent(),
-        );
+        let failed = matches!(compact, CompactCall::Failed);
+        let icon = if failed {
+            IconName::Close
+        } else {
+            thread_activity::ActivityToolKind::from_tool_call(
+                &tool_call.kind,
+                tool_call.is_subagent(),
+            )
+            .icon()
+        };
+        let color = if failed { Color::Error } else { Color::Muted };
+        let tooltip = if failed {
+            "Failed — click to see why"
+        } else {
+            "Running now — click to watch it"
+        };
+
+        let text = Label::new(label)
+            .buffer_font(cx)
+            .size(LabelSize::Small)
+            .color(color);
+        let text = if failed {
+            text.into_any_element()
+        } else {
+            text.with_animation(
+                ("compact-call-label", entry_ix),
+                Animation::new(Duration::from_secs(2))
+                    .repeat()
+                    .with_easing(pulsating_between(0.3, 0.7)),
+                |label, delta| label.alpha(delta),
+            )
+            .into_any_element()
+        };
 
         div()
             .px_5()
@@ -6825,34 +6868,28 @@ impl ThreadView {
             .w_full()
             .child(
                 h_flex()
-                    .id(("live-action", entry_ix))
+                    .id(("compact-call", entry_ix))
                     .w_full()
                     .gap_1p5()
                     .h(window.line_height() - px(2.))
                     .overflow_hidden()
-                    .child(
-                        Icon::new(kind.icon())
-                            .size(IconSize::Small)
-                            .color(Color::Muted),
-                    )
-                    .child(
-                        div().min_w_0().overflow_hidden().child(
-                            Label::new(label)
-                                .buffer_font(cx)
-                                .size(LabelSize::Small)
-                                .color(Color::Muted)
-                                .with_animation(
-                                    ("live-action-label", entry_ix),
-                                    Animation::new(Duration::from_secs(2))
-                                        .repeat()
-                                        .with_easing(pulsating_between(0.3, 0.7)),
-                                    |label, delta| label.alpha(delta),
-                                ),
-                        ),
-                    )
-                    .tooltip(Tooltip::text("Running now — click to watch it"))
-                    .on_click(cx.listener(move |this, _event: &ClickEvent, window, cx| {
-                        this.toggle_activity_expansion(&activity_key, window, cx);
+                    .child(Icon::new(icon).size(IconSize::Small).color(color))
+                    .child(div().min_w_0().overflow_hidden().child(text))
+                    .tooltip(Tooltip::text(tooltip))
+                    .on_click(cx.listener({
+                        let tool_call_id = tool_call.id.clone();
+                        move |this, _event: &ClickEvent, window, cx| match &compact {
+                            CompactCall::Live { activity } => {
+                                this.toggle_activity_expansion(activity, window, cx);
+                            }
+                            CompactCall::Failed => {
+                                this.entry_view_state.update(cx, |state, _cx| {
+                                    state.expand_tool_call(tool_call_id.clone());
+                                });
+                                this.refresh_thread_search(window, cx);
+                                cx.notify();
+                            }
+                        }
                     })),
             )
             .into_any_element()

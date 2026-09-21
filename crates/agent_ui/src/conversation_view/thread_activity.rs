@@ -214,10 +214,20 @@ pub enum EntryFold {
     Shown,
     /// Hidden behind its Activity's line.
     Folded,
-    /// A Live Action: a line of its own, so that the thread does not look idle
-    /// while the agent works. Carries the key of the Activity it will join, so
-    /// that clicking the line opens it.
-    LiveLine(acp::ToolCallId),
+    /// One line instead of the whole call.
+    Line(CompactCall),
+}
+
+/// Why a call is down to one line, and what opening that line opens.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum CompactCall {
+    /// Running now, so the thread does not look idle while the agent works.
+    /// Opens the Activity it will join, which is where its output appears.
+    Live { activity: acp::ToolCallId },
+    /// Failed or rejected. It stands outside every Activity so that it is easy
+    /// to find, but finding it should not mean reading the whole call, so
+    /// opening it opens the call itself.
+    Failed,
 }
 
 /// One unbroken run of work the agent did without addressing the user.
