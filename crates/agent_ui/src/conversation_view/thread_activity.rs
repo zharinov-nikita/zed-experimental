@@ -198,6 +198,19 @@ pub fn tool_calls_awaiting_permission(
     })
 }
 
+/// What the thread does with one entry in Focused.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum EntryFold {
+    /// Drawn as it is in Full: outside every Activity, or inside an open one.
+    Shown,
+    /// Hidden behind its Activity's line.
+    Folded,
+    /// A Live Action: a line of its own, so that the thread does not look idle
+    /// while the agent works. Carries the key of the Activity it will join, so
+    /// that clicking the line opens it.
+    LiveLine(acp::ToolCallId),
+}
+
 /// One unbroken run of work the agent did without addressing the user.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Activity {

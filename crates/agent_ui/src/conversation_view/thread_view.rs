@@ -8,7 +8,7 @@ use crate::{
 use agent_client_protocol::schema::v1 as acp;
 
 // Fork-local: Focused Thread.
-use super::thread_activity::{self, Activity, ThreadActivities};
+use super::thread_activity::{self, Activity, EntryFold, ThreadActivities};
 use settings::ThreadDisplay;
 use std::cell::RefCell;
 use std::ops::Range;
@@ -6663,10 +6663,23 @@ impl ThreadView {
                 if let Some(entry) = entries.get(index) {
                     // Fork-local: Focused Thread.
                     let activity = this.activities.starts_at(index).cloned();
-                    let rendered = if this.entry_is_folded(index, cx) {
-                        this.render_folded_entry(index, entries.len(), entry, cx)
-                    } else {
-                        this.render_entry(index, entries.len(), entry, window, cx)
+                    let rendered = match this.entry_fold(index, cx) {
+                        EntryFold::Shown => {
+                            this.render_entry(index, entries.len(), entry, window, cx)
+                        }
+                        EntryFold::Folded => {
+                            this.render_folded_entry(index, entries.len(), entry, cx)
+                        }
+                        EntryFold::LiveLine(activity_key) => match entry {
+                            AgentThreadEntry::ToolCall(tool_call) => this.render_live_action_line(
+                                index,
+                                tool_call,
+                                activity_key,
+                                window,
+                                cx,
+                            ),
+                            _ => this.render_folded_entry(index, entries.len(), entry, cx),
+                        },
                     };
                     let rendered = match activity {
                         Some(activity) => v_flex()
@@ -6746,21 +6759,102 @@ impl ThreadView {
         matches!(self.thread_display, ThreadDisplay::Full)
     }
 
-    /// Fork-local: Focused Thread. Whether the entry is folded away right now.
-    /// A Live Action is never folded, so that the thread does not look idle
-    /// while the agent works.
-    fn entry_is_folded(&self, entry_ix: usize, cx: &App) -> bool {
+    /// Fork-local: Focused Thread. What the list does with one entry.
+    fn entry_fold(&self, entry_ix: usize, cx: &App) -> EntryFold {
         let Some(activity) = self.activities.at(entry_ix) else {
-            return false;
+            return EntryFold::Shown;
         };
         if self
             .entry_view_state
             .read(cx)
             .is_activity_expanded(&activity.key)
         {
-            return false;
+            return EntryFold::Shown;
         }
-        !self.activities.is_live(entry_ix)
+        if self.activities.is_live(entry_ix) {
+            return EntryFold::LiveLine(activity.key.clone());
+        }
+        EntryFold::Folded
+    }
+
+    /// Fork-local: Focused Thread. The agent's own label for a call, cut down to
+    /// one line. A terminal call's label is its whole command, and a command
+    /// can be thirty lines, which is what the fold exists to get rid of.
+    fn one_line_label(label: &Entity<Markdown>, cx: &App) -> SharedString {
+        const MAX_CHARACTERS: usize = 90;
+
+        let source = label.read(cx).source();
+        let line = source
+            .trim()
+            .trim_start_matches("```")
+            .trim_end_matches("```")
+            .lines()
+            .map(str::trim)
+            .find(|line| !line.is_empty())
+            .unwrap_or_default();
+
+        if line.chars().count() > MAX_CHARACTERS {
+            let kept: String = line.chars().take(MAX_CHARACTERS).collect();
+            format!("{kept}\u{2026}").into()
+        } else {
+            line.to_string().into()
+        }
+    }
+
+    /// Fork-local: Focused Thread. The line a Live Action gets while the
+    /// Activity it will join is folded. Clicking it opens that Activity, which
+    /// is also the way to see what the call is printing.
+    fn render_live_action_line(
+        &self,
+        entry_ix: usize,
+        tool_call: &ToolCall,
+        activity_key: acp::ToolCallId,
+        window: &Window,
+        cx: &Context<Self>,
+    ) -> AnyElement {
+        let label = Self::one_line_label(&tool_call.label, cx);
+        let kind = thread_activity::ActivityToolKind::from_tool_call(
+            &tool_call.kind,
+            tool_call.is_subagent(),
+        );
+
+        div()
+            .px_5()
+            .py_1()
+            .w_full()
+            .child(
+                h_flex()
+                    .id(("live-action", entry_ix))
+                    .w_full()
+                    .gap_1p5()
+                    .h(window.line_height() - px(2.))
+                    .overflow_hidden()
+                    .child(
+                        Icon::new(kind.icon())
+                            .size(IconSize::Small)
+                            .color(Color::Muted),
+                    )
+                    .child(
+                        div().min_w_0().overflow_hidden().child(
+                            Label::new(label)
+                                .buffer_font(cx)
+                                .size(LabelSize::Small)
+                                .color(Color::Muted)
+                                .with_animation(
+                                    ("live-action-label", entry_ix),
+                                    Animation::new(Duration::from_secs(2))
+                                        .repeat()
+                                        .with_easing(pulsating_between(0.3, 0.7)),
+                                    |label, delta| label.alpha(delta),
+                                ),
+                        ),
+                    )
+                    .tooltip(Tooltip::text("Running now — click to watch it"))
+                    .on_click(cx.listener(move |this, _event: &ClickEvent, window, cx| {
+                        this.toggle_activity_expansion(&activity_key, window, cx);
+                    })),
+            )
+            .into_any_element()
     }
 
     /// Fork-local: Focused Thread. A folded entry draws nothing of its own, but

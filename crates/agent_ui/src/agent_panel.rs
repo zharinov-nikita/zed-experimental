@@ -7223,6 +7223,12 @@ mod tests {
             panel
         });
         open_thread_with_connection(&panel, connection.clone(), cx);
+        // Fork-local: Focused Thread. This test is about what clicking a tool
+        // call's output does, so the thread has to be laid out rather than
+        // folded into an Activity line.
+        panel.update_in(cx, |panel, _window, _cx| {
+            panel.thread_display_override = Some(ThreadDisplay::Full);
+        });
 
         let session_id = active_session_id(&panel, cx);
         let tool_call_id = acp::ToolCallId::new("tool-call-output-focus-regression");
