@@ -159,3 +159,13 @@ _Avoid_: Confirmation, elicitation, approval prompt, Agent Question
 **Live Action**:
 A tool call the agent is running right now, shown as its own line beneath the Activity it will join, so that a Focused Thread never looks idle while the agent works. There is one line per call in flight, so an agent running several at once shows several.
 _Avoid_: Spinner, status line, current tool, progress row
+
+### Thread Outline (adjacent feature, designed after Focused Thread)
+
+**Exchange**:
+One of the user's messages together with everything the agent said and did in answer to it, up to the user's next message. The unit the Thread Outline lists. A Thread is a run of Exchanges; anything the agent put in before the user's first message belongs to none of them.
+_Avoid_: Turn, round, pair, block, conversation
+
+**Thread Outline**:
+The list of a Thread's Exchanges, opened over the window to pick one and go to it. It shows the user's own words and nothing else — newest first until the user types, then best match first — and narrows as they type. Picking an Exchange puts the user's message at the top of the Thread.
+_Avoid_: Palette, index, minimap, table of contents, jump list

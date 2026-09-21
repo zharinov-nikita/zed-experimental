@@ -9,6 +9,7 @@ use agent_client_protocol::schema::v1 as acp;
 
 // Fork-local: Focused Thread.
 use super::thread_activity::{self, Activity, CompactCall, EntryFold, ThreadActivities};
+use super::thread_outline;
 use settings::ThreadDisplay;
 use std::cell::RefCell;
 use std::ops::Range;
@@ -6754,6 +6755,44 @@ impl ThreadView {
     /// an Activity is opened, by [`Self::expand_cards_in_activity`].
     fn cards_auto_expand(&self) -> bool {
         matches!(self.thread_display, ThreadDisplay::Full)
+    }
+
+    /// Fork-local: Thread Outline. Every Exchange of this thread, newest
+    /// first.
+    pub(crate) fn exchanges(&self, cx: &App) -> Vec<thread_outline::Exchange> {
+        let entries = self.thread.read(cx).entries();
+        thread_outline::exchanges(entries.iter().enumerate().filter_map(|(entry_ix, entry)| {
+            let AgentThreadEntry::UserMessage(message) = entry else {
+                return None;
+            };
+            // Not every user message is the user's: a skill or MCP prompt is
+            // shown as an indented one, and listing those would both add rows
+            // nobody wrote and split the Exchange they sit inside. Indentation
+            // is the only signal that survives a thread being read back from
+            // history, where every message the user ever sent arrives from the
+            // agent with no local id on it.
+            if message.indented {
+                return None;
+            }
+            Some((entry_ix, message.content.to_markdown(cx)))
+        }))
+    }
+
+    /// Fork-local: Thread Outline. The entry at the top of the viewport, which
+    /// stands for where the reader is.
+    pub(crate) fn top_visible_entry(&self) -> usize {
+        self.list_state.logical_scroll_top().item_ix
+    }
+
+    /// Fork-local: Thread Outline. Picking an Exchange means wanting to read
+    /// from it, so its message goes to the top rather than being merely
+    /// revealed.
+    pub(crate) fn scroll_to_entry(&mut self, entry_ix: usize, cx: &mut Context<Self>) {
+        self.list_state.scroll_to(ListOffset {
+            item_ix: entry_ix,
+            offset_in_item: px(0.),
+        });
+        cx.notify();
     }
 
     /// Fork-local: Focused Thread. What the list does with one entry.

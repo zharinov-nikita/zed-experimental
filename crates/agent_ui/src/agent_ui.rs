@@ -227,6 +227,9 @@ actions!(
         /// Fork-local: Focused Thread. Toggles between folding the agent's work
         /// into Activity lines and laying all of it out.
         ToggleThreadDisplay,
+        /// Fork-local: Thread Outline. Lists your own messages in this thread so
+        /// you can go to one instead of scrolling for it.
+        ToggleThreadOutline,
         /// Toggles the profile or mode selector for switching between agent profiles.
         ToggleProfileSelector,
         /// Cycles through available session modes.
@@ -677,6 +680,9 @@ pub fn init(
     })
     .detach();
     cx.observe_new(ManageProfilesModal::register).detach();
+    // Fork-local: Thread Outline.
+    cx.observe_new(conversation_view::thread_outline::ThreadOutline::register)
+        .detach();
     cx.observe_new(|workspace: &mut Workspace, _window, _cx| {
         workspace.register_action(
             |workspace: &mut Workspace,
