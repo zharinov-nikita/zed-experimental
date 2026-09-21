@@ -218,9 +218,11 @@ impl Activity {
     }
 }
 
-/// Fewer tool calls than this in a run and nothing is folded: wrapping one line
-/// in another line buys nothing and costs a click.
-const MINIMUM_TOOL_CALLS: usize = 2;
+/// A run needs this many tool calls before it is folded. One is enough: a tool
+/// call is not one line. A terminal call prints its whole command in its
+/// header, which no collapse hides, so a single `python - <<EOF` can be thirty
+/// lines of the thread on its own.
+const MINIMUM_TOOL_CALLS: usize = 1;
 
 /// The Activities of a thread, in order, none of them overlapping.
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
@@ -408,7 +410,9 @@ mod tests {
     }
 
     #[test]
-    fn a_lone_tool_call_is_left_alone() {
+    fn a_lone_tool_call_folds_too() {
+        // What the agent says between its actions ends a run, so most runs hold
+        // exactly one call. Leaving those alone left the thread as it was.
         let activities = ThreadActivities::new([
             EntryRole::Silent,
             tool("a", ActivityToolKind::Edit),
@@ -416,7 +420,11 @@ mod tests {
             EntryRole::Break,
         ]);
 
-        assert!(activities.is_empty());
+        assert_eq!(ranges(&activities), vec![0..3]);
+        assert_eq!(
+            activities.at(1).unwrap().counts,
+            vec![(ActivityToolKind::Edit, 1)]
+        );
     }
 
     #[test]
