@@ -13,6 +13,8 @@ description: Build, run, and manage local Zed instances on Windows - release-fas
 - **Release channel** is `dev` (`crates/zed/RELEASE_CHANNEL`). For Dev: auto-update is disabled and the Windows single-instance check is skipped entirely (`crates/zed/src/main.rs` ~line 359) — multiple local instances run concurrently out of the box. Do not change the channel: preview/stable builds re-enable the single-instance mutex (`Zed-Editor-<Channel>-Instance-Mutex`) and auto-update.
 - **Icon embedding**: the exe/taskbar icon is embedded at build time from `crates/zed/resources/windows/app-icon-dev.ico` by `crates/windows_resources/src/windows_resources.rs` (resource ID 1; channel unset → dev arm). The About window uses `include_bytes!` of `crates/zed/resources/app-icon-dev.png` (`crates/zed/src/zed.rs`, `about_window_icon`). No code changes needed to swap icons.
   - **Gotcha**: after replacing icon files, update the mtime of `crates/zed/build.rs` (`(Get-Item crates\zed\build.rs).LastWriteTime = Get-Date`) — its build script only emits `rerun-if-env-changed`, so cargo may not re-embed resources otherwise.
+- **Standing verification worktree**: `..\zed-check` on branch `check` = `zed-experimental` plus one commit that recolors the dev icon green. It exists so a change can be looked at without replacing the working build. **Crimson = main checkout (including the release install at `C:\Users\Public\Zed-Experimental`); green = `zed-check`.** Never build a release from `zed-check` — it would come out green and the two builds become indistinguishable. Refresh it with `git rebase zed-experimental` inside the worktree: the icon commit replays on top, so it never reaches `zed-experimental`. Its data dir is `%LOCALAPPDATA%\Zed-Local\check`.
+- **A rebuild needs the running instance stopped first**: Windows holds `zed.exe` open, so cargo fails with `error: failed to remove file ... Access is denied. (os error 5)`. Stop the process, then build.
 - **Local-only commits**: this branch carries local commits (crimson dev icons, `script/new-worktree.ps1`, this skill). Never push them; when preparing a PR, branch from `origin/main` or cherry-pick around them.
 - **Data isolation**: by default all instances share `%LOCALAPPDATA%\Zed` (sqlite with 500ms busy timeout and a silent in-memory fallback, window state, extensions — they race). For independent instances pass `--user-data-dir <dir>`; config is then read from `<dir>\config` (a junction to `%APPDATA%\Zed` keeps settings/keymaps shared while DB/state/extensions stay isolated). `state_dir`/`temp_dir` remain global but are PID-keyed — no conflicts.
 
@@ -60,7 +62,7 @@ Shift is in 0–255 hue units. Source blue ≈ 220°; formula: `shift = round(((
 | crimson (current main) | 89 |
 | pure red | 96 |
 | orange | 121 |
-| green | 185 |
+| green (taken: worktree `zed-check`) | 185 |
 | teal | 213 |
 | purple | 43 |
 | magenta | 57 |

@@ -9,7 +9,7 @@ cargo run --profile release-fast          # собрать и запустить
 cargo build --profile release-fast --package zed   # только собрать
 ```
 
-- Бинарник: `target\release-fast\zed.exe` — **малиновая иконка** = ваша локальная сборка.
+- Бинарник: `target\release-fast\zed.exe` — **малиновая иконка** = сборка из главного чекаута.
 - Профиль `release-fast`: оптимизации как в release, но линкуется быстро (без LTO). Задача есть и в Zed: `.zed/tasks.json`.
 - ⚠️ Не задавайте глобальный `RUSTFLAGS` — сломает сборку (перебьёт обязательные флаги из `.cargo/config.toml`).
 
@@ -28,9 +28,33 @@ cargo run --profile release-fast -- --user-data-dir "$env:LOCALAPPDATA\Zed-Local
 
 Несколько экземпляров Zed работают одновременно и независимо (dev-канал не имеет single-instance блокировки). Первая сборка нового worktree — почти холодная, ~35–40 мин (sccache попадает в кеш лишь на ~27%: workspace-крейты привязаны к абсолютному пути); дальше пересборки в worktree быстрые. Удаление: `git worktree remove --force ..\zed-фича1` + удалить data-dir (в git включён `core.longpaths`, без него удаление падает на глубоких путях `target\`).
 
+## Проверочная сборка `zed-check`
+
+Постоянный worktree рядом с главным чекаутом — чтобы смотреть свежую фичу глазами, не подменяя рабочую сборку.
+
+| | Главный чекаут | Проверочный worktree |
+|---|---|---|
+| Путь | `projects\zed-experimental` | `projects\zed-check` |
+| Ветка | `zed-experimental` | `check` |
+| Иконка | малиновая | зелёная |
+| Data-dir | `%LOCALAPPDATA%\Zed` | `%LOCALAPPDATA%\Zed-Local\check` |
+| Для чего | release, повседневная работа | посмотреть правку и выбросить |
+
+```powershell
+# подтянуть свежие коммиты в проверочную и пересобрать
+cd ..\zed-check
+git rebase zed-experimental        # коммит с зелёной иконкой переедет наверх
+cargo build --profile release-fast --package zed
+.\target\release-fast\zed.exe --user-data-dir "$env:LOCALAPPDATA\Zed-Local\check"
+```
+
+- ⚠️ **Release собирать только из `zed-experimental`.** Сборка из `zed-check` получит зелёную иконку, и два билда станет не различить.
+- ⚠️ Перед пересборкой закрыть запущенный экземпляр: Windows держит `zed.exe`, и cargo падает с `Access is denied (os error 5)`.
+- Коммит с зелёной иконкой живёт только на ветке `check` и в `zed-experimental` не попадает — `git rebase` каждый раз переносит его наверх.
+
 ## Иконки
 
-- Цвета официальных каналов: чёрный = stable, синий = preview, тёмно-фиолетовый = nightly, серый = обычный dev. Локальная сборка — **малиновый**.
+- Цвета официальных каналов: чёрный = stable, синий = preview, тёмно-фиолетовый = nightly, серый = обычный dev. Занято форком: **малиновый** — главный чекаут, **зелёный** — worktree `zed-check`.
 - Перекрасить (например, свой цвет для worktree): см. секцию Recolor в `.claude/skills/zed-local/SKILL.md` (скрипт `recolor.py`, сдвиг тона от preview-иконки).
 - После замены иконки перед сборкой: `(Get-Item crates\zed\build.rs).LastWriteTime = Get-Date` — иначе cargo может не перевстроить ресурсы.
 
