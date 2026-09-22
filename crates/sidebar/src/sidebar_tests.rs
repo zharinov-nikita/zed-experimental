@@ -15240,3 +15240,45 @@ async fn test_find_or_create_workspace_returns_the_created_remote_workspace(
         "the local workspace should have re-activated during the open"
     );
 }
+
+#[gpui::test]
+async fn test_create_worktree_entry_foregrounds_new_checkout(cx: &mut TestAppContext) {
+    let (project, _fs) = init_test_project_with_git("/project", cx).await;
+    project
+        .update(cx, |project, cx| project.git_scans_complete(cx))
+        .await;
+
+    let (multi_workspace, cx) =
+        cx.add_window_view(|window, cx| MultiWorkspace::test_new(project.clone(), window, cx));
+    multi_workspace.update(cx, |multi_workspace, cx| {
+        multi_workspace.retain_active_workspace(cx);
+    });
+    let sidebar = setup_sidebar(&multi_workspace, cx);
+
+    let main_workspace =
+        multi_workspace.read_with(cx, |multi_workspace, _| multi_workspace.workspace().clone());
+    let main_paths = cx.update(|_window, cx| workspace_path_list(&main_workspace, cx));
+    sidebar.update_in(cx, |sidebar, window, cx| {
+        sidebar.create_isolated_thread(
+            &main_workspace,
+            NewWorktreeBranchTarget::CurrentBranch,
+            window,
+            cx,
+        );
+    });
+    cx.run_until_parked();
+
+    let active_workspace =
+        multi_workspace.read_with(cx, |multi_workspace, _| multi_workspace.workspace().clone());
+    assert_ne!(
+        active_workspace, main_workspace,
+        "creating a Checkout should foreground the new workspace"
+    );
+
+    let active_paths = cx.update(|_window, cx| workspace_path_list(&active_workspace, cx));
+    assert_ne!(
+        active_paths.paths(),
+        main_paths.paths(),
+        "the foregrounded workspace should be rooted in the new Checkout"
+    );
+}

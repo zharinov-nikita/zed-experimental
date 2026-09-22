@@ -162,3 +162,19 @@ cargo run --profile release-fast -- --user-data-dir "$env:LOCALAPPDATA\Zed-Local
 ## Ветки и форк
 
 Это личный экспериментальный форк `zharinov-nikita/zed-experimental`; PR в оригинальный Zed не планируются. Иконки, `script/new-worktree.ps1`, skill и этот файл коммитятся в ветку `zed-experimental` и пушатся в форк. `main` — чистое зеркало апстрима, свои коммиты туда не добавлять.
+
+## Isolated Thread (фича форка)
+
+Пункты «Create New Worktree… → Based on …» в меню `+` на заголовке проекта в сайдбаре теперь не только
+создают linked worktree (Checkout), но и открывают в нём новый тред. Раньше меню `+` — меню создания треда —
+на этих пунктах останавливалось на worktree, и тред приходилось создавать вторым кликом.
+
+Код: `create_isolated_thread_in_workspace` в `crates/sidebar/src/sidebar.rs` и
+`create_worktree_workspace_foreground` в `crates/git_ui_core/src/worktree_service.rs` (публичный вариант
+`handle_create_worktree`, отдающий `Task` с новым воркспейсом). Всё остальное — апстримное: перенос открытых
+файлов и доков на новый корень, хук `create_worktree` для настройки, чипы worktree и ветки у треда в сайдбаре,
+архивирование треда с сохранением WIP-коммитов и удалением Checkout с диска, восстановление при restore.
+
+Checkout создаётся в detached HEAD (ADR 0006), имя выбирает Zed, директория — настройка `git.worktree_directory`
+(дефолт `../worktrees`). Возврат работы в основную ветку — вручную обычным git. Словарь: **Checkout**,
+**Isolated Thread**, **Bring In** в `CONTEXT.md`.

@@ -169,3 +169,17 @@ _Avoid_: Turn, round, pair, block, conversation
 **Thread Outline**:
 The list of a Thread's Exchanges, opened over the window to pick one and go to it. It shows the user's own words and nothing else — newest first until the user types, then best match first — and narrows as they type. Picking an Exchange puts the user's message at the top of the Thread.
 _Avoid_: Palette, index, minimap, table of contents, jump list
+
+### Isolated Thread (adjacent feature, designed after Thread Outline)
+
+**Checkout**:
+The copy of a project's files a Thread works in. Its own, so that what the agent does for one Thread never shows up in the files the user is reading. Backed by a git worktree, but the user is never asked to think about one.
+_Avoid_: Worktree, workspace, clone, sandbox, branch
+
+**Isolated Thread**:
+A Thread that owns a Checkout of its own. Its opposite is a Thread that works in the project the user has open, which is what every Thread does today. Which one a Thread is, is decided when it is made and never changes.
+_Avoid_: Isolated Workspace, parallel agent, background thread, detached thread
+
+**Bring In**:
+Moving what an Isolated Thread did in its Checkout into the project the user works in. Until it happens the user's files are untouched, and it is always the user who does it.
+_Avoid_: Merge, apply, land, sync, integrate

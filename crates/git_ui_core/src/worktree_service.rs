@@ -752,6 +752,28 @@ pub fn create_worktree_workspace(
     )
 }
 
+/// Same as [`handle_create_worktree`] — foreground, with the source
+/// workspace's open files and dock layout transferred — but hands back the
+/// task so the caller can act on the new workspace once it is open. Used by
+/// the sidebar to start a thread inside a Checkout it just created.
+pub fn create_worktree_workspace_foreground(
+    workspace: &mut Workspace,
+    action: &zed_actions::CreateWorktree,
+    window: &mut gpui::Window,
+    fallback_focused_dock: Option<DockPosition>,
+    cx: &mut gpui::Context<Workspace>,
+) -> Task<anyhow::Result<CreatedWorktreeWorkspace>> {
+    create_worktree_workspace_inner(
+        workspace,
+        action,
+        window,
+        fallback_focused_dock,
+        RemoteBranchFetchMode::Fetch,
+        true,
+        cx,
+    )
+}
+
 fn create_worktree_workspace_inner(
     workspace: &mut Workspace,
     action: &zed_actions::CreateWorktree,
