@@ -734,6 +734,28 @@ enum DefaultBranchCache {
     Resolved(Option<RemoteBranchName>),
 }
 
+// Mirrors the behavior of the worktree picker's "Create new worktree" entries.
+fn create_worktree_in_workspace(
+    workspace: &Entity<Workspace>,
+    branch_target: NewWorktreeBranchTarget,
+    window: &mut Window,
+    cx: &mut App,
+) {
+    workspace.update(cx, |workspace, cx| {
+        let focused_dock = workspace.focused_dock_position(window, cx);
+        git_ui_core::worktree_service::handle_create_worktree(
+            workspace,
+            &CreateWorktree {
+                worktree_name: None,
+                branch_target,
+            },
+            window,
+            focused_dock,
+            cx,
+        );
+    });
+}
+
 /// The sidebar re-derives its entire entry list from scratch on every
 /// change via `update_entries` → `rebuild_contents`. Avoid adding
 /// incremental or inter-event coordination state — if something can
@@ -2683,17 +2705,13 @@ impl Sidebar {
                                     );
                                     let branch_target = target.branch_target();
                                     let workspace = base_workspace.clone();
-                                    let this = this.clone();
                                     submenu = submenu.entry(label, None, move |window, cx| {
-                                        this.update(cx, |sidebar, cx| {
-                                            sidebar.create_isolated_thread(
-                                                &workspace,
-                                                branch_target.clone(),
-                                                window,
-                                                cx,
-                                            );
-                                        })
-                                        .ok();
+                                        create_worktree_in_workspace(
+                                            &workspace,
+                                            branch_target.clone(),
+                                            window,
+                                            cx,
+                                        );
                                     });
                                 }
 
@@ -6937,47 +6955,6 @@ impl Sidebar {
         }
 
         self.update_entries(cx);
-    }
-
-    // Creates a Checkout and starts an entry in it. These menu entries sit in
-    // the project header's `+` menu, which the user reaches asking for a new
-    // thread, so stopping at the worktree would leave them one click short.
-    fn create_isolated_thread(
-        &mut self,
-        workspace: &Entity<Workspace>,
-        branch_target: NewWorktreeBranchTarget,
-        window: &mut Window,
-        cx: &mut Context<Self>,
-    ) {
-        // The linked worktree joins the project group of the checkout it was
-        // made from, so the new entry appears under the group whose menu the
-        // user opened.
-        let key = workspace.read(cx).project_group_key(cx);
-        let creation = workspace.update(cx, |workspace, cx| {
-            let focused_dock = workspace.focused_dock_position(window, cx);
-            git_ui_core::worktree_service::create_worktree_workspace_foreground(
-                workspace,
-                &CreateWorktree {
-                    worktree_name: None,
-                    branch_target,
-                },
-                window,
-                focused_dock,
-                cx,
-            )
-        });
-
-        cx.spawn_in(window, async move |this, cx| {
-            let created = creation.await?;
-            this.update_in(cx, |this, window, cx| {
-                this.set_group_expanded(&key, true, cx);
-                this.selection = None;
-                // `create_new_entry`, not `create_new_thread`, so the entry
-                // this opens matches what the rest of the `+` menu opens.
-                this.create_new_entry(&created.workspace, window, cx);
-            })
-        })
-        .detach_and_log_err(cx);
     }
 
     fn create_new_entry(
