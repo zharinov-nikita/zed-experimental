@@ -5,6 +5,7 @@
 //! This crate has no GPUI dependency. The agent panel drives it from a
 //! background task and receives `DictationEvent`s over a channel.
 
+use std::io::Read as _;
 use std::num::NonZero;
 use std::ops::Range;
 use std::path::{Path, PathBuf};
@@ -12,7 +13,7 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::mpsc;
 use std::sync::{Arc, Mutex, OnceLock};
 use std::thread::{self, JoinHandle};
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 use anyhow::{Context as _, Result, anyhow};
 use audio::RodioExt as _;
@@ -125,7 +126,9 @@ pub struct Transcriber {
 
 impl Transcriber {
     pub fn load(config: &EngineConfig) -> Result<Self> {
+        let started = Instant::now();
         init_backends(config.backends_dir.as_deref())?;
+        let backends_ready = Instant::now();
         if !config.model_path.is_file() {
             return Err(anyhow!(
                 "dictation model not found: {}",
@@ -136,8 +139,16 @@ impl Transcriber {
             backend: Backend::Auto,
             ..Default::default()
         };
+        if let Err(error) = prefetch_model(&config.model_path) {
+            log::warn!(
+                "dictation: prefetching {} failed, loading it cold: {error}",
+                config.model_path.display()
+            );
+        }
+        let prefetched = Instant::now();
         let model = Model::load_with(&config.model_path, &model_options)
             .with_context(|| format!("loading {}", config.model_path.display()))?;
+        let model_ready = Instant::now();
         let mut session_options = SessionOptions::default();
         if config.threads > 0 {
             session_options.n_threads = config.threads as i32;
@@ -167,12 +178,20 @@ impl Transcriber {
             })),
             ..Default::default()
         };
+        // Model Loading is the one wait the user sits through before every
+        // first dictation, so the log carries the split: a slow start is
+        // either the backend modules, the model bytes or the session.
         log::info!(
-            "dictation: loaded {} ({} / {}) on backend {}",
+            "dictation: loaded {} ({} / {}) on backend {} in {:.0} ms              (backends {:.0} ms, prefetch {:.0} ms, model {:.0} ms, session {:.0} ms)",
             config.model_path.display(),
             model.arch(),
             model.variant(),
-            model.backend()
+            model.backend(),
+            started.elapsed().as_secs_f64() * 1000.0,
+            backends_ready.duration_since(started).as_secs_f64() * 1000.0,
+            prefetched.duration_since(backends_ready).as_secs_f64() * 1000.0,
+            model_ready.duration_since(prefetched).as_secs_f64() * 1000.0,
+            model_ready.elapsed().as_secs_f64() * 1000.0,
         );
         Ok(Self {
             model,
@@ -274,6 +293,26 @@ impl Transcriber {
 static BACKENDS: OnceLock<Result<(), String>> = OnceLock::new();
 
 /// Backend registration is a process-wide, once-only operation in transcribe.cpp.
+/// Reads the model file end to end so its pages are in the operating system's
+/// cache before the engine asks for them. The engine's own read leaves the
+/// disk idle between requests: on the author's NVMe the same file reads
+/// sequentially at ~1950 MB/s but loads at ~450 MB/s, which turns a cold
+/// 1.1 GB model into a 3.4 s wait instead of 1.5 s. A build or anything else
+/// that fills the cache puts the model back on the cold path, so this runs
+/// before every load; when the pages are already there it costs a copy.
+fn prefetch_model(path: &Path) -> std::io::Result<()> {
+    let mut file = std::fs::File::open(path)?;
+    let mut buffer = vec![0u8; 8 * 1024 * 1024];
+    loop {
+        match file.read(&mut buffer) {
+            Ok(0) => return Ok(()),
+            Ok(_) => {}
+            Err(error) if error.kind() == std::io::ErrorKind::Interrupted => {}
+            Err(error) => return Err(error),
+        }
+    }
+}
+
 fn init_backends(dir: Option<&Path>) -> Result<()> {
     let result = BACKENDS.get_or_init(|| {
         let outcome = match dir {
