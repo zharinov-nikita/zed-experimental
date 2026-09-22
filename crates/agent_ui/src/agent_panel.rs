@@ -50,9 +50,9 @@ use crate::{
 };
 use crate::{
     AgentDiffPane, ConversationView, CopyThreadToClipboard, Follow, LoadThreadFromClipboard,
-    NewTerminalThread, NewThread, OpenActiveThreadAsMarkdown, OpenAgentDiff, ResetFastModeWarnings,
-    ResetTrialEndUpsell, ResetTrialUpsell, ShowAllSidebarThreadMetadata, ShowThreadMetadata,
-    ToggleNewThreadMenu, ToggleOptionsMenu, ToggleThreadDisplay,
+    LogThreadFold, NewTerminalThread, NewThread, OpenActiveThreadAsMarkdown, OpenAgentDiff,
+    ResetFastModeWarnings, ResetTrialEndUpsell, ResetTrialUpsell, ShowAllSidebarThreadMetadata,
+    ShowThreadMetadata, ToggleNewThreadMenu, ToggleOptionsMenu, ToggleThreadDisplay,
     conversation_view::{
         AcpThreadViewEvent, RootThreadUpdated, ThreadView, reset_fast_mode_warnings,
     },
@@ -463,6 +463,15 @@ pub fn init(cx: &mut App) {
                     }
                 })
                 // Fork-local: Focused Thread.
+                .register_action(|workspace, _: &LogThreadFold, _window, cx| {
+                    let Some(thread_view) = workspace
+                        .panel::<AgentPanel>(cx)
+                        .and_then(|panel| panel.read(cx).active_thread_view(cx))
+                    else {
+                        return;
+                    };
+                    thread_view.update(cx, |thread_view, cx| thread_view.log_fold_state(cx));
+                })
                 .register_action(|workspace, _: &ToggleThreadDisplay, window, cx| {
                     if let Some(panel) = workspace.panel::<AgentPanel>(cx) {
                         panel.update(cx, |panel, cx| {
@@ -7190,6 +7199,318 @@ mod tests {
 
         fn into_any(self: Rc<Self>) -> Rc<dyn Any> {
             self
+        }
+    }
+
+    /// Fork-local: Focused Thread. The agent speaks while the reader clicks:
+    /// a thought that later gains text turns from something an Activity folds
+    /// over into something that ends it, which moves where the Activity starts
+    /// — and its key with it.
+    #[gpui::test]
+    async fn test_activity_closes_after_the_agent_speaks_mid_run(cx: &mut TestAppContext) {
+        init_test(cx);
+        cx.update(|cx| {
+            agent::ThreadStore::init_global(cx);
+            language_model::LanguageModelRegistry::test(cx);
+        });
+
+        let fs = FakeFs::new(cx.executor());
+        let project = Project::test(fs, [], cx).await;
+        let multi_workspace =
+            cx.add_window(|window, cx| MultiWorkspace::test_new(project.clone(), window, cx));
+        let workspace = multi_workspace
+            .read_with(cx, |multi_workspace, _cx| {
+                multi_workspace.workspace().clone()
+            })
+            .unwrap();
+        let cx = &mut VisualTestContext::from_window(multi_workspace.into(), cx);
+        cx.simulate_resize(size(px(900.), px(700.)));
+
+        let connection = StubAgentConnection::new();
+        let panel = workspace.update_in(cx, |workspace, window, cx| {
+            let panel = cx.new(|cx| AgentPanel::new(workspace, window, cx));
+            workspace.add_panel(panel.clone(), window, cx);
+            workspace.focus_panel::<AgentPanel>(window, cx);
+            panel
+        });
+        open_thread_with_connection(&panel, connection.clone(), cx);
+        panel.update_in(cx, |panel, window, cx| {
+            panel.toggle_zoom(&ToggleZoom, window, cx);
+        });
+        cx.run_until_parked();
+
+        let session_id = active_session_id(&panel, cx);
+        let send = |update: acp::SessionUpdate, cx: &mut VisualTestContext| {
+            let session_id = session_id.clone();
+            let connection = connection.clone();
+            cx.update(|_window, cx| connection.send_update(session_id, update, cx));
+            cx.run_until_parked();
+        };
+        let completed_call = |id: &str, title: &str| {
+            acp::SessionUpdate::ToolCall(
+                acp::ToolCall::new(acp::ToolCallId::new(id), title)
+                    .kind(acp::ToolKind::Read)
+                    .status(acp::ToolCallStatus::Completed),
+            )
+        };
+
+        // A thought between two calls is folded over, not a break, so all three
+        // entries belong to one Activity keyed by the first call.
+        send(completed_call("speaks-1", "Read one"), cx);
+        send(
+            acp::SessionUpdate::AgentThoughtChunk(acp::ContentChunk::new("thinking".into())),
+            cx,
+        );
+        send(completed_call("speaks-2", "Read two"), cx);
+
+        let first_call = acp::ToolCallId::new("speaks-1");
+        let thread_view = panel.read_with(cx, |panel, cx| panel.active_thread_view(cx).unwrap());
+        assert!(
+            cx.debug_bounds("thread-entry-0-folded").is_some()
+                && cx.debug_bounds("thread-entry-2-folded").is_some(),
+            "both calls should start folded into one Activity"
+        );
+
+        // The reader opens it.
+        thread_view.update_in(cx, |thread_view, window, cx| {
+            thread_view.toggle_activity_expansion(&first_call, window, cx);
+        });
+        cx.run_until_parked();
+        assert!(
+            cx.debug_bounds("thread-entry-0-shown").is_some(),
+            "opening the Activity should lay it out"
+        );
+
+        // While it is open the agent starts speaking, which ends the run where
+        // the thought sits and moves the Activity's start onto the second call.
+        send(
+            acp::SessionUpdate::AgentMessageChunk(acp::ContentChunk::new("and here is why".into())),
+            cx,
+        );
+
+        // The reader clicks the same line again to close it.
+        thread_view.update_in(cx, |thread_view, window, cx| {
+            thread_view.toggle_activity_expansion(&first_call, window, cx);
+        });
+        cx.run_until_parked();
+
+        assert!(
+            cx.debug_bounds("thread-entry-0-shown").is_none(),
+            "closing the Activity should fold it away even though the agent spoke mid-run"
+        );
+    }
+
+    /// Fork-local: Focused Thread. Built while chasing a report that folding
+    /// stops working after a few clicks. It covers the obvious path — a mode
+    /// round-trip, a turn in flight, and three open/close rounds — and stays
+    /// green, so whatever breaks in the real panel is not in here yet.
+    #[gpui::test]
+    async fn test_activity_keeps_folding_through_mode_changes_and_toggles(cx: &mut TestAppContext) {
+        init_test(cx);
+        cx.update(|cx| {
+            agent::ThreadStore::init_global(cx);
+            language_model::LanguageModelRegistry::test(cx);
+        });
+
+        let fs = FakeFs::new(cx.executor());
+        let project = Project::test(fs, [], cx).await;
+        let multi_workspace =
+            cx.add_window(|window, cx| MultiWorkspace::test_new(project.clone(), window, cx));
+        let workspace = multi_workspace
+            .read_with(cx, |multi_workspace, _cx| {
+                multi_workspace.workspace().clone()
+            })
+            .unwrap();
+        let cx = &mut VisualTestContext::from_window(multi_workspace.into(), cx);
+        cx.simulate_resize(size(px(900.), px(700.)));
+
+        let connection = StubAgentConnection::new();
+        let panel = workspace.update_in(cx, |workspace, window, cx| {
+            let panel = cx.new(|cx| AgentPanel::new(workspace, window, cx));
+            workspace.add_panel(panel.clone(), window, cx);
+            workspace.focus_panel::<AgentPanel>(window, cx);
+            panel
+        });
+        open_thread_with_connection(&panel, connection.clone(), cx);
+
+        let session_id = active_session_id(&panel, cx);
+        let first_tool_call_id = acp::ToolCallId::new("activity-toggle-1");
+        for (id, title) in [
+            (first_tool_call_id.clone(), "Read one"),
+            (acp::ToolCallId::new("activity-toggle-2"), "Read two"),
+            (acp::ToolCallId::new("activity-toggle-3"), "Read three"),
+        ] {
+            cx.update(|_window, cx| {
+                connection.send_update(
+                    session_id.clone(),
+                    acp::SessionUpdate::ToolCall(
+                        acp::ToolCall::new(id.clone(), title)
+                            .kind(acp::ToolKind::Read)
+                            .status(acp::ToolCallStatus::InProgress),
+                    ),
+                    cx,
+                );
+                connection.send_update(
+                    session_id.clone(),
+                    acp::SessionUpdate::ToolCallUpdate(acp::ToolCallUpdate::new(
+                        id,
+                        acp::ToolCallUpdateFields::new()
+                            .status(acp::ToolCallStatus::Completed)
+                            .content(vec![acp::ToolCallContent::Content(acp::Content::new(
+                                acp::ContentBlock::Text(acp::TextContent::new(
+                                    "tool output text".to_string(),
+                                )),
+                            ))]),
+                    )),
+                    cx,
+                );
+            });
+            cx.run_until_parked();
+        }
+
+        // The dock is too narrow to lay the thread out; zooming gives the list
+        // the whole window, as the neighbouring tool-call test does.
+        panel.update_in(cx, |panel, window, cx| {
+            panel.toggle_zoom(&ToggleZoom, window, cx);
+        });
+        cx.run_until_parked();
+
+        let thread_view = panel.read_with(cx, |panel, cx| panel.active_thread_view(cx).unwrap());
+
+        let folded = |cx: &mut VisualTestContext| {
+            cx.debug_bounds("thread-entry-0-folded").is_some()
+                && cx.debug_bounds("thread-entry-1-folded").is_some()
+                && cx.debug_bounds("thread-entry-2-folded").is_some()
+        };
+        let laid_out = |cx: &mut VisualTestContext| {
+            cx.debug_bounds("thread-entry-0-shown").is_some()
+                && cx.debug_bounds("thread-entry-1-shown").is_some()
+                && cx.debug_bounds("thread-entry-2-shown").is_some()
+        };
+
+        assert!(
+            folded(cx),
+            "three completed tool calls in a row should start folded into one Activity"
+        );
+
+        // Control: in Full the same probes report the entries laid out, so
+        // "folded" is a real reading rather than a thread that never drew.
+        panel.update_in(cx, |panel, _window, cx| {
+            panel.thread_display_override = Some(ThreadDisplay::Full);
+            cx.notify();
+        });
+        cx.run_until_parked();
+        assert!(
+            laid_out(cx),
+            "control: in Full every tool call should be laid out"
+        );
+
+        panel.update_in(cx, |panel, _window, cx| {
+            panel.thread_display_override = Some(ThreadDisplay::Focused);
+            cx.notify();
+        });
+        cx.run_until_parked();
+        assert!(
+            folded(cx),
+            "going back to Focused should fold the tool calls away again"
+        );
+
+        // Now with the agent working: a call in flight is what the thread looks
+        // like when the fold is said to stop working.
+        connection.set_next_prompt_updates(vec![acp::SessionUpdate::ToolCall(
+            acp::ToolCall::new(acp::ToolCallId::new("activity-toggle-live"), "Run one")
+                .kind(acp::ToolKind::Execute)
+                .status(acp::ToolCallStatus::InProgress),
+        )]);
+        send_message(&panel, cx);
+        cx.run_until_parked();
+        assert!(
+            folded(cx),
+            "a turn starting should not unfold the Activity behind it"
+        );
+
+        // A call carrying a card is what makes opening an Activity do more than
+        // reveal rows: it also expands the cards inside it.
+        cx.update(|_window, cx| {
+            connection.send_update(
+                session_id.clone(),
+                acp::SessionUpdate::ToolCall(
+                    acp::ToolCall::new(acp::ToolCallId::new("activity-toggle-edit"), "Edit a file")
+                        .kind(acp::ToolKind::Edit)
+                        .status(acp::ToolCallStatus::Completed)
+                        .content(vec![acp::ToolCallContent::Diff(
+                            acp::Diff::new("/project/a.txt", "new").old_text("old"),
+                        )]),
+                ),
+                cx,
+            );
+        });
+        cx.run_until_parked();
+
+        // The report: open the Activity the agent is adding to, close it again,
+        // and the work that arrives afterwards stops folding.
+        let live_activity_id = acp::ToolCallId::new("activity-toggle-live");
+        for _ in 0..2 {
+            thread_view.update_in(cx, |thread_view, window, cx| {
+                thread_view.toggle_activity_expansion(&live_activity_id, window, cx);
+            });
+            cx.run_until_parked();
+        }
+        assert!(
+            folded(cx),
+            "opening and closing should leave the fold as it was"
+        );
+
+        for (id, title) in [
+            (acp::ToolCallId::new("activity-toggle-after-1"), "Read four"),
+            (acp::ToolCallId::new("activity-toggle-after-2"), "Read five"),
+        ] {
+            cx.update(|_window, cx| {
+                connection.send_update(
+                    session_id.clone(),
+                    acp::SessionUpdate::ToolCall(
+                        acp::ToolCall::new(id.clone(), title)
+                            .kind(acp::ToolKind::Read)
+                            .status(acp::ToolCallStatus::InProgress),
+                    ),
+                    cx,
+                );
+                connection.send_update(
+                    session_id.clone(),
+                    acp::SessionUpdate::ToolCallUpdate(acp::ToolCallUpdate::new(
+                        id,
+                        acp::ToolCallUpdateFields::new().status(acp::ToolCallStatus::Completed),
+                    )),
+                    cx,
+                );
+            });
+            cx.run_until_parked();
+        }
+
+        assert!(
+            cx.debug_bounds("thread-entry-6-folded").is_some()
+                && cx.debug_bounds("thread-entry-7-folded").is_some(),
+            "work arriving after an open and close should fold like the rest"
+        );
+
+        for round in 1..=3 {
+            thread_view.update_in(cx, |thread_view, window, cx| {
+                thread_view.toggle_activity_expansion(&first_tool_call_id, window, cx);
+            });
+            cx.run_until_parked();
+            assert!(
+                laid_out(cx),
+                "round {round}: opening the Activity should lay its tool calls out"
+            );
+
+            thread_view.update_in(cx, |thread_view, window, cx| {
+                thread_view.toggle_activity_expansion(&first_tool_call_id, window, cx);
+            });
+            cx.run_until_parked();
+            assert!(
+                folded(cx),
+                "round {round}: closing the Activity should fold its tool calls away again"
+            );
         }
     }
 

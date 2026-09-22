@@ -100,6 +100,16 @@ impl EntryViewState {
         self.expanded_activities.contains(key)
     }
 
+    /// Fork-local: Focused Thread. For the fold-state log.
+    pub(crate) fn expanded_activity_keys(&self) -> impl Iterator<Item = &acp::ToolCallId> {
+        self.expanded_activities.iter()
+    }
+
+    /// Fork-local: Focused Thread. For the fold-state log.
+    pub(crate) fn expanded_tool_call_ids(&self) -> impl Iterator<Item = &acp::ToolCallId> {
+        self.expanded_tool_calls.iter()
+    }
+
     pub(crate) fn toggle_activity_expansion(&mut self, key: &acp::ToolCallId) {
         if !self.expanded_activities.remove(key) {
             self.expanded_activities.insert(key.clone());

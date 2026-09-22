@@ -6664,7 +6664,16 @@ impl ThreadView {
                 if let Some(entry) = entries.get(index) {
                     // Fork-local: Focused Thread.
                     let activity = this.activities.starts_at(index).cloned();
-                    let rendered = match this.entry_fold(index, entry, cx) {
+                    let fold = this.entry_fold(index, entry, cx);
+                    // Names what the fold decided, so a test can read the
+                    // decision instead of inferring it from what drew.
+                    let fold_name = match &fold {
+                        EntryFold::Shown => "shown",
+                        EntryFold::Folded => "folded",
+                        EntryFold::Line(CompactCall::Live { .. }) => "live",
+                        EntryFold::Line(CompactCall::Failed) => "failed",
+                    };
+                    let rendered = match fold {
                         EntryFold::Shown => {
                             this.render_entry(index, entries.len(), entry, window, cx)
                         }
@@ -6686,6 +6695,12 @@ impl ThreadView {
                             .into_any_element(),
                         None => rendered.into_any_element(),
                     };
+                    let rendered = div()
+                        .id(("thread-entry", index))
+                        .w_full()
+                        .debug_selector(move || format!("thread-entry-{index}-{fold_name}"))
+                        .child(rendered)
+                        .into_any_element();
                     centered_container(rendered).into_any_element()
                 } else if this.generating_indicator_in_list {
                     let confirmation = this.thread.read(cx).is_waiting_for_confirmation()
@@ -6793,6 +6808,68 @@ impl ThreadView {
             offset_in_item: px(0.),
         });
         cx.notify();
+    }
+
+    /// Fork-local: Focused Thread. Writes the whole fold decision to the log:
+    /// which Activities were built and from what, which of them the reader has
+    /// open, and what each entry was drawn as. Reading this beats guessing from
+    /// a screenshot when the fold misbehaves.
+    pub(crate) fn log_fold_state(&mut self, cx: &mut Context<Self>) {
+        self.refresh_activities(cx);
+
+        let thread = self.thread.clone();
+        let entries = thread.read(cx).entries();
+        let status = thread.read(cx).status();
+
+        log::info!(
+            "[thread-fold] display={:?} entries={} status={:?}",
+            self.thread_display,
+            entries.len(),
+            status
+        );
+
+        let entry_view_state = self.entry_view_state.read(cx);
+        log::info!(
+            "[thread-fold] activities open: {:?}",
+            entry_view_state
+                .expanded_activity_keys()
+                .map(|key| key.0.as_ref())
+                .collect::<Vec<_>>()
+        );
+        log::info!(
+            "[thread-fold] tool calls expanded: {:?}",
+            entry_view_state
+                .expanded_tool_call_ids()
+                .map(|id| id.0.as_ref())
+                .collect::<Vec<_>>()
+        );
+
+        for activity in self.activities.iter() {
+            log::info!(
+                "[thread-fold] activity key={} range={:?} open={} counts={:?}",
+                activity.key.0,
+                activity.range,
+                entry_view_state.is_activity_expanded(&activity.key),
+                activity.counts
+            );
+        }
+
+        for (entry_ix, entry) in entries.iter().enumerate() {
+            let kind = match entry {
+                AgentThreadEntry::UserMessage(_) => "user".to_string(),
+                AgentThreadEntry::AssistantMessage(_) => "assistant".to_string(),
+                AgentThreadEntry::ToolCall(tool_call) => {
+                    format!("tool {} {:?}", tool_call.id.0, tool_call.status)
+                }
+                AgentThreadEntry::Elicitation(_) => "question".to_string(),
+                AgentThreadEntry::CompletedPlan(_) => "plan".to_string(),
+                AgentThreadEntry::ContextCompaction(_) => "compaction".to_string(),
+            };
+            log::info!(
+                "[thread-fold] entry {entry_ix} {kind} -> {:?}",
+                self.entry_fold(entry_ix, entry, cx)
+            );
+        }
     }
 
     /// Fork-local: Focused Thread. What the list does with one entry.
@@ -7118,7 +7195,7 @@ impl ThreadView {
     }
 
     /// Fork-local: Focused Thread.
-    fn toggle_activity_expansion(
+    pub(crate) fn toggle_activity_expansion(
         &mut self,
         key: &acp::ToolCallId,
         window: &mut Window,

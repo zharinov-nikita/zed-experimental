@@ -230,6 +230,9 @@ actions!(
         /// Fork-local: Thread Outline. Lists your own messages in this thread so
         /// you can go to one instead of scrolling for it.
         ToggleThreadOutline,
+        /// Fork-local: Focused Thread. Writes what the thread folded and what it
+        /// left laid out to the log, for diagnosing a fold that misbehaves.
+        LogThreadFold,
         /// Toggles the profile or mode selector for switching between agent profiles.
         ToggleProfileSelector,
         /// Cycles through available session modes.
